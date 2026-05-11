@@ -1,0 +1,53 @@
+# ── GUI ──────────────────────────────────────────────
+PyQt6>=6.6.0
+PyQt6-Qt6>=6.6.0
+
+# ── Voice / Audio ────────────────────────────────────
+SpeechRecognition>=3.10.0
+faster-whisper>=1.0.0
+pyttsx3>=2.90
+vosk>=0.3.45               # Wake word (No API key needed)
+sounddevice>=0.4.6
+soundfile>=0.12.1
+numpy>=1.24.0
+
+# ── AI / NLP ─────────────────────────────────────────
+google-generativeai>=0.5.0
+openai>=1.0.0               # Optional fallback
+
+# ── Authentication ───────────────────────────────────
+bcrypt>=4.0.1
+
+# ── System Control ───────────────────────────────────
+pyautogui
+pygetwindow
+pyperclip
+pyttsx3
+pywin32>=306
+psutil>=5.9.0
+screen-brightness-control>=0.23.0
+pycaw>=20240210             # Windows audio control
+comtypes>=1.2.0
+
+# ── WhatsApp Automation ──────────────────────────────
+selenium>=4.18.0
+webdriver-manager>=4.0.0
+websockets>=12.0
+
+# ── Web / Search / APIs ──────────────────────────────
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+duckduckgo-search>=5.0.0
+pyowm>=3.3.0                # Weather
+
+# ── Utilities ────────────────────────────────────────
+python-dotenv>=1.0.0
+schedule>=1.2.0
+playsound==1.2.2
+keyboard>=0.13.5
+mouse>=0.7.1
+pyperclip>=1.8.2
+Pillow>=10.0.0
+rapidfuzz>=3.6.0
+phonetics>=1.0.5
+yt-dlp>=2024.1.1
