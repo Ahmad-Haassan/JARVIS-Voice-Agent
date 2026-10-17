@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>JARVIS Mobile Commander</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #020617;
+      --card-bg: rgba(15, 23, 42, 0.65);
+      --accent: #6366f1;
+      --accent-glow: rgba(99, 102, 241, 0.4);
+      --cyan: #00f2fe;
+      --cyan-glow: rgba(0, 242, 254, 0.35);
+      --text: #f8fafc;
+      --text-dim: #94a3b8;
+      --success: #10b981;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(circle at 50% 10%, rgba(99, 102, 241, 0.15) 0%, transparent 60%),
+        radial-gradient(circle at 80% 90%, rgba(0, 242, 254, 0.1) 0%, transparent 50%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: env(safe-area-inset-top, 20px) 16px env(safe-area-inset-bottom, 20px);
+      overflow-x: hidden;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 6px 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-logo {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--cyan), var(--accent));
+      box-shadow: 0 0 15px var(--cyan-glow);
+    }
+
+    .brand-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 1.25rem;
+      letter-spacing: 2px;
+      background: linear-gradient(90deg, #fff, #cbd5e1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--success);
+      letter-spacing: 0.5px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+      animation: pulse-dot 2s infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    /* Telemetry Bar */
+    .telemetry-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    .telemetry-card {
+      background: var(--card-bg);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      border-radius: 16px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .telemetry-label {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .telemetry-value {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    /* Glowing Cyber Orb Area */
+    .orb-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 0 30px;
+      position: relative;
+    }
+
+    .orb-container {
+      width: 220px;
+      height: 220px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      transition: all 0.3s ease;
+    }
+
+    .ring-outer {
+      width: 210px;
+      height: 210px;
+      border-top-color: var(--cyan);
+      border-bottom-color: var(--cyan);
+      box-shadow: 0 0 25px var(--cyan-glow);
+      animation: rotate-cw 8s linear infinite;
+    }
+
+    .ring-middle {
+      width: 170px;
+      height: 170px;
+      border-left-color: var(--accent);
+      border-right-color: var(--accent);
+      box-shadow: 0 0 20px var(--accent-glow);
+      animation: rotate-ccw 5s linear infinite;
+    }
+
+    .ring-inner {
+      width: 130px;
+      height: 130px;
+      border: 2px dashed rgba(255, 255, 255, 0.25);
+      animation: rotate-cw 12s linear infinite;
+    }
+
+    .orb-core {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #ffffff 0%, #6366f1 60%, #312e81 100%);
+      box-shadow: 0 0 30px var(--accent-glow), inset 0 0 15px rgba(255, 255, 255, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .orb-container:active .orb-core {
+      transform: scale(0.92);
+    }
+
+    .mic-icon {
+      width: 32px;
+      height: 32px;
+      fill: #ffffff;
+      filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
+    }
+
+    /* Listening and Processing Orb States */
+    .orb-container.listening .ring-outer {
+      border-top-color: #ef4444;
+      border-bottom-color: #ef4444;
+      box-shadow: 0 0 35px rgba(239, 68, 68, 0.6);
+      animation-duration: 3s;
+    }
+    .orb-container.listening .orb-core {
+      background: radial-gradient(circle, #ffffff 0%, #ef4444 60%, #991b1b 100%);
+      animation: pulse-core 0.8s ease-in-out infinite alternate;
+    }
+
+    .orb-container.processing .ring-middle {
+      border-left-color: #f59e0b;
+      border-right-color: #f59e0b;
+      animation-duration: 1.5s;
+    }
+
+    @keyframes rotate-cw { 100% { transform: rotate(360deg); } }
+    @keyframes rotate-ccw { 100% { transform: rotate(-360deg); } }
+    @keyframes pulse-core { 0% { transform: scale(0.95); } 100% { transform: scale(1.08); } }
+
+    .orb-hint {
+      margin-top: 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    /* Chat / Response Box */
+    .console-feed {
+      background: var(--card-bg);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 20px;
+      padding: 16px;
+      min-height: 90px;
+      max-height: 140px;
+      overflow-y: auto;
+      margin-bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    .feed-text {
+      font-size: 0.95rem;
+      line-height: 1.5;
+      color: #f1f5f9;
+      font-weight: 500;
+    }
+
+    .feed-time {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      margin-top: 6px;
+    }
+
+    /* Quick Action Commands */
+    .section-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: var(--text-dim);
+      margin-bottom: 12px;
+      padding-left: 4px;
+    }
+
+    .quick-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .quick-btn {
+      background: var(--card-bg);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 14px 8px;
+      color: #e2e8f0;
+      font-size: 0.8rem;
+      font-weight: 600;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .quick-btn:active {
+      transform: scale(0.95);
+      background: rgba(99, 102, 241, 0.2);
+      border-color: var(--accent);
+    }
+
+    .btn-icon {
+      font-size: 1.25rem;
+    }
+
+    /* Input Bar */
+    .input-row {
+      display: flex;
+      gap: 10px;
+      margin-top: auto;
+    }
+
+    .command-input {
+      flex: 1;
+      background: var(--card-bg);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      padding: 14px 18px;
+      color: #fff;
+      font-size: 0.95rem;
+      outline: none;
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+    }
+
+    .command-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 15px var(--accent-glow);
+    }
+
+    .send-btn {
+      background: linear-gradient(135deg, var(--accent), #4f46e5);
+      border: none;
+      border-radius: 16px;
+      width: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      cursor: pointer;
+      box-shadow: 0 0 15px var(--accent-glow);
+    }
+
+    .send-btn:active {
+      transform: scale(0.92);
+    }
+
+    /* Screenshot Modal */
+    .modal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.9);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      z-index: 100;
+      padding: 20px;
+    }
+    .modal.active { display: flex; }
+    .modal img { max-width: 100%; max-height: 80vh; border-radius: 12px; border: 1px solid rgba(255,255,255,0.2); }
+    .modal-close { margin-top: 15px; padding: 10px 24px; border-radius: 12px; background: #ef4444; color: white; border: none; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo"></div>
+      <div class="brand-title">JARVIS OS</div>
+    </div>
+    <div class="status-badge">
+      <div class="status-dot"></div>
+      <span>CONNECTED</span>
+    </div>
+  </header>
+
+  <!-- Telemetry Row (Live Windows Metrics) -->
+  <div class="telemetry-row">
+    <div class="telemetry-card">
+      <div class="telemetry-label">CPU</div>
+      <div class="telemetry-value" id="cpu-val">--%</div>
+    </div>
+    <div class="telemetry-card">
+      <div class="telemetry-label">Memory</div>
+      <div class="telemetry-value" id="ram-val">--%</div>
+    </div>
+    <div class="telemetry-card">
+      <div class="telemetry-label">Battery</div>
+      <div class="telemetry-value" id="bat-val">--%</div>
+    </div>
+  </div>
+
+  <!-- Cyber Arc Reactor Orb -->
+  <div class="orb-section">
+    <div class="orb-container" id="orb" onclick="toggleVoice()">
+      <div class="ring ring-outer"></div>
+      <div class="ring ring-middle"></div>
+      <div class="ring ring-inner"></div>
+      <div class="orb-core">
+        <svg class="mic-icon" viewBox="0 0 24 24">
+          <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+          <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+        </svg>
+      </div>
+    </div>
+    <div class="orb-hint" id="orb-hint">Tap Orb to Speak</div>
+  </div>
+
+  <!-- Live Speech/Response Log -->
+  <div class="console-feed">
+    <div class="feed-text" id="feed-text">JARVIS Online. Awaiting voice command from your mobile device...</div>
+    <div class="feed-time" id="feed-time">Ready</div>
+  </div>
+
+  <!-- Quick Command Buttons -->
+  <div class="section-title">Quick Commands</div>
+  <div class="quick-grid">
+    <button class="quick-btn" onclick="sendCommand('start work mode')">
+      <span class="btn-icon">⚡</span>
+      <span>Work Mode</span>
+    </button>
+    <button class="quick-btn" onclick="sendCommand('open whatsapp')">
+      <span class="btn-icon">💬</span>
+      <span>WhatsApp</span>
+    </button>
+    <button class="quick-btn" onclick="sendCommand('take screenshot')">
+      <span class="btn-icon">📸</span>
+      <span>Screenshot</span>
+    </button>
+    <button class="quick-btn" onclick="sendCommand('play lofi on youtube')">
+      <span class="btn-icon">🎵</span>
+      <span>YouTube</span>
+    </button>
+    <button class="quick-btn" onclick="sendCommand('open chrome')">
+      <span class="btn-icon">🌐</span>
+      <span>Chrome</span>
+    </button>
+    <button class="quick-btn" onclick="sendCommand('lock pc')">
+      <span class="btn-icon">🔒</span>
+      <span>Lock PC</span>
+    </button>
+  </div>
+
+  <!-- Bottom Input Bar -->
+  <div class="input-row">
+    <input type="text" id="cmd-input" class="command-input" placeholder="Type a command or question..." onkeypress="handleKey(event)">
+    <button class="send-btn" onclick="submitText()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Screenshot Preview Modal -->
+  <div class="modal" id="shot-modal">
+    <img id="shot-img" src="" alt="Screenshot">
+    <button class="modal-close" onclick="closeModal()">Close Preview</button>
+  </div>
+
+  <script>
+    const orb = document.getElementById('orb');
+    const orbHint = document.getElementById('orb-hint');
+    const feedText = document.getElementById('feed-text');
+    const feedTime = document.getElementById('feed-time');
+    const cmdInput = document.getElementById('cmd-input');
+    let isListening = false;
+    let recognition = null;
+
+    // Initialize Web Speech API for iPhone / Android
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        isListening = true;
+        orb.classList.add('listening');
+        orbHint.innerText = 'Listening... Speak now';
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        feedText.innerText = `"${transcript}"`;
+        feedTime.innerText = 'Transcribed';
+        sendCommand(transcript);
+      };
+
+      recognition.onerror = (e) => {
+        console.warn('Speech error:', e);
+        stopListening();
+      };
+
+      recognition.onend = () => {
+        stopListening();
+      };
+    }
+
+    function toggleVoice() {
+      if (!recognition) {
+        alert('Voice dictation is supported in Safari/Chrome. Or type in the box below!');
+        return;
+      }
+      if (isListening) {
+        recognition.stop();
+        stopListening();
+      } else {
+        try {
+          recognition.start();
+        } catch(e) {
+          console.error(e);
+        }
+      }
+    }
+
+    function stopListening() {
+      isListening = false;
+      orb.classList.remove('listening');
+      orbHint.innerText = 'Tap Orb to Speak';
+    }
+
+    async function sendCommand(text) {
+      if (!text || !text.trim()) return;
+      orb.classList.add('processing');
+      orbHint.innerText = 'Executing on PC...';
+
+      try {
+        const res = await fetch('/api/command', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text })
+        });
+        const data = await res.json();
+        
+        feedText.innerText = data.response || 'Command executed.';
+        feedTime.innerText = new Date().toLocaleTimeString();
+
+        // Speak reply on mobile if audio is supported
+        if ('speechSynthesis' in window && data.response) {
+          const utterance = new SpeechSynthesisUtterance(data.response);
+          window.speechSynthesis.speak(utterance);
+        }
+
+        // If screenshot was requested, show modal
+        if (data.intent === 'system_control' && data.action === 'screenshot' && data.screenshot_url) {
+          document.getElementById('shot-img').src = data.screenshot_url + '?t=' + Date.now();
+          document.getElementById('shot-modal').classList.add('active');
+        }
+      } catch (err) {
+        feedText.innerText = 'Failed to dispatch command to PC.';
+      } finally {
+        orb.classList.remove('processing');
+        orbHint.innerText = 'Tap Orb to Speak';
+        fetchTelemetry();
+      }
+    }
+
+    function submitText() {
+      const val = cmdInput.value.trim();
+      if (val) {
+        cmdInput.value = '';
+        sendCommand(val);
+      }
+    }
+
+    function handleKey(e) {
+      if (e.key === 'Enter') submitText();
+    }
+
+    function closeModal() {
+      document.getElementById('shot-modal').classList.remove('active');
+    }
+
+    // Live Telemetry updates from PC
+    async function fetchTelemetry() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        document.getElementById('cpu-val').innerText = (data.cpu || '--') + '%';
+        document.getElementById('ram-val').innerText = (data.ram || '--') + '%';
+        document.getElementById('bat-val').innerText = (data.battery !== null ? data.battery + '%' : 'Plugged');
+      } catch(e) {}
+    }
+
+    // Refresh telemetry every 5 seconds
+    setInterval(fetchTelemetry, 5000);
+    fetchTelemetry();
+  </script>
+</body>
+</html>
