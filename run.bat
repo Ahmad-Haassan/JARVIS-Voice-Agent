@@ -3,6 +3,5 @@ title JARVIS Voice Assistant
 echo ====================================================
 echo      Starting JARVIS AI Voice Assistant...
 echo ====================================================
-call "%~dp0venv\Scripts\activate.bat"
-python "%~dp0main.py"
+"%~dp0venv\Scripts\python.exe" "%~dp0main.py"
 pause
