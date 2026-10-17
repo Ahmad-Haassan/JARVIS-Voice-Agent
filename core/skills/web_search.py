@@ -3,6 +3,7 @@ Web Search & Media Skill — DuckDuckGo search + YouTube media queries.
 """
 import urllib.parse
 import webbrowser
+import subprocess
 from core.utils.logger import get_logger
 
 logger = get_logger("skills.web")
@@ -29,8 +30,13 @@ class WebSearch:
     def play_youtube(self, query: str) -> bool:
         logger.info(f"Playing YouTube query: '{query}'")
         try:
+            from core.skills.system_control import get_chrome_path
             encoded = urllib.parse.quote(query)
             url = f"https://www.youtube.com/results?search_query={encoded}"
+            cp = get_chrome_path()
+            if cp:
+                subprocess.Popen([cp, url])
+                return True
             webbrowser.open(url)
             return True
         except Exception as e:

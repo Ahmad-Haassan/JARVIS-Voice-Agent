@@ -3,6 +3,7 @@ JARVIS Mobile Remote Server — FastAPI backend for iPhone & Mobile Web HUD.
 """
 import os
 import sys
+import time
 import socket
 import psutil
 from fastapi import FastAPI, Request
@@ -106,9 +107,18 @@ async def get_status():
 
 @app.get("/api/screenshot")
 async def get_screenshot():
+    data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+    path = os.path.join(data_dir, "screenshot.png")
+    
+    # If fresh screenshot exists (taken within last 5 seconds), serve it immediately
+    if os.path.exists(path) and (time.time() - os.path.getmtime(path) < 5.0):
+        return FileResponse(path, media_type="image/png")
+
     sys_ctrl = get_system_control()
-    path = sys_ctrl.take_screenshot()
-    if path and os.path.exists(path):
+    fresh_path = sys_ctrl.take_screenshot()
+    if fresh_path and os.path.exists(fresh_path):
+        return FileResponse(fresh_path, media_type="image/png")
+    elif os.path.exists(path):
         return FileResponse(path, media_type="image/png")
     return {"error": "Failed to capture screenshot"}
 

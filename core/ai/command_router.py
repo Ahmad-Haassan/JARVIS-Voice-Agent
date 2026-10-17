@@ -45,7 +45,7 @@ class CommandRouter:
             # 3. Work Mode
             elif intent == "work_mode":
                 success = get_system_control().work_mode()
-                resp = "Work mode initialized. VS Code, Terminal, and developer resources opened." if success else "Failed to launch full work mode."
+                resp = "Work mode initialized. Antigravity IDE, Google Chrome, and terminal opened." if success else "Failed to launch work mode."
                 return CommandResult(success=success, response=resp)
 
             # 4. System Control (Diagnostics, Screenshot, Power)
@@ -58,7 +58,7 @@ class CommandRouter:
                     return CommandResult(success=True, response=f"System Diagnostics: {diag}", data=diag)
                 elif sub_action == "screenshot":
                     path = sys_ctrl.take_screenshot()
-                    resp = f"Screenshot captured and saved to Desktop." if path else "Failed to capture screenshot."
+                    resp = "Screenshot captured successfully." if path else "Could not capture screenshot. If Windows is locked, please unlock your PC first."
                     return CommandResult(success=bool(path), response=resp, data=path)
                 elif sub_action in ["lock", "sleep", "restart", "shutdown"]:
                     success = sys_ctrl.system_power(sub_action)

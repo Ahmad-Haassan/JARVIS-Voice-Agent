@@ -1,6 +1,6 @@
 """
 System Control Skill — launch/close applications, volume, brightness,
-screenshots, power management, and 'work mode' routine.
+screenshots, power management, Antigravity IDE, and 'work mode' routine.
 """
 import os
 import subprocess
@@ -10,11 +10,32 @@ from core.utils.logger import get_logger
 
 logger = get_logger("skills.system")
 
+def get_chrome_path():
+    candidates = [
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    return None
+
+def get_antigravity_path():
+    candidates = [
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs\antigravity\antigravity.exe"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs\Antigravity\Antigravity.exe"),
+        os.path.expandvars(r"%LOCALAPPDATA%\antigravity\antigravity.exe"),
+        os.path.expandvars(r"%USERPROFILE%\.gemini\antigravity-ide\bin\antigravity.cmd")
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    return None
+
 APP_MAP = {
     "whatsapp": "start whatsapp:",
-    "chrome": "chrome",
-    "google chrome": "chrome",
-    "edge": "msedge",
+    "edge": "start msedge",
     "vs code": "code",
     "vscode": "code",
     "code": "code",
@@ -38,12 +59,40 @@ class SystemControl:
         if not app_clean:
             return False
 
-        # Specific handler for YouTube
-        if "youtube" in app_clean:
-            webbrowser.open("https://www.youtube.com")
+        # 1. Antigravity IDE
+        if "antigravity" in app_clean:
+            ag = get_antigravity_path()
+            if ag:
+                subprocess.Popen([ag])
+                return True
+            os.system("start antigravity")
             return True
 
-        # Check known shortcuts
+        # 2. Chrome
+        if "chrome" in app_clean or "google chrome" in app_clean:
+            cp = get_chrome_path()
+            if cp:
+                subprocess.Popen([cp])
+                return True
+            os.system("start chrome")
+            return True
+
+        # 3. YouTube (opens directly in Chrome or browser)
+        if "youtube" in app_clean:
+            cp = get_chrome_path()
+            url = "https://www.youtube.com"
+            if cp:
+                subprocess.Popen([cp, url])
+                return True
+            webbrowser.open(url)
+            return True
+
+        # 4. WhatsApp
+        if "whatsapp" in app_clean:
+            os.system("start whatsapp:")
+            return True
+
+        # 5. Check known map
         for name, cmd in APP_MAP.items():
             if name in app_clean or app_clean in name:
                 try:
@@ -55,7 +104,7 @@ class SystemControl:
                 except Exception as e:
                     logger.warning(f"Error launching {name} with command {cmd}: {e}")
 
-        # Fallback: try direct launch via Windows shell
+        # Fallback
         try:
             os.system(f'start "" "{app_clean}"')
             return True
@@ -78,7 +127,6 @@ class SystemControl:
         except Exception as e:
             logger.warning(f"psutil process termination error: {e}")
 
-        # Fallback to taskkill
         try:
             subprocess.run(f"taskkill /F /IM {app_clean}*.exe", shell=True, capture_output=True)
             return True
@@ -86,33 +134,86 @@ class SystemControl:
             return False
 
     def take_screenshot(self) -> str:
+        """Captures Windows desktop screenshot and saves to data/screenshot.png."""
+        data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data")
+        os.makedirs(data_dir, exist_ok=True)
+        path = os.path.join(data_dir, "screenshot.png")
+
+        # Method 1: PIL ImageGrab
         try:
             from PIL import ImageGrab
-            import datetime
-            desktop = os.path.join(os.path.expanduser("~"), "Desktop")
-            if not os.path.exists(desktop):
-                desktop = os.path.join(os.path.expanduser("~"), "OneDrive", "Desktop")
-            filename = f"screenshot_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-            path = os.path.join(desktop, filename)
             img = ImageGrab.grab()
             img.save(path)
-            logger.info(f"Screenshot saved to: {path}")
+            try:
+                desktop_path = os.path.join(os.path.expanduser("~"), "Desktop", "JARVIS_screenshot.png")
+                img.save(desktop_path)
+            except Exception:
+                pass
+            logger.info(f"Screenshot successfully saved to: {path}")
             return path
         except Exception as e:
-            logger.error(f"Screenshot error: {e}")
-            return ""
+            logger.warning(f"PIL ImageGrab error ({e}), trying PowerShell capture...")
+
+        # Method 2: PowerShell Drawing Capture
+        try:
+            ps_script = f"""
+            Add-Type -AssemblyName System.Windows.Forms
+            Add-Type -AssemblyName System.Drawing
+            $s = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $b = New-Object System.Drawing.Bitmap $s.Width, $s.Height
+            $g = [System.Drawing.Graphics]::FromImage($b)
+            $g.CopyFromScreen($s.Location, [System.Drawing.Point]::Empty, $s.Size)
+            $b.Save('{path}', [System.Drawing.Imaging.ImageFormat]::Png)
+            $g.Dispose()
+            $b.Dispose()
+            """
+            subprocess.run(["powershell", "-NoProfile", "-Command", ps_script], capture_output=True, timeout=5)
+            if os.path.exists(path) and os.path.getsize(path) > 1000:
+                try:
+                    import shutil
+                    desktop_path = os.path.join(os.path.expanduser("~"), "Desktop", "JARVIS_screenshot.png")
+                    shutil.copyfile(path, desktop_path)
+                except Exception:
+                    pass
+                logger.info(f"PowerShell screenshot saved to: {path}")
+                return path
+        except Exception as pe:
+            logger.warning(f"PowerShell capture error: {pe}")
+
+        return ""
 
     def work_mode(self) -> bool:
-        """Launches work setup: VS Code, Terminal, and Chrome."""
+        """Launches work setup: Antigravity IDE, Google Chrome, Terminal, and VS Code."""
         logger.info("Initiating Work Mode routine...")
-        try:
-            subprocess.Popen("code", shell=True)
-            subprocess.Popen("powershell", shell=True)
+        success = False
+
+        # 1. Launch Antigravity IDE
+        ag = get_antigravity_path()
+        if ag:
+            subprocess.Popen([ag])
+            success = True
+        else:
+            os.system("start antigravity")
+            success = True
+
+        # 2. Launch Google Chrome with developer resources
+        cp = get_chrome_path()
+        if cp:
+            subprocess.Popen([cp, "https://github.com"])
+            success = True
+        else:
             webbrowser.open("https://github.com")
-            return True
-        except Exception as e:
-            logger.error(f"Work mode launch error: {e}")
-            return False
+            success = True
+
+        # 3. Launch Terminal & VS Code
+        try:
+            subprocess.Popen("cmd.exe /c start powershell", shell=True)
+            subprocess.Popen("cmd.exe /c code", shell=True)
+            success = True
+        except Exception:
+            pass
+
+        return success
 
     def get_system_diagnostics(self) -> str:
         try:

@@ -22,7 +22,7 @@ class NLPEngine:
         try:
             import google.generativeai as genai
             genai.configure(api_key=api_key)
-            model_name = cfg.get("ai", "model", "gemini-1.5-flash")
+            model_name = cfg.get("ai", "model", "gemini-3.8-flash")
             self._model = genai.GenerativeModel(model_name)
             logger.info(f"Gemini model '{model_name}' initialized.")
         except Exception as e:
@@ -47,7 +47,13 @@ class NLPEngine:
 
         logger.info(f"Processing command: '{query}'")
 
-        # First try Gemini if available
+        # Fast-Path: Instantly resolve direct action commands (zero latency & no quota errors)
+        fast_action = self._match_direct_command(query)
+        if fast_action:
+            logger.info(f"Fast-path matched intent: {fast_action.get('intent')}")
+            return fast_action
+
+        # Try Gemini AI for complex reasoning / conversational queries
         if self._model:
             try:
                 prompt = (
@@ -79,17 +85,94 @@ class NLPEngine:
                     logger.info(f"Gemini parsed intent: {parsed.get('intent')}")
                     return parsed
             except Exception as e:
-                logger.warning(f"Gemini processing error (falling back to rule engine): {e}")
+                logger.warning(f"Gemini processing error: {e}")
 
-        # Comprehensive Rule Engine Fallback
-        return self._rule_based_fallback(query)
+        # Fallback to conversational small talk or web search
+        return self._conversational_fallback(query)
 
-    def _rule_based_fallback(self, query: str) -> dict:
+    def _match_direct_command(self, query: str) -> dict:
         q = query.lower()
 
-        # 1. Work Mode
-        if "work mode" in q:
-            return {"intent": "work_mode", "entities": {}, "response": "Initiating development work mode."}
+        # 1. Work Mode & Antigravity IDE
+        if "antigravity" in q:
+            return {"intent": "open_app", "entities": {"app": "antigravity"}, "response": "Opening Antigravity IDE."}
+
+        if "work mode" in q or "workmode" in q:
+            return {"intent": "work_mode", "entities": {}, "response": "Initiating development work mode. Opening Antigravity IDE, Google Chrome, and terminal."}
+
+        # 2. System Diagnostics & Telemetry
+        if any(w in q for w in ["system diagnostic", "diagnostics", "cpu load", "ram usage", "battery", "system specs"]):
+            return {"intent": "system_control", "entities": {"action": "diagnostics"}, "response": "Checking system diagnostics."}
+
+        # 3. Screenshot
+        if "screenshot" in q or "screen shot" in q:
+            return {"intent": "system_control", "entities": {"action": "screenshot"}, "response": "Capturing screen."}
+
+        # 4. WhatsApp Automation
+        if "whatsapp" in q or "message" in q:
+            m = re.search(r"(?:send message to|message|tell|whatsapp)\s+([a-zA-Z0-9_\s]+?)\s+(?:saying|that|:)\s+(.+)", q)
+            if m:
+                contact = m.group(1).strip()
+                msg = m.group(2).strip()
+                return {"intent": "send_whatsapp", "entities": {"contact": contact, "message": msg}, "response": f"Sending WhatsApp message to {contact}."}
+            elif "open whatsapp" in q or q.strip() == "whatsapp":
+                return {"intent": "open_app", "entities": {"app": "whatsapp"}, "response": "Opening WhatsApp Desktop."}
+
+        # 5. YouTube Media Playback
+        if "youtube" in q or q.startswith("play "):
+            play_query = q
+            for prefix in ["play on youtube", "play in youtube", "play on you tube", "play", "youtube"]:
+                if play_query.startswith(prefix):
+                    play_query = play_query[len(prefix):].strip()
+            play_query = play_query.replace("on youtube", "").strip()
+            return {"intent": "youtube_play", "entities": {"query": play_query or "music"}, "response": f"Playing {play_query or 'music'} on YouTube."}
+
+        # 6. System Power
+        if "lock" in q and ("pc" in q or "computer" in q or "screen" in q or q.strip() == "lock"):
+            return {"intent": "system_control", "entities": {"action": "lock"}, "response": "Locking workstation."}
+        if "sleep" in q and ("pc" in q or "computer" in q or "go to sleep" in q or q.strip() == "sleep"):
+            return {"intent": "system_control", "entities": {"action": "sleep"}, "response": "Entering sleep state."}
+
+        # 7. File Actions
+        if "desktop folder" in q or "create folder" in q or "new folder" in q:
+            folder_name = "New Folder"
+            m = re.search(r"folder\s+(?:named|called)?\s*([a-zA-Z0-9_\-]+)", q)
+            if m:
+                folder_name = m.group(1).strip()
+            return {"intent": "file_action", "entities": {"action": "create_folder", "name": folder_name}, "response": f"Creating desktop folder '{folder_name}'."}
+
+        # 8. Weather
+        if "weather" in q or "temperature" in q:
+            city = cfg.get("skills", "weather_city", "Karachi")
+            m = re.search(r"(?:in|for)\s+([a-zA-Z\s]+)", q)
+            if m:
+                city = m.group(1).strip()
+            return {"intent": "weather", "entities": {"city": city}, "response": f"Checking weather for {city}."}
+
+        # 9. Close App
+        if q.startswith("close ") or q.startswith("kill ") or q.startswith("exit "):
+            app = q.split(" ", 1)[1].strip()
+            return {"intent": "close_app", "entities": {"app": app}, "response": f"Closing {app}."}
+
+        # 10. Open App
+        if q.startswith("open ") or q.startswith("launch ") or q.startswith("start "):
+            app = q.split(" ", 1)[1].strip()
+            return {"intent": "open_app", "entities": {"app": app}, "response": f"Opening {app}."}
+
+        if "chrome" in q or "google chrome" in q:
+            return {"intent": "open_app", "entities": {"app": "chrome"}, "response": "Opening Google Chrome."}
+
+        return None
+
+    def _conversational_fallback(self, query: str) -> dict:
+        q = query.lower()
+
+        # 1. Work Mode & Antigravity IDE
+        if "antigravity" in q:
+            return {"intent": "open_app", "entities": {"app": "antigravity"}, "response": "Opening Antigravity IDE."}
+
+        if "work mode" in q or "workmode" in q:
+            return {"intent": "work_mode", "entities": {}, "response": "Initiating development work mode. Opening Antigravity IDE, Google Chrome, and terminal."}
 
         # 2. System Diagnostics & Telemetry
         if any(w in q for w in ["system diagnostic", "diagnostics", "cpu load", "ram usage", "battery", "system specs"]):
