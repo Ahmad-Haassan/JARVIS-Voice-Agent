@@ -39,10 +39,16 @@ class JarvisApp:
         self.auth_screen.login_success.connect(self.launch_main)
         self.auth_screen.setup_complete.connect(self.launch_main)
         
-        # Make auth screen look nice
-        self.auth_screen.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        # Make auth screen look nice and center on screen
+        self.auth_screen.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Window)
         self.auth_screen.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        screen = self.app.primaryScreen().geometry()
+        x = (screen.width() - self.auth_screen.width()) // 2
+        y = (screen.height() - self.auth_screen.height()) // 2
+        self.auth_screen.move(x, y)
         self.auth_screen.show()
+        self.auth_screen.raise_()
+        self.auth_screen.activateWindow()
 
     def launch_main(self):
         logger.info("Authentication successful. Launching main window...")
@@ -50,7 +56,13 @@ class JarvisApp:
             self.auth_screen.close()
         
         self.main_window = MainWindow(self.auth_manager)
+        screen = self.app.primaryScreen().geometry()
+        x = (screen.width() - self.main_window.width()) // 2
+        y = (screen.height() - self.main_window.height()) // 2
+        self.main_window.move(x, y)
         self.main_window.show()
+        self.main_window.raise_()
+        self.main_window.activateWindow()
 
 if __name__ == "__main__":
     # Create necessary directories
