@@ -12,6 +12,10 @@ from pydantic import BaseModel
 
 # Ensure project root in sys.path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+try:
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+except Exception:
+    pass
 
 from core.utils.logger import get_logger
 from core.ai.nlp_engine import get_nlp
@@ -111,11 +115,11 @@ async def get_screenshot():
 def print_banner(host_ip, port):
     url = f"http://{host_ip}:{port}"
     print("\n" + "=" * 60)
-    print("   🌐 JARVIS MOBILE REMOTE SERVER IS ACTIVE!")
+    print("   [+] JARVIS MOBILE REMOTE SERVER IS ACTIVE!")
     print("=" * 60)
-    print(f"\n👉 OPEN THIS URL ON YOUR IPHONE (Safari/Chrome):")
-    print(f"   \033[1;36m{url}\033[0m\n")
-    print("   Make sure your iPhone is connected to the same Wi-Fi!\n")
+    print(f"\n>>> OPEN THIS URL ON YOUR IPHONE (Safari/Chrome):")
+    print(f"    {url}\n")
+    print("    Make sure your iPhone is connected to the same Wi-Fi!\n")
 
     # Generate QR Code in terminal
     try:
@@ -123,7 +127,7 @@ def print_banner(host_ip, port):
         qr = qrcode.QRCode(border=1)
         qr.add_data(url)
         qr.make(fit=True)
-        print("📱 SCAN THIS QR CODE WITH YOUR IPHONE CAMERA:")
+        print("[*] SCAN THIS QR CODE WITH YOUR IPHONE CAMERA:")
         qr.print_ascii(invert=True)
     except Exception:
         pass
