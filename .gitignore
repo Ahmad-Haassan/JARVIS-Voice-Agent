@@ -1,2 +1,17 @@
-# Created by venv; see https://docs.python.org/3/library/venv.html
-*
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Local credentials
+config.json
+.env
+
+# Large model downloads (keep directory structure)
+model/*.zip
+model/*.tar.gz
