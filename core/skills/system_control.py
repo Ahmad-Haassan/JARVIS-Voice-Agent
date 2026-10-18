@@ -23,6 +23,9 @@ def get_chrome_path():
 
 def get_antigravity_path():
     candidates = [
+        r"C:\Users\Ahmad\Desktop\Antigravity IDE\Antigravity IDE.exe",
+        os.path.expandvars(r"%USERPROFILE%\Desktop\Antigravity IDE\Antigravity IDE.exe"),
+        os.path.expandvars(r"%USERPROFILE%\OneDrive\Desktop\Antigravity IDE\Antigravity IDE.exe"),
         os.path.expandvars(r"%LOCALAPPDATA%\Programs\antigravity\antigravity.exe"),
         os.path.expandvars(r"%LOCALAPPDATA%\Programs\Antigravity\Antigravity.exe"),
         os.path.expandvars(r"%LOCALAPPDATA%\antigravity\antigravity.exe"),
@@ -36,6 +39,11 @@ def get_antigravity_path():
 def shell_execute(target: str, args: str = "") -> bool:
     """Launches an application or URL directly on the user's interactive Windows desktop using Windows Shell."""
     try:
+        try:
+            import pythoncom
+            pythoncom.CoInitialize()
+        except Exception:
+            pass
         import win32com.client
         shell = win32com.client.Dispatch("Shell.Application")
         shell.ShellExecute(target, args, "", "open", 1)

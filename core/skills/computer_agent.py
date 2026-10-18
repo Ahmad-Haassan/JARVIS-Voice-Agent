@@ -69,10 +69,16 @@ class ComputerAgent:
 
     def click(self, x: Optional[int] = None, y: Optional[int] = None, button: str = "left", clicks: int = 1) -> bool:
         try:
+            btn = "left"
+            if button in ("right", "middle", "left", "primary", "secondary"):
+                btn = button
+            elif button == "double":
+                btn = "left"
+                clicks = 2
             if x is not None and y is not None:
                 self.move_to(x, y, duration=0.2)
-            pyautogui.click(button=button, clicks=clicks)
-            self._log_action("MOUSE", f"Clicked {button} button ({clicks}x) at {pyautogui.position()}")
+            pyautogui.click(button=btn, clicks=clicks)
+            self._log_action("MOUSE", f"Clicked {btn} button ({clicks}x) at {pyautogui.position()}")
             return True
         except Exception as e:
             logger.error(f"click failed: {e}")
