@@ -243,9 +243,51 @@ class SystemControl:
         except Exception as e:
             return f"System info unavailable: {e}"
 
-    def system_power(self, action: str) -> bool:
+    def unlock_pc(self, pin: str = "") -> bool:
+        """Wakes the display, dismisses the lock screen curtain, and enters PIN if provided."""
+        logger.info("Attempting to unlock/wake PC...")
+        try:
+            import ctypes
+            import time
+            from core.utils import config as cfg
+            user32 = ctypes.windll.user32
+
+            # Wake up display
+            user32.mouse_event(0x0001, 1, 1, 0, 0)
+            user32.mouse_event(0x0001, -1, -1, 0, 0)
+            time.sleep(0.3)
+
+            # Dismiss lock screen curtain (Space key)
+            VK_SPACE = 0x20
+            VK_RETURN = 0x0D
+            user32.keybd_event(VK_SPACE, 0, 0, 0)
+            user32.keybd_event(VK_SPACE, 0, 2, 0)
+            time.sleep(0.6)
+
+            # If PIN is specified in config or passed in
+            if not pin:
+                pin = cfg.get("auth", "windows_pin", "")
+
+            if pin:
+                for c in str(pin):
+                    vk = ord(c.upper())
+                    user32.keybd_event(vk, 0, 0, 0)
+                    user32.keybd_event(vk, 0, 2, 0)
+                    time.sleep(0.04)
+                time.sleep(0.2)
+                user32.keybd_event(VK_RETURN, 0, 0, 0)
+                user32.keybd_event(VK_RETURN, 0, 2, 0)
+
+            return True
+        except Exception as e:
+            logger.error(f"Unlock error: {e}")
+            return False
+
+    def system_power(self, action: str, pin: str = "") -> bool:
         action = action.lower()
-        if "lock" in action:
+        if "unlock" in action:
+            return self.unlock_pc(pin)
+        elif "lock" in action:
             import ctypes
             ctypes.windll.user32.LockWorkStation()
             return True

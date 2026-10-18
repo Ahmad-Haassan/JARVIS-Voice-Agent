@@ -377,8 +377,9 @@ class MainWindow(QMainWindow):
         
         qa_btns = [
             ("⚡ Work Mode", "start work mode"), ("🚀 Antigravity", "open antigravity"),
+            ("📷 Camera", "open camera"), ("📸 Screenshot", "take screenshot"),
             ("🌐 Chrome", "open chrome"), ("🎵 YouTube", "play lofi on youtube"),
-            ("📸 Screenshot", "take screenshot"), ("💬 WhatsApp", "open whatsapp"),
+            ("💬 WhatsApp", "open whatsapp"), ("🔓 Unlock", "unlock pc"),
             ("📁 Folder", "create desktop folder"), ("⚙️ Settings", "open settings")
         ]
         
@@ -389,9 +390,9 @@ class MainWindow(QMainWindow):
                     background: rgba(255, 255, 255, 0.03);
                     border: 1px solid rgba(255, 255, 255, 0.05);
                     border-radius: 10px;
-                    padding: 10px;
+                    padding: 8px 4px;
                     color: #94a3b8;
-                    font-size: 11px;
+                    font-size: 10px;
                 }
                 QPushButton:hover {
                     background: rgba(99, 102, 241, 0.1);
@@ -400,7 +401,7 @@ class MainWindow(QMainWindow):
                 }
             """)
             btn.clicked.connect(lambda checked, c=cmd: self._on_quick_action(c))
-            self.qa_grid.addWidget(btn, i // 4, i % 4)
+            self.qa_grid.addWidget(btn, i // 5, i % 5)
         
         rp_layout.addLayout(self.qa_grid)
 

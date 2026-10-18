@@ -6,8 +6,8 @@ import sys
 import time
 import socket
 import psutil
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi import FastAPI, Request, UploadFile, File
+from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -22,6 +22,7 @@ from core.utils.logger import get_logger
 from core.ai.nlp_engine import get_nlp
 from core.ai.command_router import get_router
 from core.skills.system_control import get_system_control
+from core.skills.camera import get_camera
 
 logger = get_logger("server")
 app = FastAPI(title="JARVIS Mobile Remote")
@@ -76,18 +77,22 @@ async def execute_command(req: CommandRequest):
 
     final_resp = exec_result.response or spoken_resp or "Command executed."
     
-    # If screenshot was requested
+    # If screenshot or camera was requested
     screenshot_url = None
+    camera_url = None
     action_type = entities.get("action", "")
     if intent == "system_control" and action_type == "screenshot":
         screenshot_url = "/api/screenshot"
+    elif intent == "camera":
+        camera_url = "/api/camera/stream"
 
     return {
         "success": exec_result.success,
         "response": final_resp,
         "intent": intent,
         "action": action_type,
-        "screenshot_url": screenshot_url
+        "screenshot_url": screenshot_url,
+        "camera_url": camera_url
     }
 
 @app.get("/api/status")
@@ -122,6 +127,53 @@ async def get_screenshot():
     elif os.path.exists(path):
         return FileResponse(path, media_type="image/png", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     return {"error": "Failed to capture screenshot"}
+
+@app.get("/api/camera/stream")
+def camera_stream():
+    """Live MJPEG video stream from the computer's webcam."""
+    cam = get_camera()
+    return StreamingResponse(
+        cam.generate_mjpeg_stream(),
+        media_type="multipart/x-mixed-replace; boundary=frame"
+    )
+
+@app.get("/api/camera/snapshot")
+def camera_snapshot():
+    """Captures and returns a single photo from the PC camera."""
+    cam = get_camera()
+    path = cam.capture_snapshot()
+    if path and os.path.exists(path):
+        return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+    return {"error": "Failed to capture camera snapshot"}
+
+@app.post("/api/voice")
+async def process_voice_audio(audio: UploadFile = File(...)):
+    """Receives voice audio from mobile, transcribes via Google STT, and executes command."""
+    try:
+        import speech_recognition as sr
+        import tempfile
+        
+        contents = await audio.read()
+        suffix = os.path.splitext(audio.filename or "")[1] or ".wav"
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tf:
+            tf.write(contents)
+            tmp_audio_path = tf.name
+
+        recognizer = sr.Recognizer()
+        with sr.AudioFile(tmp_audio_path) as source:
+            recorded = recognizer.record(source)
+            text = recognizer.recognize_google(recorded)
+
+        try:
+            os.remove(tmp_audio_path)
+        except Exception:
+            pass
+
+        logger.info(f"Mobile voice transcribed: '{text}'")
+        return await execute_command(CommandRequest(text=text))
+    except Exception as e:
+        logger.warning(f"Voice upload processing error: {e}")
+        return {"success": False, "response": f"Voice transcription error: {e}"}
 
 def print_banner(host_ip, port):
     url = f"http://{host_ip}:{port}"

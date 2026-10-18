@@ -441,6 +441,14 @@
       <span class="btn-icon">🚀</span>
       <span>Antigravity</span>
     </button>
+    <button class="quick-btn" onclick="openCameraModal()">
+      <span class="btn-icon">📷</span>
+      <span>PC Camera</span>
+    </button>
+    <button class="quick-btn" onclick="sendCommand('take screenshot')">
+      <span class="btn-icon">📸</span>
+      <span>Screenshot</span>
+    </button>
     <button class="quick-btn" onclick="sendCommand('open chrome')">
       <span class="btn-icon">🌐</span>
       <span>Chrome</span>
@@ -449,27 +457,27 @@
       <span class="btn-icon">🎵</span>
       <span>YouTube</span>
     </button>
-    <button class="quick-btn" onclick="sendCommand('take screenshot')">
-      <span class="btn-icon">📸</span>
-      <span>Screenshot</span>
-    </button>
     <button class="quick-btn" onclick="sendCommand('open whatsapp')">
       <span class="btn-icon">💬</span>
       <span>WhatsApp</span>
     </button>
-    <button class="quick-btn" onclick="sendCommand('system diagnostics')">
-      <span class="btn-icon">📊</span>
-      <span>Diagnostics</span>
+    <button class="quick-btn" onclick="promptUnlock()">
+      <span class="btn-icon">🔓</span>
+      <span>Unlock PC</span>
     </button>
     <button class="quick-btn" onclick="sendCommand('lock pc')">
       <span class="btn-icon">🔒</span>
       <span>Lock PC</span>
     </button>
+    <button class="quick-btn" onclick="sendCommand('system diagnostics')">
+      <span class="btn-icon">📊</span>
+      <span>Diagnostics</span>
+    </button>
   </div>
 
   <!-- Bottom Input Bar -->
   <div class="input-row">
-    <input type="text" id="cmd-input" class="command-input" placeholder="Type a command or question..." onkeypress="handleKey(event)">
+    <input type="text" id="cmd-input" class="command-input" placeholder="Type or tap keyboard mic..." onkeypress="handleKey(event)">
     <button class="send-btn" onclick="submitText()">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
         <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
@@ -480,8 +488,25 @@
   <!-- Screenshot Preview Modal -->
   <div class="modal" id="shot-modal" onclick="closeModal()">
     <div style="display:flex; flex-direction:column; align-items:center; max-width:100%;" onclick="event.stopPropagation()">
-      <img id="shot-img" src="" alt="Screenshot">
+      <img id="shot-img" src="" alt="Screenshot Preview">
       <button class="modal-close" onclick="closeModal()">✕ Close Preview</button>
+    </div>
+  </div>
+
+  <!-- Live Computer Camera Feed Modal -->
+  <div class="modal" id="camera-modal" onclick="closeCameraModal()">
+    <div style="display:flex; flex-direction:column; align-items:center; max-width:100%; width: 100%; max-width: 460px; background: rgba(15,23,42,0.9); padding: 16px; border-radius: 16px; border: 1px solid rgba(0, 242, 254, 0.3);" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 10px;">
+        <span style="font-weight: 700; color: #00f2fe; letter-spacing: 1px; font-size: 0.9rem;">LIVE COMPUTER WEBCAM</span>
+        <span style="color: #10b981; font-size: 0.75rem; display: flex; align-items: center; gap: 4px;">
+          <span style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; display: inline-block;"></span> LIVE
+        </span>
+      </div>
+      <img id="camera-stream-img" src="" alt="Connecting to PC Webcam..." style="width: 100%; min-height: 220px; background: #000; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); object-fit: contain;">
+      <div style="display: flex; gap: 8px; width: 100%; margin-top: 12px;">
+        <button onclick="snapPhoto()" style="flex: 1; padding: 12px; border-radius: 12px; background: linear-gradient(135deg, #6366f1, #00f2fe); color: white; border: none; font-weight: 700; cursor: pointer; font-size: 0.85rem;">📸 Save Photo</button>
+        <button onclick="closeCameraModal()" style="flex: 1; padding: 12px; border-radius: 12px; background: #334155; color: white; border: none; font-weight: 700; cursor: pointer; font-size: 0.85rem;">✕ Close Feed</button>
+      </div>
     </div>
   </div>
 
@@ -494,40 +519,50 @@
     let isListening = false;
     let recognition = null;
 
-    // Initialize Web Speech API for iPhone / Android
+    // Initialize Web Speech API if supported
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'en-US';
+      try {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
 
-      recognition.onstart = () => {
-        isListening = true;
-        orb.classList.add('listening');
-        orbHint.innerText = 'Listening... Speak now';
-      };
+        recognition.onstart = () => {
+          isListening = true;
+          orb.classList.add('listening');
+          orbHint.innerText = 'Listening... Speak now';
+        };
 
-      recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        feedText.innerText = `"${transcript}"`;
-        feedTime.innerText = 'Transcribed';
-        sendCommand(transcript);
-      };
+        recognition.onresult = (event) => {
+          const transcript = event.results[0][0].transcript;
+          feedText.innerText = `"${transcript}"`;
+          feedTime.innerText = 'Transcribed';
+          sendCommand(transcript);
+        };
 
-      recognition.onerror = (e) => {
-        console.warn('Speech error:', e);
-        stopListening();
-      };
+        recognition.onerror = (e) => {
+          console.warn('Speech error:', e);
+          stopListening();
+          // If iOS Safari restricts microphone on HTTP, prompt user to use keyboard dictation
+          orbHint.innerText = 'Use keyboard mic on iPhone';
+          cmdInput.placeholder = 'Tap microphone on keyboard to speak...';
+          cmdInput.focus();
+        };
 
-      recognition.onend = () => {
-        stopListening();
-      };
+        recognition.onend = () => {
+          stopListening();
+        };
+      } catch(e) {
+        console.warn('SpeechRecognition init error:', e);
+      }
     }
 
     function toggleVoice() {
       if (!recognition) {
-        alert('Voice dictation is supported in Safari/Chrome. Or type in the box below!');
+        orbHint.innerText = 'Tap keyboard mic on iPhone';
+        cmdInput.placeholder = 'Tap microphone key on keyboard to speak...';
+        cmdInput.focus();
         return;
       }
       if (isListening) {
@@ -537,7 +572,8 @@
         try {
           recognition.start();
         } catch(e) {
-          console.error(e);
+          orbHint.innerText = 'Tap keyboard mic on iPhone';
+          cmdInput.focus();
         }
       }
     }
@@ -570,10 +606,15 @@
           window.speechSynthesis.speak(utterance);
         }
 
-        // If screenshot was requested, show modal
-        if (data.intent === 'system_control' && data.action === 'screenshot' && data.screenshot_url) {
-          document.getElementById('shot-img').src = data.screenshot_url + '?t=' + Date.now();
+        // If screenshot was requested
+        if (data.action === 'screenshot' || data.screenshot_url) {
+          document.getElementById('shot-img').src = (data.screenshot_url || '/api/screenshot') + '?t=' + Date.now();
           document.getElementById('shot-modal').classList.add('active');
+        }
+
+        // If camera stream was requested
+        if (data.intent === 'camera' || data.camera_url) {
+          openCameraModal();
         }
       } catch (err) {
         feedText.innerText = 'Failed to dispatch command to PC.';
@@ -581,6 +622,42 @@
         orb.classList.remove('processing');
         orbHint.innerText = 'Tap Orb to Speak';
         fetchTelemetry();
+      }
+    }
+
+    function promptUnlock() {
+      const pin = prompt('Enter your Windows PIN (leave empty if no PIN):', '');
+      if (pin !== null) {
+        sendCommand(pin.trim() ? ('unlock pc pin ' + pin.trim()) : 'unlock pc');
+      }
+    }
+
+    function openCameraModal() {
+      const img = document.getElementById('camera-stream-img');
+      img.src = '/api/camera/stream?t=' + Date.now();
+      document.getElementById('camera-modal').classList.add('active');
+    }
+
+    function closeCameraModal() {
+      const img = document.getElementById('camera-stream-img');
+      img.src = ''; // Stop stream connection to release camera
+      document.getElementById('camera-modal').classList.remove('active');
+    }
+
+    async function snapPhoto() {
+      try {
+        const res = await fetch('/api/camera/snapshot');
+        if (res.ok) {
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'pc_camera_photo.jpg';
+          a.click();
+          feedText.innerText = 'Photo saved to PC Desktop and downloaded to mobile.';
+        }
+      } catch (e) {
+        feedText.innerText = 'Error capturing photo.';
       }
     }
 
@@ -611,7 +688,6 @@
       } catch(e) {}
     }
 
-    // Refresh telemetry every 5 seconds
     setInterval(fetchTelemetry, 5000);
     fetchTelemetry();
   </script>

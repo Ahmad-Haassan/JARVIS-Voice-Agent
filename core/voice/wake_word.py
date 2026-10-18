@@ -48,9 +48,8 @@ class WakeDetector:
     def _listen_loop(self):
         model_path = self._get_model_path()
         if not model_path:
-            logger.info("No offline Vosk model found in ./model/ or ./data/. Assistant ready via GUI and manual trigger.")
-            while self._running:
-                time.sleep(1.0)
+            logger.info("No offline Vosk model found. Activating continuous background microphone listener...")
+            self._speech_recognition_wake_loop()
             return
 
         try:
@@ -93,6 +92,42 @@ class WakeDetector:
                                 self.on_detected()
         except Exception as e:
             logger.warning(f"Vosk wake word loop error: {e}")
+            while self._running:
+                time.sleep(1.0)
+
+    def _speech_recognition_wake_loop(self):
+        try:
+            import speech_recognition as sr
+            recognizer = sr.Recognizer()
+            recognizer.energy_threshold = 300
+            recognizer.dynamic_energy_threshold = True
+
+            with sr.Microphone() as source:
+                logger.info("Calibrating microphone for ambient background noise...")
+                recognizer.adjust_for_ambient_noise(source, duration=0.8)
+                logger.info(f"Microphone active. Listening continuously for '{self.wake_word}'...")
+
+                while self._running:
+                    try:
+                        audio = recognizer.listen(source, timeout=3.0, phrase_time_limit=4.0)
+                        try:
+                            text = recognizer.recognize_google(audio).lower()
+                            logger.info(f"Microphone heard: '{text}'")
+                            if self.wake_word in text or "jarvis" in text:
+                                logger.info(f"Wake word detected via speech recognition: '{text}'!")
+                                if self.on_detected:
+                                    self.on_detected()
+                        except sr.UnknownValueError:
+                            pass
+                        except Exception as e:
+                            logger.debug(f"Speech recognition parse error: {e}")
+                    except sr.WaitTimeoutError:
+                        continue
+                    except Exception as e:
+                        logger.debug(f"Audio listen timeout/error: {e}")
+                        time.sleep(0.5)
+        except Exception as e:
+            logger.warning(f"Continuous wake loop error: {e}")
             while self._running:
                 time.sleep(1.0)
 

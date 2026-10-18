@@ -127,7 +127,16 @@ class NLPEngine:
             play_query = play_query.replace("on youtube", "").strip()
             return {"intent": "youtube_play", "entities": {"query": play_query or "music"}, "response": f"Playing {play_query or 'music'} on YouTube."}
 
-        # 6. System Power
+        # 6. Camera & Webcam
+        if any(w in q for w in ["camera", "webcam", "take photo", "view camera", "access camera"]):
+            return {"intent": "camera", "entities": {"action": "stream"}, "response": "Opening computer camera feed."}
+
+        # 7. System Power & Unlock
+        if "unlock" in q and ("pc" in q or "computer" in q or "screen" in q or q.strip() == "unlock"):
+            m = re.search(r"pin\s*([0-9]{4,8})", q)
+            pin = m.group(1) if m else ""
+            return {"intent": "system_control", "entities": {"action": "unlock", "pin": pin}, "response": "Waking and unlocking workstation."}
+
         if "lock" in q and ("pc" in q or "computer" in q or "screen" in q or q.strip() == "lock"):
             return {"intent": "system_control", "entities": {"action": "lock"}, "response": "Locking workstation."}
         if "sleep" in q and ("pc" in q or "computer" in q or "go to sleep" in q or q.strip() == "sleep"):

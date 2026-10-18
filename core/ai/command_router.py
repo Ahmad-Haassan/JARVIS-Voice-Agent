@@ -60,11 +60,21 @@ class CommandRouter:
                     path = sys_ctrl.take_screenshot()
                     resp = "Screenshot captured successfully." if path else "Could not capture screenshot. If Windows is locked, please unlock your PC first."
                     return CommandResult(success=bool(path), response=resp, data=path)
-                elif sub_action in ["lock", "sleep", "restart", "shutdown"]:
-                    success = sys_ctrl.system_power(sub_action)
-                    return CommandResult(success=success, response=f"Executed system {sub_action}.")
+                elif sub_action in ["lock", "unlock", "sleep", "restart", "shutdown"]:
+                    pin = entities.get("pin", "")
+                    success = sys_ctrl.system_power(sub_action, pin=pin)
+                    resp = "Workstation screen awakened and unlocked." if sub_action == "unlock" else f"Executed system {sub_action}."
+                    return CommandResult(success=success, response=resp)
                 else:
                     return CommandResult(success=True, response=spoken_resp or "System action completed.")
+
+            # 5. Computer Camera Feed
+            elif intent == "camera":
+                from core.skills.camera import get_camera
+                cam = get_camera()
+                path = cam.capture_snapshot()
+                resp = "Computer camera feed online." if path else "Could not access computer camera."
+                return CommandResult(success=bool(path), response=resp, data=path)
 
             # 5. WhatsApp
             elif intent == "send_whatsapp":
