@@ -1,23 +1,23 @@
 """
 Main Assistant Window — JARVIS Sci-Fi Arc Reactor HUD Edition.
-Matches the high-tech Iron Man cyberpunk interface with:
-- 360-degree dynamic radial audio waveform & glowing J core
-- Live CPU semi-circular speedometer gauge & RAM glow bar
-- HUD status card (Wake-Word & Local STT engine)
-- Recent voice commands live telemetry card
-- Tech bracket chamfered frame and animated pulsing status
+Matches the high-tech Iron Man cyberpunk interface with multi-page swapping:
+- Page 0: CORE HUD (360-degree dynamic radial audio waveform & glowing J core, CPU/RAM telemetry)
+- Page 1: PREDEFINED CONTROLS (Apps, System/Media, Automations & Macros)
+- Page 2: MOBILE REMOTE & NETWORK (HTTPS Remote access, QR/Link, mobile microphone guide)
+- Page 3: DIAGNOSTICS & AI PIPELINE (Live system audit, voice pipeline controls)
 """
 import math
 import time
 import os
 import threading
 import psutil
+import webbrowser
 from datetime import datetime
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-    QListWidget, QListWidgetItem, QPushButton, QFrame, 
-    QLineEdit, QSizePolicy
+    QPushButton, QFrame, QLineEdit, QSizePolicy, QStackedWidget,
+    QGridLayout, QApplication
 )
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QSize, QRectF, QPointF
 from PyQt6.QtGui import (
@@ -62,10 +62,16 @@ class ArcReactorWidget(QWidget):
         self.update()
 
     def _tick(self):
-        speed = 0.08 if self._listening else (0.12 if self._processing else 0.035)
-        self._phase += speed
-        self._rot_angle = (self._rot_angle + (2.8 if self._listening else 0.8)) % 360
-        self._pulse_val = (math.sin(self._phase * 2.2) + 1.0) * 0.5
+        # Rotation of outer dashed HUD ring
+        speed = 2.4 if self._processing else (1.4 if self._listening else 0.4)
+        self._rot_angle = (self._rot_angle + speed) % 360.0
+
+        # Sine wave phase progression
+        phase_speed = 0.16 if self._listening else (0.10 if self._processing else 0.035)
+        self._phase = (self._phase + phase_speed) % (math.pi * 2)
+
+        # Core breathing glow
+        self._pulse_val = 0.5 + 0.5 * math.sin(self._phase * 1.5)
         self.update()
 
     def mousePressEvent(self, event):
@@ -78,204 +84,179 @@ class ArcReactorWidget(QWidget):
 
         cx = self.width() / 2.0
         cy = self.height() / 2.0
-        base_r = 82.0  # Core radius
 
-        # 1. Soft atmospheric glow behind the reactor
-        glow_r = 180.0 if self._listening else 150.0
-        glow_alpha = 65 if self._listening else (85 if self._processing else 35)
-        glow_col = QColor(168, 85, 247, glow_alpha) if self._processing else QColor(0, 242, 254, glow_alpha)
-        glow_grad = QRadialGradient(QPointF(cx, cy), glow_r)
-        glow_grad.setColorAt(0.0, glow_col)
-        glow_grad.setColorAt(0.55, QColor(0, 242, 254, int(glow_alpha * 0.35)))
-        glow_grad.setColorAt(1.0, QColor(0, 0, 0, 0))
-        painter.setBrush(QBrush(glow_grad))
+        # Dynamic cyan/blue tones
+        cyan_neon = QColor(0, 242, 254)
+        blue_core = QColor(0, 114, 255)
+        glow_cyan = QColor(0, 242, 254, int(45 + 50 * self._pulse_val))
+
+        # 1. Outer Deep Cosmic Glow Halo
+        halo = QRadialGradient(cx, cy, 175)
+        halo.setColorAt(0.0, glow_cyan)
+        halo.setColorAt(0.65, QColor(0, 150, 255, int(20 + 20 * self._pulse_val)))
+        halo.setColorAt(1.0, QColor(0, 0, 0, 0))
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(QPointF(cx, cy), glow_r, glow_r)
+        painter.setBrush(QBrush(halo))
+        painter.drawEllipse(QPointF(cx, cy), 175, 175)
 
-        # 2. 360-Degree Radial Audio Waveform (Equalizer Bars)
-        # Quad-peak wave shape matching the screenshot (crests at top, bottom, left, right)
-        bars = self._bars_count
-        for i in range(bars):
-            ang_deg = i * 360.0 / bars
-            ang_rad = math.radians(ang_deg)
+        # 2. 360-Degree Radial Audio Equalizer Bars (Waveform)
+        base_r = 104.0
+        for i in range(self._bars_count):
+            angle_rad = (2.0 * math.pi * i) / self._bars_count
+            cos_a = math.cos(angle_rad)
+            sin_a = math.sin(angle_rad)
 
-            # Prominent crests at cardinal points (0, 90, 180, 270)
-            q_factor = abs(math.cos(ang_rad * 2.0)) ** 1.8
-            harm1 = math.sin(ang_rad * 4.0 - self._phase * 3.0) * 0.35
-            harm2 = math.cos(ang_rad * 6.0 + self._phase * 2.0) * 0.2
+            # Harmonic wave function: 4 crests + oscillating phase
+            cardinal_weight = math.pow(math.sin(angle_rad * 2.0), 4)
+            wave1 = math.sin(angle_rad * 6.0 + self._phase * 2.0)
+            wave2 = math.cos(angle_rad * 4.0 - self._phase)
 
             if self._listening:
-                amp = 18.0 + 38.0 * q_factor + 16.0 * math.sin(self._phase * 6.0 + i * 0.5)
+                h = 10.0 + 38.0 * cardinal_weight * (0.6 + 0.4 * wave1) + 8.0 * abs(wave2)
+                alpha = int(180 + 75 * cardinal_weight)
             elif self._processing:
-                amp = 14.0 + 28.0 * abs(math.sin(ang_rad * 3.0 + self._phase * 4.0))
+                rot_offset = (i + int(self._rot_angle / 4)) % self._bars_count
+                h = 12.0 + 24.0 * math.sin((rot_offset / self._bars_count) * math.pi * 4.0)
+                alpha = 200
             else:
-                amp = 8.0 + 30.0 * q_factor + 8.0 * harm1 + 4.0 * harm2
-                amp += self._pulse_val * 5.0
+                # Idle ambient breathing
+                h = 4.0 + 14.0 * cardinal_weight * (0.5 + 0.5 * math.sin(self._phase + i * 0.1))
+                alpha = int(90 + 90 * cardinal_weight)
 
-            amp = max(4.0, min(amp, 58.0))
+            h = max(3.0, h)
+            r_start = base_r
+            r_end = base_r + h
 
-            r_start = base_r + 4.0
-            r_end = r_start + amp
+            x1 = cx + r_start * cos_a
+            y1 = cy + r_start * sin_a
+            x2 = cx + r_end * cos_a
+            y2 = cy + r_end * sin_a
 
-            x1 = cx + r_start * math.cos(ang_rad)
-            y1 = cy + r_start * math.sin(ang_rad)
-            x2 = cx + r_end * math.cos(ang_rad)
-            y2 = cy + r_end * math.sin(ang_rad)
-
-            # Dynamic neon color along ray
-            if self._listening:
-                bar_col = QColor(0, 242, 254, int(190 + 65 * q_factor))
-                pen_w = 2.4
-            elif self._processing:
-                bar_col = QColor(192, 132, 252, int(180 + 75 * q_factor))
-                pen_w = 2.2
-            else:
-                alpha = int(150 + 105 * (amp / 50.0))
-                bar_col = QColor(0, 230, 255, min(255, alpha))
-                pen_w = 2.0
-
-            painter.setPen(QPen(bar_col, pen_w, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            bar_color = QColor(0, 242, 254, alpha)
+            bar_pen = QPen(bar_color, 2.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+            painter.setPen(bar_pen)
             painter.drawLine(QPointF(x1, y1), QPointF(x2, y2))
 
-        # 3. Outer Rotating Dashed Sci-Fi Tech Ring
-        outer_pen = QPen(QColor(0, 242, 254, 85), 1.2)
-        outer_pen.setDashPattern([3, 5, 8, 5])
-        painter.setPen(outer_pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
+        # 3. Rotating Outer Dashed Tech HUD Ring
         painter.save()
         painter.translate(cx, cy)
         painter.rotate(self._rot_angle)
-        painter.drawEllipse(QPointF(0, 0), base_r + 7.5, base_r + 7.5)
-
-        # Tick marks on the rotating outer tech ring
-        painter.setPen(QPen(QColor(0, 242, 254, 140), 1.5))
-        for t in range(0, 360, 45):
-            trad = math.radians(t)
-            tx1 = (base_r + 7.5) * math.cos(trad)
-            ty1 = (base_r + 7.5) * math.sin(trad)
-            tx2 = (base_r + 13.5) * math.cos(trad)
-            ty2 = (base_r + 13.5) * math.sin(trad)
-            painter.drawLine(QPointF(tx1, ty1), QPointF(tx2, ty2))
-        painter.restore()
-
-        # 4. Main Luminous Cyan Ring (Reactor Rim)
-        main_ring_pen = QPen(QColor(0, 242, 254, 255), 2.8)
-        painter.setPen(main_ring_pen)
-        painter.drawEllipse(QPointF(cx, cy), base_r, base_r)
-
-        # Soft glowing rim halo
-        painter.setPen(QPen(QColor(0, 242, 254, 50), 7.0))
-        painter.drawEllipse(QPointF(cx, cy), base_r, base_r)
-
-        # 5. Core Disc (Deep Dark Cosmic Glass)
-        core_grad = QRadialGradient(QPointF(cx - 20, cy - 20), base_r - 2)
-        core_grad.setColorAt(0.0, QColor(7, 26, 48, 245))
-        core_grad.setColorAt(0.65, QColor(3, 13, 27, 250))
-        core_grad.setColorAt(1.0, QColor(2, 6, 14, 255))
-        painter.setPen(QPen(QColor(0, 242, 254, 110), 1.0))
-        painter.setBrush(QBrush(core_grad))
-        painter.drawEllipse(QPointF(cx, cy), base_r - 2, base_r - 2)
-
-        # 6. Stylized "J" Emblem in Center
-        self._draw_j_emblem(painter, cx, cy - 14)
-
-        # 7. "JARVIS" Text
-        painter.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
-        painter.setPen(QPen(QColor(240, 249, 255, 235)))
-        painter.drawText(QRectF(cx - 70, cy + 24, 140, 26), Qt.AlignmentFlag.AlignCenter, "J A R V I S")
-
-    def _draw_j_emblem(self, painter: QPainter, cx: float, cy: float):
-        """Draws the crisp stylized J neon logo from the screenshot."""
-        painter.save()
-        painter.translate(cx, cy)
-
-        # Outer glowing path for J
-        path = QPainterPath()
-        path.moveTo(6, -26)
-        path.lineTo(6, 6)
-        path.cubicTo(6, 18, -4, 24, -14, 24)
-        path.cubicTo(-24, 24, -28, 16, -28, 10)
-
-        # Halo glow
+        dash_pen = QPen(QColor(0, 242, 254, 160), 1.5, Qt.PenStyle.CustomDashLine)
+        dash_pen.setDashPattern([3.0, 7.0])
+        painter.setPen(dash_pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.setPen(QPen(QColor(0, 242, 254, 90), 8.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
-        painter.drawPath(path)
+        painter.drawEllipse(QPointF(0, 0), 101.0, 101.0)
 
-        # Outer cyan stroke
-        painter.setPen(QPen(QColor(0, 242, 254, 255), 4.2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
-        painter.drawPath(path)
-
-        # Inner white bright core
-        painter.setPen(QPen(QColor(240, 253, 255, 240), 2.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
-        painter.drawPath(path)
-
-        # Top horizontal serif bar
-        painter.setPen(QPen(QColor(0, 242, 254, 255), 3.5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-        painter.drawLine(QPointF(-2, -26), QPointF(14, -26))
-
+        # 4 Tech Ring Ticks at 90-degree points
+        tick_pen = QPen(cyan_neon, 2.5)
+        painter.setPen(tick_pen)
+        for deg in [0, 90, 180, 270]:
+            painter.save()
+            painter.rotate(deg)
+            painter.drawLine(QPointF(96, 0), QPointF(106, 0))
+            painter.restore()
         painter.restore()
+
+        # 4. Concentric Luminous Inner Tech Circles
+        # Outer bright border
+        rim_pen = QPen(cyan_neon, 2.8)
+        painter.setPen(rim_pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawEllipse(QPointF(cx, cy), 94.0, 94.0)
+
+        # Intermediate glowing circle
+        mid_pen = QPen(QColor(0, 180, 255, 110), 1.2)
+        painter.setPen(mid_pen)
+        painter.drawEllipse(QPointF(cx, cy), 88.0, 88.0)
+
+        # 5. Core Glass Reactor Center
+        core_grad = QRadialGradient(cx, cy, 86)
+        core_grad.setColorAt(0.0, QColor(8, 28, 52, 245))
+        core_grad.setColorAt(0.7, QColor(4, 15, 30, 250))
+        core_grad.setColorAt(1.0, QColor(1, 8, 18, 255))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(core_grad))
+        painter.drawEllipse(QPointF(cx, cy), 86.0, 86.0)
+
+        # 6. Central Stylized "J" Tech Emblem
+        painter.save()
+        j_glow_pen = QPen(QColor(0, 242, 254, int(120 + 80 * self._pulse_val)), 7.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin)
+        j_core_pen = QPen(QColor(230, 250, 255), 3.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin)
+
+        j_path = QPainterPath()
+        # Stem top
+        j_path.moveTo(cx + 8, cy - 36)
+        # Vertical shaft
+        j_path.lineTo(cx + 8, cy + 10)
+        # Curved bottom hook
+        j_path.cubicTo(cx + 8, cy + 30, cx - 18, cy + 30, cx - 18, cy + 14)
+
+        # Glow pass
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(j_glow_pen)
+        painter.drawPath(j_path)
+        # Crisp neon center pass
+        painter.setPen(j_core_pen)
+        painter.drawPath(j_path)
+        painter.restore()
+
+        # 7. "J A R V I S" Futuristic Lettering Below Core
+        font = QFont("Segoe UI", 11, QFont.Weight.Black)
+        font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 4.0)
+        painter.setFont(font)
+        painter.setPen(QColor(241, 245, 249))
+        text_rect = QRectF(cx - 70, cy + 40, 140, 22)
+        painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, "JARVIS")
 
 
 # ==========================================
-# 2. CPU SPEEDOMETER SEMI-GAUGE
+# 2. CPU SPEEDOMETER ARC GAUGE
 # ==========================================
 class CpuGaugeWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(68, 44)
-        self._val = 3.2
+        self.setFixedSize(70, 48)
+        self._value = 3.2
 
     def set_value(self, val: float):
-        self._val = max(0.0, min(100.0, val))
+        self._value = max(0.0, min(100.0, val))
         self.update()
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        cx = self.width() / 2.0 + 4.0
-        cy = self.height() - 4.0
-        r = 24.0
+        rect = QRectF(6, 6, 58, 58)
+        # Background arc (180 to 0 degrees clockwise)
+        bg_pen = QPen(QColor(255, 255, 255, 25), 4.5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+        painter.setPen(bg_pen)
+        painter.drawArc(rect, 0 * 16, 180 * 16)
 
-        # 1. Background semi-circle track
-        track_pen = QPen(QColor(255, 255, 255, 28), 4.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
-        painter.setPen(track_pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawArc(int(cx - r), int(cy - r), int(r * 2), int(r * 2), 0 * 16, 180 * 16)
-
-        # 2. Active cyan arc (proportional to CPU %)
-        span = int((self._val / 100.0) * 180.0)
-        span = max(6, span)
-        gauge_pen = QPen(QColor(0, 242, 254, 255), 4.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
-        painter.setPen(gauge_pen)
-        painter.drawArc(int(cx - r), int(cy - r), int(r * 2), int(r * 2), 180 * 16, -span * 16)
-
-        # 3. Glowing needle/tip pointer
-        tip_angle_deg = 180.0 - (self._val / 100.0) * 180.0
-        tip_rad = math.radians(tip_angle_deg)
-        tx = cx + r * math.cos(tip_rad)
-        ty = cy - r * math.sin(tip_rad)
-
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QBrush(QColor(255, 255, 255, 255)))
-        painter.drawEllipse(QPointF(tx, ty), 2.5, 2.5)
+        # Active glowing cyan arc
+        active_span = int((self._value / 100.0) * 180.0)
+        arc_pen = QPen(QColor(0, 242, 254), 4.5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+        painter.setPen(arc_pen)
+        painter.drawArc(rect, 180 * 16, -active_span * 16)
 
         # Center small pivot dot
-        painter.setBrush(QBrush(QColor(0, 242, 254, 180)))
-        painter.drawEllipse(QPointF(cx, cy - 2), 2.0, 2.0)
+        cx = 35.0
+        cy = 35.0
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(QColor(0, 242, 254)))
+        painter.drawEllipse(QPointF(cx, cy), 2.2, 2.2)
 
 
 # ==========================================
-# 3. RAM GLOWING PROGRESS BAR
+# 3. RAM PROGRESS GLOW BAR
 # ==========================================
 class RamBarWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(8)
-        self._pct = 37.6
+        self.setFixedHeight(10)
+        self._percent = 38.0
 
     def set_percent(self, pct: float):
-        self._pct = max(0.0, min(100.0, pct))
+        self._percent = max(0.0, min(100.0, pct))
         self.update()
 
     def paintEvent(self, event):
@@ -284,67 +265,206 @@ class RamBarWidget(QWidget):
 
         w = float(self.width())
         h = float(self.height())
+        r = h / 2.0
 
         # Background track
+        bg_path = QPainterPath()
+        bg_path.addRoundedRect(QRectF(0, 1, w, h - 2), r, r)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QBrush(QColor(255, 255, 255, 22)))
-        painter.drawRoundedRect(QRectF(0, 1, w, h - 2), 3, 3)
+        painter.drawPath(bg_path)
 
-        # Active cyan fill
-        fill_w = max(6.0, (self._pct / 100.0) * w)
+        # Filled active bar
+        fill_w = max(h, (self._percent / 100.0) * w)
+        fill_path = QPainterPath()
+        fill_path.addRoundedRect(QRectF(0, 1, fill_w, h - 2), r, r)
+
         grad = QLinearGradient(0, 0, fill_w, 0)
-        grad.setColorAt(0.0, QColor(0, 242, 254, 160))
-        grad.setColorAt(1.0, QColor(0, 242, 254, 255))
+        grad.setColorAt(0.0, QColor(0, 180, 255))
+        grad.setColorAt(1.0, QColor(0, 242, 254))
         painter.setBrush(QBrush(grad))
-        painter.drawRoundedRect(QRectF(0, 1, fill_w, h - 2), 3, 3)
+        painter.drawPath(fill_path)
 
-        # Illuminated rounded head
-        painter.setBrush(QBrush(QColor(224, 247, 250, 240)))
-        painter.drawEllipse(QPointF(fill_w - 2.5, h / 2.0), 2.5, 2.5)
+        # Head light dot
+        head_pen = QPen(QColor(255, 255, 255), 2.0)
+        painter.setPen(head_pen)
+        painter.drawPoint(QPointF(fill_w - r, r + 0.5))
 
 
 # ==========================================
-# 4. ANIMATED 4-DOT STATUS INDICATOR
+# 4. INTERACTIVE PULSE DOTS & PAGINATION
 # ==========================================
 class PulseDotsWidget(QWidget):
-    def __init__(self, parent=None):
+    page_selected = pyqtSignal(int)
+
+    def __init__(self, parent=None, count=4):
         super().__init__(parent)
-        self.setFixedSize(68, 14)
+        self._count = count
+        self.setFixedSize(count * 20 + 8, 20)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._active_idx = 0
+        self._pulse_alpha = 255
+        self._pulse_dir = -4
+
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._step)
-        self.timer.start(230)
+        self.timer.start(40)
+
+    def set_active_page(self, idx: int):
+        self._active_idx = max(0, min(self._count - 1, idx))
+        self.update()
 
     def _step(self):
-        self._active_idx = (self._active_idx + 1) % 4
+        self._pulse_alpha += self._pulse_dir
+        if self._pulse_alpha <= 130:
+            self._pulse_dir = 4
+        elif self._pulse_alpha >= 255:
+            self._pulse_dir = -4
         self.update()
+
+    def mousePressEvent(self, event):
+        x = event.position().x()
+        spacing = 20.0
+        start_x = 10.0
+        idx = int(round((x - start_x) / spacing))
+        idx = max(0, min(self._count - 1, idx))
+        self.set_active_page(idx)
+        self.page_selected.emit(idx)
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        spacing = 15.0
-        start_x = 11.0
+        spacing = 20.0
+        start_x = 10.0
         cy = self.height() / 2.0
 
-        for i in range(4):
+        for i in range(self._count):
             cx = start_x + i * spacing
             if i == self._active_idx:
-                # Active glowing dot
+                # Active glowing dot with breathing halo
                 painter.setPen(Qt.PenStyle.NoPen)
-                painter.setBrush(QBrush(QColor(0, 242, 254, 255)))
+                painter.setBrush(QBrush(QColor(0, 242, 254, int(self._pulse_alpha * 0.25))))
+                painter.drawEllipse(QPointF(cx, cy), 7.0, 7.0)
+
+                painter.setBrush(QBrush(QColor(0, 242, 254, self._pulse_alpha)))
                 painter.drawEllipse(QPointF(cx, cy), 3.8, 3.8)
-                painter.setBrush(QBrush(QColor(0, 242, 254, 60)))
-                painter.drawEllipse(QPointF(cx, cy), 6.5, 6.5)
             else:
-                # Dim dot
+                # Inactive dim dot
                 painter.setPen(Qt.PenStyle.NoPen)
-                painter.setBrush(QBrush(QColor(255, 255, 255, 45)))
+                painter.setBrush(QBrush(QColor(255, 255, 255, 50)))
                 painter.drawEllipse(QPointF(cx, cy), 2.8, 2.8)
 
 
 # ==========================================
-# 5. SCI-FI HUD FRAME & BACKGROUND CONTAINER
+# 5. CYBER HUD BUTTONS (NAV & ACTIONS)
+# ==========================================
+class HudNavButton(QPushButton):
+    """Top bar Cyber Navigation Tab Button."""
+    def __init__(self, text: str, page_idx: int, parent=None):
+        super().__init__(text, parent)
+        self.page_idx = page_idx
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedHeight(28)
+        self.set_active(False)
+
+    def set_active(self, active: bool):
+        if active:
+            self.setStyleSheet("""
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                stop:0 rgba(0, 242, 254, 0.28), stop:1 rgba(0, 180, 216, 0.10));
+                    border: 1px solid #00f2fe;
+                    border-bottom: 2px solid #00f2fe;
+                    border-radius: 6px;
+                    color: #ffffff;
+                    font-size: 11px;
+                    font-weight: 800;
+                    letter-spacing: 1.2px;
+                    padding: 3px 12px;
+                }
+            """)
+        else:
+            self.setStyleSheet("""
+                QPushButton {
+                    background: rgba(10, 20, 35, 0.5);
+                    border: 1px solid rgba(0, 242, 254, 0.18);
+                    border-radius: 6px;
+                    color: #94a3b8;
+                    font-size: 11px;
+                    font-weight: 600;
+                    letter-spacing: 0.8px;
+                    padding: 3px 12px;
+                }
+                QPushButton:hover {
+                    background: rgba(0, 242, 254, 0.14);
+                    border-color: rgba(0, 242, 254, 0.5);
+                    color: #f1f5f9;
+                }
+            """)
+
+
+class HudActionButton(QPushButton):
+    """Futuristic Grid Button for Predefined Controls Matrix."""
+    def __init__(self, title: str, subtitle: str, icon_str: str, color_hex: str = "#00f2fe", parent=None):
+        super().__init__(parent)
+        self.setFixedHeight(54)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(10, 4, 10, 4)
+        layout.setSpacing(10)
+
+        # Icon badge
+        icon_lbl = QLabel(icon_str)
+        icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_lbl.setFixedSize(36, 36)
+        icon_lbl.setStyleSheet(f"""
+            QLabel {{
+                background: rgba(0, 242, 254, 0.08);
+                border: 1px solid {color_hex};
+                border-radius: 8px;
+                color: {color_hex};
+                font-size: 17px;
+            }}
+        """)
+        layout.addWidget(icon_lbl)
+
+        # Text container
+        t_layout = QVBoxLayout()
+        t_layout.setSpacing(2)
+        t_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+
+        lbl_title = QLabel(title)
+        lbl_title.setStyleSheet("color: #f1f5f9; font-size: 12px; font-weight: 700; border: none; background: transparent;")
+
+        lbl_sub = QLabel(subtitle)
+        lbl_sub.setStyleSheet("color: #64748b; font-size: 10px; font-weight: 500; border: none; background: transparent;")
+
+        t_layout.addWidget(lbl_title)
+        t_layout.addWidget(lbl_sub)
+        layout.addLayout(t_layout)
+        layout.addStretch()
+
+        self.setStyleSheet(f"""
+            QPushButton {{
+                background: rgba(10, 25, 45, 0.65);
+                border: 1px solid rgba(0, 242, 254, 0.22);
+                border-radius: 10px;
+                text-align: left;
+            }}
+            QPushButton:hover {{
+                background: rgba(0, 242, 254, 0.15);
+                border: 1px solid {color_hex};
+            }}
+            QPushButton:pressed {{
+                background: rgba(0, 242, 254, 0.32);
+            }}
+        """)
+
+
+# ==========================================
+# 6. SCI-FI HUD FRAME & BACKGROUND CONTAINER
 # ==========================================
 class HudFrame(QFrame):
     def __init__(self, parent=None):
@@ -357,7 +477,7 @@ class HudFrame(QFrame):
 
         w = float(self.width())
         h = float(self.height())
-        cut = 18.0  # Angled chamfer size
+        cut = 18.0
 
         # 1. Main Background Gradient
         bg_grad = QLinearGradient(0, 0, 0, h)
@@ -414,7 +534,7 @@ class HudFrame(QFrame):
         painter.drawLine(QPointF(w - cut, h), QPointF(w, h - cut))
         painter.drawLine(QPointF(w, h - cut), QPointF(w, h - cut - 14))
 
-        # 5. Inner Inset Wire Guide Lines (Subtle HUD detailing)
+        # 5. Inner Inset Wire Guide Lines
         inner_pen = QPen(QColor(0, 242, 254, 25), 1.0)
         painter.setPen(inner_pen)
         inset = 6.0
@@ -432,10 +552,10 @@ class HudFrame(QFrame):
 
 
 # ==========================================
-# 6. VOICE WORKER THREAD
+# 7. VOICE WORKER THREAD
 # ==========================================
 class VoiceWorker(QThread):
-    update_signal = pyqtSignal(str, bool)  # text, is_user
+    update_signal = pyqtSignal(str, bool)
     listening_signal = pyqtSignal(bool)
     status_signal = pyqtSignal(str)
 
@@ -449,7 +569,6 @@ class VoiceWorker(QThread):
         self.router = None
         self.tts = None
         self.wake = None
-        self._cancel_flag = False
 
     def _on_wake(self):
         from core.voice.wake_word import get_wake_detector
@@ -460,127 +579,84 @@ class VoiceWorker(QThread):
             return
 
         if self._is_processing:
-            logger.info("Session takeover: Stopping previous session.")
-            self._cancel_flag = True
-            self.tts.stop()
-            time.sleep(0.2)
+            return
 
+        self._is_processing = True
         try:
-            self._is_processing = True
-            self._cancel_flag = False
             wake.pause()
-            self.status_signal.emit("JARVIS LISTENING...")
-
-            # 1. Wake Response Chime / Confirmation
-            WAKE_POOL = ["Yes, sir?", "I'm listening.", "How can I help you?", "Yes, go ahead."]
-            import random
-            resp = random.choice(WAKE_POOL)
-            self.tts.speak(resp, block=True)
-            if self._cancel_flag:
-                return
-
-            # 2. Listen for Command
             self.listening_signal.emit(True)
-            text = self.stt.listen(timeout=6.0)
-            self.listening_signal.emit(False)
+            self.status_signal.emit("LISTENING...")
+            self.tts.speak("How can I help you?", block=False)
 
-            if self._cancel_flag:
+            audio_data = self.stt.listen(timeout=6.0, phrase_time_limit=10.0)
+            if not audio_data:
+                self.listening_signal.emit(False)
+                self.status_signal.emit("STANDBY [ACTIVE]")
                 return
+
+            self.status_signal.emit("PROCESSING...")
+            text = self.stt.transcribe(audio_data)
 
             if text:
                 self.update_signal.emit(text, True)
-                self.status_signal.emit("PROCESSING...")
-
-                # 3. Process Intent
-                result = self.nlp.process(text)
-                intent = result.get("intent", "unknown")
-                nlp_resp = result.get("response", "")
-
-                if self._cancel_flag:
-                    return
-
-                # 4. Immediate AI Feedback
-                if nlp_resp:
-                    self.tts.speak(nlp_resp, block=True)
-
-                if self._cancel_flag:
-                    return
-
-                # 5. Execute Action
-                exec_result = self.router.route({
-                    "intent": intent,
-                    "entities": result.get("entities"),
-                    "response": nlp_resp
-                })
-
-                if self._cancel_flag:
-                    return
-
-                # 6. Final Spoken Feedback
-                final_resp = exec_result.response or nlp_resp
-                self.update_signal.emit(final_resp, False)
-
-                if exec_result.response and exec_result.response != nlp_resp:
-                    self.tts.speak(exec_result.response, block=True)
-                elif not nlp_resp and final_resp:
-                    self.tts.speak(final_resp, block=True)
-
-                if self._cancel_flag:
-                    return
-
-                # 7. Task Confirmation
-                TASK_INTENTS = [
-                    "open_app", "close_app", "open_folder", "open_file",
-                    "open_in", "system_control", "file_action", "write_content",
-                    "send_whatsapp", "youtube_play", "work_mode"
-                ]
-                if exec_result.success and intent in TASK_INTENTS:
-                    self.tts.speak("Command completed.", block=True)
+                self._execute_pipeline(text)
             else:
-                logger.info("No command detected.")
-        except Exception as e:
-            logger.error(f"Voice session error: {e}")
+                self.status_signal.emit("STANDBY [ACTIVE]")
         finally:
             self._is_processing = False
             self.listening_signal.emit(False)
-            self.status_signal.emit("STANDBY [ACTIVE]")
             wake.resume()
 
+    def _execute_pipeline(self, text: str):
+        result = self.nlp.process(text)
+        nlp_resp = result.get("response", "")
+        if nlp_resp:
+            self.tts.speak(nlp_resp, block=True)
+
+        exec_result = self.router.route({
+            "intent": result.get("intent"),
+            "entities": result.get("entities"),
+            "response": nlp_resp
+        })
+
+        final_resp = exec_result.response or nlp_resp
+        if exec_result.response and exec_result.response != nlp_resp:
+            self.tts.speak(exec_result.response)
+        elif not nlp_resp and final_resp:
+            self.tts.speak(final_resp)
+
+        TASK_INTENTS = [
+            "open_app", "close_app", "open_folder", "open_file",
+            "open_in", "system_control", "file_action", "write_content",
+            "send_whatsapp", "youtube_play", "work_mode"
+        ]
+        if exec_result.success and result.get("intent") in TASK_INTENTS:
+            self.tts.speak("Command completed.")
+
+        self.update_signal.emit(final_resp or "Command completed.", False)
+        self.status_signal.emit("STANDBY [ACTIVE]")
+
     def trigger(self):
-        """Manually trigger listening."""
-        if not self.tts or not self.stt:
-            logger.warning("Voice engine not ready for manual trigger.")
-            return
+        """Manually triggered via microphone button or reactor click."""
         threading.Thread(target=self._on_wake, daemon=True).start()
 
     def run(self):
-        self.status_signal.emit("INITIALIZING VOICE ENGINE...")
-        from core.voice.stt import get_stt
-        from core.voice.tts import get_tts
-        from core.voice.wake_word import get_wake_detector
-        from core.ai.nlp_engine import get_nlp
-        from core.ai.command_router import get_router
-
         try:
+            from core.voice.stt import get_stt
+            from core.ai.nlp_engine import get_nlp
+            from core.ai.command_router import get_router
+            from core.voice.tts import get_tts
+            from core.voice.wake_word import get_wake_detector
+
             self.stt = get_stt()
-            self.tts = get_tts()
             self.nlp = get_nlp()
-            self.wake = get_wake_detector(on_detected=self._on_wake)
             self.router = get_router()
+            self.tts = get_tts()
+            self.wake = get_wake_detector(on_detected=self._on_wake)
 
-            self.status_signal.emit("STANDBY [ACTIVE]")
-
-            # Startup Greeting
-            GREETINGS = [
-                "Hey! How can I help you?",
-                "Jarvis online. What do you need?",
-                "Good to see you. I'm ready.",
-                "Hello! Say my name whenever you need me.",
-            ]
-            import random
-            self.tts.speak(random.choice(GREETINGS))
-
+            self.tts.speak("Jarvis online. What do you need?", block=False)
             self.wake.start()
+
             while self._running:
                 time.sleep(0.5)
         except Exception as e:
@@ -595,9 +671,16 @@ class VoiceWorker(QThread):
 
 
 # ==========================================
-# 7. MAIN SCI-FI HUD WINDOW
+# 8. MAIN SCI-FI HUD WINDOW WITH SWAP PAGES
 # ==========================================
 class MainWindow(QMainWindow):
+    PAGE_TITLES = [
+        "PAGE 1/4: CORE HUD",
+        "PAGE 2/4: CONTROLS",
+        "PAGE 3/4: REMOTE HUB",
+        "PAGE 4/4: DIAGNOSTICS"
+    ]
+
     def __init__(self, auth_manager=None):
         super().__init__()
         if auth_manager is None:
@@ -613,6 +696,8 @@ class MainWindow(QMainWindow):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
         self.drag_pos = None
+        self.nav_buttons = []
+
         self._setup_ui()
 
         # Telemetry Timer (Updates CPU & RAM every second)
@@ -628,24 +713,21 @@ class MainWindow(QMainWindow):
         self.worker.start()
 
     def _setup_ui(self):
-        # Master Sci-Fi HUD Frame
         self.frame = HudFrame(self)
         self.frame.setGeometry(0, 0, 1020, 640)
 
-        # Main Layout inside Frame
         main_layout = QVBoxLayout(self.frame)
-        main_layout.setContentsMargins(18, 14, 18, 14)
+        main_layout.setContentsMargins(18, 14, 18, 12)
         main_layout.setSpacing(0)
 
-        # ─── TOP TITLE BAR ───
+        # ─── 1. TOP TITLE BAR & CYBER NAV TABS ───
         title_bar = QHBoxLayout()
-        title_bar.setContentsMargins(12, 4, 12, 10)
+        title_bar.setContentsMargins(12, 4, 12, 8)
 
         # Left Brand Emblem & Title
         brand_layout = QHBoxLayout()
         brand_layout.setSpacing(8)
 
-        # Small neon J badge
         badge = QLabel("J")
         badge.setFixedSize(22, 22)
         badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -673,9 +755,28 @@ class MainWindow(QMainWindow):
         title_bar.addLayout(brand_layout)
         title_bar.addStretch()
 
+        # Center Top Cyber Navigation Tabs (Page Swapping)
+        nav_tabs = QHBoxLayout()
+        nav_tabs.setSpacing(6)
+
+        tab_specs = [
+            ("◈ CORE HUD", 0),
+            ("⚡ CONTROLS", 1),
+            ("📡 REMOTE", 2),
+            ("⚙ DIAGNOSTICS", 3)
+        ]
+        for name, idx in tab_specs:
+            btn = HudNavButton(name, idx)
+            btn.clicked.connect(lambda checked, i=idx: self._set_page(i))
+            self.nav_buttons.append(btn)
+            nav_tabs.addWidget(btn)
+
+        title_bar.addLayout(nav_tabs)
+        title_bar.addStretch()
+
         # Window Controls (—  ▢  ✕)
         win_ctrls = QHBoxLayout()
-        win_ctrls.setSpacing(6)
+        win_ctrls.setSpacing(4)
 
         btn_min = QPushButton("—")
         btn_min.setFixedSize(28, 24)
@@ -733,76 +834,84 @@ class MainWindow(QMainWindow):
         title_bar.addLayout(win_ctrls)
         main_layout.addLayout(title_bar)
 
-        # ─── CORE BODY (THREE COLUMNS) ───
-        body_layout = QHBoxLayout()
-        body_layout.setContentsMargins(10, 0, 10, 0)
-        body_layout.setSpacing(18)
+        # ─── 2. MULTI-PAGE STACK (SWAPPABLE PAGES) ───
+        self.stack = QStackedWidget()
+        self.stack.addWidget(self._build_page_core_hud())       # Index 0
+        self.stack.addWidget(self._build_page_controls())       # Index 1
+        self.stack.addWidget(self._build_page_remote())         # Index 2
+        self.stack.addWidget(self._build_page_diagnostics())    # Index 3
 
-        # 1. LEFT CARD: HUD STATUS
-        self.left_card = self._build_left_hud_card()
-        body_layout.addWidget(self.left_card, alignment=Qt.AlignmentFlag.AlignVCenter)
+        main_layout.addWidget(self.stack, stretch=1)
 
-        # 2. CENTER: ARC REACTOR & LISTENING HUD
-        center_container = QWidget()
-        center_layout = QVBoxLayout(center_container)
-        center_layout.setContentsMargins(0, 0, 0, 0)
-        center_layout.setSpacing(4)
-        center_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        # 360-degree Reactor
-        self.reactor = ArcReactorWidget()
-        self.reactor.clicked.connect(lambda: self.worker.trigger())
-        center_layout.addWidget(self.reactor, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        # "AI VOICE ASSISTANT" Label
-        assistant_lbl = QLabel("AI VOICE ASSISTANT")
-        assistant_lbl.setStyleSheet("color: #94a3b8; font-size: 11px; font-weight: 700; letter-spacing: 3px;")
-        center_layout.addWidget(assistant_lbl, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        # Dynamic State Label ("LISTENING..." / "STANDBY [ACTIVE]")
-        self.state_lbl = QLabel("STANDBY [ACTIVE]")
-        self.state_lbl.setStyleSheet("color: #00f2fe; font-size: 12px; font-weight: 800; letter-spacing: 2px;")
-        center_layout.addWidget(self.state_lbl, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        # Animated 4-dot status wave
-        self.dots = PulseDotsWidget()
-        center_layout.addWidget(self.dots, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        body_layout.addWidget(center_container, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        # 3. RIGHT COLUMN: TWO STACKED CARDS (System Telemetry & Recent Commands)
-        right_container = QWidget()
-        right_container.setFixedWidth(250)
-        right_layout = QVBoxLayout(right_container)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(14)
-        right_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-
-        # System Telemetry Card (CPU gauge & RAM bar)
-        self.sys_card = self._build_system_card()
-        right_layout.addWidget(self.sys_card)
-
-        # Recent Voice Commands Card
-        self.commands_card = self._build_commands_card()
-        right_layout.addWidget(self.commands_card)
-
-        body_layout.addWidget(right_container, alignment=Qt.AlignmentFlag.AlignVCenter)
-        main_layout.addLayout(body_layout)
-
-        # ─── BOTTOM DECORATION & INTERACTIVE COMMAND BAR ───
+        # ─── 3. BOTTOM DECORATION & INTERACTIVE PAGINATION BAR ───
         bottom_bar = QHBoxLayout()
         bottom_bar.setContentsMargins(14, 6, 14, 4)
+        bottom_bar.setSpacing(12)
 
-        # Bottom-Left Technical Data Block
+        # Left Tech Telemetry Block
         telemetry_block = QLabel("//////  [SYS_V2.4.1] CORE NOMINAL\nSTREAM: 16KHZ MONO SYNCED")
         telemetry_block.setStyleSheet("color: #334155; font-family: 'Consolas', monospace; font-size: 9px; line-height: 1.2;")
-        bottom_bar.addWidget(telemetry_block, alignment=Qt.AlignmentFlag.AlignBottom)
+        bottom_bar.addWidget(telemetry_block, alignment=Qt.AlignmentFlag.AlignVCenter)
 
-        bottom_bar.addSpacing(20)
+        # Interactive Page Swapper Controls (‹  ● ○ ○ ○  › + Label)
+        swapper_box = QHBoxLayout()
+        swapper_box.setSpacing(6)
 
-        # Center Cyber Input Line (Allows typing commands anytime!)
+        btn_prev = QPushButton("‹")
+        btn_prev.setFixedSize(22, 22)
+        btn_prev.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_prev.setStyleSheet("""
+            QPushButton {
+                background: rgba(15, 23, 42, 0.7);
+                border: 1px solid rgba(0, 242, 254, 0.3);
+                border-radius: 4px;
+                color: #00f2fe;
+                font-size: 13px;
+                font-weight: 700;
+            }
+            QPushButton:hover {
+                background: rgba(0, 242, 254, 0.25);
+                color: #ffffff;
+            }
+        """)
+        btn_prev.clicked.connect(self._prev_page)
+        swapper_box.addWidget(btn_prev)
+
+        self.dots = PulseDotsWidget(count=4)
+        self.dots.page_selected.connect(self._set_page)
+        swapper_box.addWidget(self.dots)
+
+        btn_next = QPushButton("›")
+        btn_next.setFixedSize(22, 22)
+        btn_next.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_next.setStyleSheet("""
+            QPushButton {
+                background: rgba(15, 23, 42, 0.7);
+                border: 1px solid rgba(0, 242, 254, 0.3);
+                border-radius: 4px;
+                color: #00f2fe;
+                font-size: 13px;
+                font-weight: 700;
+            }
+            QPushButton:hover {
+                background: rgba(0, 242, 254, 0.25);
+                color: #ffffff;
+            }
+        """)
+        btn_next.clicked.connect(self._next_page)
+        swapper_box.addWidget(btn_next)
+
+        self.page_indicator_lbl = QLabel("PAGE 1/4: CORE HUD")
+        self.page_indicator_lbl.setFixedWidth(145)
+        self.page_indicator_lbl.setStyleSheet("color: #64748b; font-size: 10px; font-weight: 700; letter-spacing: 0.8px;")
+        swapper_box.addWidget(self.page_indicator_lbl)
+
+        bottom_bar.addLayout(swapper_box)
+        bottom_bar.addSpacing(6)
+
+        # Center Cyber Command Line Input
         self.cmd_input = QLineEdit()
-        self.cmd_input.setPlaceholderText("Type a command or click reactor / say \"Jarvis\"...")
+        self.cmd_input.setPlaceholderText("Type command (e.g. 'open vs code', 'controls', 'work mode', 'remote')...")
         self.cmd_input.setStyleSheet("""
             QLineEdit {
                 background: rgba(15, 23, 42, 0.7);
@@ -816,15 +925,32 @@ class MainWindow(QMainWindow):
             QLineEdit:focus {
                 border: 1px solid #00f2fe;
                 background: rgba(15, 23, 42, 0.95);
-                box-shadow: 0 0 10px rgba(0, 242, 254, 0.3);
             }
         """)
         self.cmd_input.returnPressed.connect(self._on_typed_command)
         bottom_bar.addWidget(self.cmd_input, stretch=1)
 
-        bottom_bar.addSpacing(20)
+        # Quick Swap Button & Trigger Mic Button
+        btn_swap = QPushButton("⚡ SWAP")
+        btn_swap.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_swap.setStyleSheet("""
+            QPushButton {
+                background: rgba(0, 242, 254, 0.08);
+                border: 1px solid rgba(0, 242, 254, 0.3);
+                border-radius: 10px;
+                padding: 6px 12px;
+                color: #38bdf8;
+                font-size: 10px;
+                font-weight: 700;
+            }
+            QPushButton:hover {
+                background: rgba(0, 242, 254, 0.2);
+                color: white;
+            }
+        """)
+        btn_swap.clicked.connect(self._next_page)
+        bottom_bar.addWidget(btn_swap)
 
-        # Bottom-Right Quick Action Trigger
         btn_trigger = QPushButton("🎙️ TRIGGER MIC")
         btn_trigger.setStyleSheet("""
             QPushButton {
@@ -844,12 +970,457 @@ class MainWindow(QMainWindow):
             }
         """)
         btn_trigger.clicked.connect(lambda: self.worker.trigger())
-        bottom_bar.addWidget(btn_trigger, alignment=Qt.AlignmentFlag.AlignBottom)
+        bottom_bar.addWidget(btn_trigger)
 
         main_layout.addLayout(bottom_bar)
+        self._set_page(0)
 
+    # ─── PAGE 0: CORE HUD (ORIGINAL LAYOUT) ───
+    def _build_page_core_hud(self) -> QWidget:
+        page = QWidget()
+        body_layout = QHBoxLayout(page)
+        body_layout.setContentsMargins(10, 0, 10, 0)
+        body_layout.setSpacing(18)
+
+        # 1. Left HUD Status Card
+        self.left_card = self._build_left_hud_card()
+        body_layout.addWidget(self.left_card, alignment=Qt.AlignmentFlag.AlignVCenter)
+
+        # 2. Center Hero Arc Reactor
+        center_container = QWidget()
+        center_layout = QVBoxLayout(center_container)
+        center_layout.setContentsMargins(0, 0, 0, 0)
+        center_layout.setSpacing(4)
+        center_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.reactor = ArcReactorWidget()
+        self.reactor.clicked.connect(lambda: self.worker.trigger())
+        center_layout.addWidget(self.reactor, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        assistant_lbl = QLabel("AI VOICE ASSISTANT")
+        assistant_lbl.setStyleSheet("color: #94a3b8; font-size: 11px; font-weight: 700; letter-spacing: 3px;")
+        center_layout.addWidget(assistant_lbl, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        self.state_lbl = QLabel("STANDBY [ACTIVE]")
+        self.state_lbl.setStyleSheet("color: #00f2fe; font-size: 12px; font-weight: 800; letter-spacing: 2px;")
+        center_layout.addWidget(self.state_lbl, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        # Center pulse indicator
+        self.center_dots = PulseDotsWidget(count=4)
+        self.center_dots.page_selected.connect(self._set_page)
+        center_layout.addWidget(self.center_dots, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        body_layout.addWidget(center_container, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        # 3. Right Telemetry & Recent Commands Stack
+        right_container = QWidget()
+        right_container.setFixedWidth(250)
+        right_layout = QVBoxLayout(right_container)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(14)
+        right_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+
+        self.sys_card = self._build_system_card()
+        right_layout.addWidget(self.sys_card)
+
+        self.commands_card = self._build_commands_card()
+        right_layout.addWidget(self.commands_card)
+
+        body_layout.addWidget(right_container, alignment=Qt.AlignmentFlag.AlignVCenter)
+        return page
+
+    # ─── PAGE 1: PREDEFINED CONTROLS DASHBOARD ───
+    def _build_page_controls(self) -> QWidget:
+        page = QWidget()
+        page_layout = QHBoxLayout(page)
+        page_layout.setContentsMargins(10, 8, 10, 8)
+        page_layout.setSpacing(14)
+
+        # Column 1: Application Quick Launchers
+        col_apps = self._create_hud_group("APPLICATIONS (QUICK LAUNCH)", [
+            ("VS Code", "Code Editor", "💻", "#38bdf8", lambda: self._exec_action("VS Code", "open_app", {"app": "code"})),
+            ("Google Chrome", "Web Browser", "🌐", "#00f2fe", lambda: self._exec_action("Chrome", "open_app", {"app": "chrome"})),
+            ("Terminal", "PowerShell CLI", "⚡", "#a78bfa", lambda: self._exec_action("Terminal", "open_app", {"app": "powershell"})),
+            ("File Explorer", "Downloads Folder", "📁", "#facc15", lambda: self._exec_action("File Explorer", "open_app", {"app": "downloads folder"})),
+            ("Notepad", "Quick Notes", "📝", "#4ade80", lambda: self._exec_action("Notepad", "open_app", {"app": "notepad"})),
+            ("WhatsApp", "Messaging Client", "💬", "#22c55e", lambda: self._exec_action("WhatsApp", "open_app", {"app": "whatsapp"}))
+        ])
+        page_layout.addWidget(col_apps)
+
+        # Column 2: System & Audio Telemetry Controls
+        col_sys = self._create_hud_group("SYSTEM & AUDIO CONTROLS", [
+            ("Volume +10%", "Boost Master Sound", "🔊", "#00f2fe", lambda: self._exec_action("Volume +10%", "volume_control", {"action": "up"})),
+            ("Volume -10%", "Lower Master Sound", "🔉", "#38bdf8", lambda: self._exec_action("Volume -10%", "volume_control", {"action": "down"})),
+            ("Mute / Unmute", "Toggle Master Audio", "🔇", "#f87171", lambda: self._exec_action("Mute Audio", "volume_control", {"action": "mute"})),
+            ("Screenshot", "Capture Display", "📸", "#38bdf8", lambda: self._exec_action("Screenshot", "system_control", {"action": "screenshot"})),
+            ("Lock Workstation", "Secure Desktop Screen", "🔒", "#fb923c", lambda: self._exec_action("Lock PC", "system_control", {"action": "lock"})),
+            ("Clean Temp Cache", "Free Memory & Disk", "🧹", "#ec4899", lambda: self._exec_action("Clean Temp", "system_control", {"action": "clean_temp"}))
+        ])
+        page_layout.addWidget(col_sys)
+
+        # Column 3: AI Automations & Macros
+        col_macro = self._create_hud_group("AUTOMATION & MACROS", [
+            ("Work Mode", "Launch Dev Suite", "🚀", "#00f2fe", lambda: self._exec_action("Work Mode", "work_mode", {})),
+            ("Play Lo-Fi Stream", "Ambient Coding Audio", "🎵", "#a855f7", lambda: self._exec_action("Lo-Fi Stream", "youtube_play", {"query": "lofi hip hop radio"})),
+            ("Health Diagnostics", "CPU/RAM/Disk Audit", "🩺", "#34d399", lambda: self._exec_action("Diagnostics", "system_control", {"action": "diagnostics"})),
+            ("Weather Report", "Local Forecast", "🌤️", "#38bdf8", lambda: self._exec_action("Weather", "weather", {})),
+            ("Minimize All", "Show Clean Desktop", "🗔", "#94a3b8", lambda: self._exec_action("Minimize Windows", "window_control", {"action": "minimize_all"})),
+            ("Voice Check", "Verify TTS Synthesis", "🎙️", "#00f2fe", lambda: self._test_voice())
+        ])
+        page_layout.addWidget(col_macro)
+
+        return page
+
+    def _create_hud_group(self, title: str, button_specs: list) -> QFrame:
+        """Constructs a glassmorphic column card containing a list of action buttons."""
+        card = QFrame()
+        card.setStyleSheet("""
+            QFrame {
+                background: rgba(10, 25, 45, 0.65);
+                border: 1px solid rgba(0, 242, 254, 0.3);
+                border-radius: 14px;
+            }
+        """)
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
+
+        # Header Title with Cyan Indicator Pill
+        h_layout = QHBoxLayout()
+        h_layout.setSpacing(6)
+        pill = QLabel()
+        pill.setFixedSize(3, 14)
+        pill.setStyleSheet("background: #00f2fe; border-radius: 1px; border: none;")
+        t_lbl = QLabel(title)
+        t_lbl.setStyleSheet("color: #94a3b8; font-size: 11px; font-weight: 700; letter-spacing: 1px; border: none; background: transparent;")
+        h_layout.addWidget(pill)
+        h_layout.addWidget(t_lbl)
+        h_layout.addStretch()
+        layout.addLayout(h_layout)
+
+        # Buttons
+        for b_title, b_sub, b_icon, b_color, b_handler in button_specs:
+            btn = HudActionButton(b_title, b_sub, b_icon, b_color)
+            btn.clicked.connect(b_handler)
+            layout.addWidget(btn)
+
+        layout.addStretch()
+        return card
+
+    # ─── PAGE 2: MOBILE REMOTE & NETWORK HUB ───
+    def _build_page_remote(self) -> QWidget:
+        page = QWidget()
+        page_layout = QHBoxLayout(page)
+        page_layout.setContentsMargins(12, 10, 12, 10)
+        page_layout.setSpacing(16)
+
+        # Left Card: Remote Telemetry & Links
+        left_card = QFrame()
+        left_card.setStyleSheet("""
+            QFrame {
+                background: rgba(10, 25, 45, 0.65);
+                border: 1px solid rgba(0, 242, 254, 0.3);
+                border-radius: 14px;
+            }
+        """)
+        l_layout = QVBoxLayout(left_card)
+        l_layout.setContentsMargins(20, 18, 20, 18)
+        l_layout.setSpacing(12)
+
+        # Header
+        h_box = QHBoxLayout()
+        pill = QLabel()
+        pill.setFixedSize(3, 14)
+        pill.setStyleSheet("background: #00f2fe; border-radius: 1px; border: none;")
+        t_lbl = QLabel("MOBILE REMOTE SERVER STATUS")
+        t_lbl.setStyleSheet("color: #94a3b8; font-size: 11px; font-weight: 700; letter-spacing: 1px; border: none; background: transparent;")
+        h_box.addWidget(pill)
+        h_box.addWidget(t_lbl)
+        h_box.addStretch()
+        l_layout.addLayout(h_box)
+
+        # Online Status Banner
+        status_box = QLabel("●  REMOTE ENGINE ONLINE [PORT 8443 / 8000]")
+        status_box.setStyleSheet("""
+            color: #10b981; 
+            font-size: 12px; 
+            font-weight: 800; 
+            letter-spacing: 1.5px;
+            padding: 8px 12px;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            border-radius: 8px;
+        """)
+        l_layout.addWidget(status_box)
+
+        # Network IP URLs
+        l_layout.addSpacing(4)
+        lbl_url_hdr = QLabel("LOCAL NETWORK ACCESS (HTTPS REQUIRED FOR MIC):")
+        lbl_url_hdr.setStyleSheet("color: #7dd3fc; font-size: 10px; font-weight: 700; border: none; background: transparent;")
+        l_layout.addWidget(lbl_url_hdr)
+
+        self.remote_url_val = "https://192.168.0.115:8443"
+        url_box = QLabel(self.remote_url_val)
+        url_box.setStyleSheet("""
+            color: #00f2fe;
+            font-family: 'Consolas', monospace;
+            font-size: 14px;
+            font-weight: 700;
+            padding: 10px 14px;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(0, 242, 254, 0.35);
+            border-radius: 8px;
+        """)
+        l_layout.addWidget(url_box)
+
+        lbl_alt = QLabel("Local Loopback: http://localhost:8000")
+        lbl_alt.setStyleSheet("color: #64748b; font-size: 11px; font-family: 'Consolas', monospace; border: none; background: transparent;")
+        l_layout.addWidget(lbl_alt)
+
+        l_layout.addSpacing(10)
+
+        # Actions
+        btn_open = QPushButton("🌐 OPEN MOBILE REMOTE IN BROWSER")
+        btn_open.setFixedHeight(42)
+        btn_open.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_open.setStyleSheet("""
+            QPushButton {
+                background: rgba(0, 242, 254, 0.18);
+                border: 1px solid #00f2fe;
+                border-radius: 8px;
+                color: #ffffff;
+                font-size: 11px;
+                font-weight: 700;
+                letter-spacing: 1px;
+            }
+            QPushButton:hover {
+                background: rgba(0, 242, 254, 0.32);
+            }
+        """)
+        btn_open.clicked.connect(lambda: webbrowser.open(self.remote_url_val))
+        l_layout.addWidget(btn_open)
+
+        btn_copy = QPushButton("📋 COPY HTTPS REMOTE LINK")
+        btn_copy.setFixedHeight(38)
+        btn_copy.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_copy.setStyleSheet("""
+            QPushButton {
+                background: rgba(15, 23, 42, 0.7);
+                border: 1px solid rgba(0, 242, 254, 0.3);
+                border-radius: 8px;
+                color: #38bdf8;
+                font-size: 11px;
+                font-weight: 600;
+            }
+            QPushButton:hover {
+                background: rgba(0, 242, 254, 0.15);
+                color: #ffffff;
+            }
+        """)
+        btn_copy.clicked.connect(self._copy_remote_link)
+        l_layout.addWidget(btn_copy)
+
+        l_layout.addStretch()
+        page_layout.addWidget(left_card, stretch=1)
+
+        # Right Card: Connection Guide & Security Bypass
+        right_card = QFrame()
+        right_card.setStyleSheet("""
+            QFrame {
+                background: rgba(10, 25, 45, 0.65);
+                border: 1px solid rgba(0, 242, 254, 0.3);
+                border-radius: 14px;
+            }
+        """)
+        r_layout = QVBoxLayout(right_card)
+        r_layout.setContentsMargins(20, 18, 20, 18)
+        r_layout.setSpacing(10)
+
+        h_guide = QHBoxLayout()
+        pill2 = QLabel()
+        pill2.setFixedSize(3, 14)
+        pill2.setStyleSheet("background: #00f2fe; border-radius: 1px; border: none;")
+        t_guide = QLabel("MOBILE CONNECTIVITY & MIC SETUP")
+        t_guide.setStyleSheet("color: #94a3b8; font-size: 11px; font-weight: 700; letter-spacing: 1px; border: none; background: transparent;")
+        h_guide.addWidget(pill2)
+        h_guide.addWidget(t_guide)
+        h_guide.addStretch()
+        r_layout.addLayout(h_guide)
+
+        guide_steps = [
+            "1. Connect Phone to Same Wi-Fi (192.168.0.x network).",
+            "2. Open Chrome (Android) or Safari (iOS) on your phone.",
+            "3. Navigate to: https://192.168.0.115:8443",
+            "4. SSL Bypass: Tap 'Advanced' -> 'Proceed to 192.168.0.115 (unsafe)'.",
+            "5. Microphone: Tap 'Allow' when the browser asks for audio permission.",
+            "6. Speak 'Jarvis' or tap mic to trigger assistant from anywhere!"
+        ]
+        for step in guide_steps:
+            lbl_step = QLabel(step)
+            lbl_step.setStyleSheet("color: #e2e8f0; font-size: 11px; line-height: 1.4; border: none; background: transparent;")
+            lbl_step.setWordWrap(True)
+            r_layout.addWidget(lbl_step)
+
+        r_layout.addStretch()
+
+        btn_restart_srv = QPushButton("🔄 RESTART REMOTE DAEMON")
+        btn_restart_srv.setFixedHeight(38)
+        btn_restart_srv.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_restart_srv.setStyleSheet("""
+            QPushButton {
+                background: rgba(245, 158, 11, 0.15);
+                border: 1px solid rgba(245, 158, 11, 0.4);
+                border-radius: 8px;
+                color: #fbbf24;
+                font-size: 11px;
+                font-weight: 700;
+            }
+            QPushButton:hover {
+                background: rgba(245, 158, 11, 0.28);
+                color: #ffffff;
+            }
+        """)
+        btn_restart_srv.clicked.connect(self._restart_mobile_server)
+        r_layout.addWidget(btn_restart_srv)
+
+        page_layout.addWidget(right_card, stretch=1)
+        return page
+
+    # ─── PAGE 3: SYSTEM DIAGNOSTICS & TELEMETRY ───
+    def _build_page_diagnostics(self) -> QWidget:
+        page = QWidget()
+        page_layout = QHBoxLayout(page)
+        page_layout.setContentsMargins(12, 10, 12, 10)
+        page_layout.setSpacing(16)
+
+        # Left Card: Hardware & OS Audit
+        card_hw = QFrame()
+        card_hw.setStyleSheet("""
+            QFrame {
+                background: rgba(10, 25, 45, 0.65);
+                border: 1px solid rgba(0, 242, 254, 0.3);
+                border-radius: 14px;
+            }
+        """)
+        l_layout = QVBoxLayout(card_hw)
+        l_layout.setContentsMargins(20, 18, 20, 18)
+        l_layout.setSpacing(12)
+
+        # Header
+        h1 = QHBoxLayout()
+        pill1 = QLabel()
+        pill1.setFixedSize(3, 14)
+        pill1.setStyleSheet("background: #00f2fe; border-radius: 1px; border: none;")
+        t1 = QLabel("HARDWARE & OS TELEMETRY")
+        t1.setStyleSheet("color: #94a3b8; font-size: 11px; font-weight: 700; letter-spacing: 1px; border: none; background: transparent;")
+        h1.addWidget(pill1)
+        h1.addWidget(t1)
+        h1.addStretch()
+        l_layout.addLayout(h1)
+
+        # Live Stats
+        cores = psutil.cpu_count(logical=True)
+        freq = psutil.cpu_freq().current if psutil.cpu_freq() else 0.0
+        mem = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+
+        stats = [
+            f"CPU Cores: {cores} Logical Processors @ {freq:.0f} MHz",
+            f"Physical Memory: {mem.used / (1024**3):.1f} GB Used / {mem.total / (1024**3):.1f} GB Total ({mem.percent}%)",
+            f"System Disk (C:): {disk.free / (1024**3):.1f} GB Free / {disk.total / (1024**3):.1f} GB Total",
+            "Platform: Windows 11 Pro 64-Bit Architecture",
+            "Process Engine: Python 3.14 (Virtual Environment)"
+        ]
+        for s in stats:
+            lbl = QLabel(s)
+            lbl.setStyleSheet("color: #e2e8f0; font-size: 11px; border: none; background: transparent;")
+            l_layout.addWidget(lbl)
+
+        l_layout.addStretch()
+        btn_audit = QPushButton("🩺 RUN FULL SYSTEM HEALTH AUDIT")
+        btn_audit.setFixedHeight(38)
+        btn_audit.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_audit.setStyleSheet("""
+            QPushButton {
+                background: rgba(0, 242, 254, 0.15);
+                border: 1px solid #00f2fe;
+                border-radius: 8px;
+                color: #ffffff;
+                font-size: 11px;
+                font-weight: 700;
+            }
+            QPushButton:hover {
+                background: rgba(0, 242, 254, 0.3);
+            }
+        """)
+        btn_audit.clicked.connect(lambda: self._exec_action("Diagnostics Audit", "system_control", {"action": "diagnostics"}))
+        l_layout.addWidget(btn_audit)
+
+        page_layout.addWidget(card_hw, stretch=1)
+
+        # Right Card: AI Voice Pipeline Stack
+        card_ai = QFrame()
+        card_ai.setStyleSheet("""
+            QFrame {
+                background: rgba(10, 25, 45, 0.65);
+                border: 1px solid rgba(0, 242, 254, 0.3);
+                border-radius: 14px;
+            }
+        """)
+        r_layout = QVBoxLayout(card_ai)
+        r_layout.setContentsMargins(20, 18, 20, 18)
+        r_layout.setSpacing(12)
+
+        # Header
+        h2 = QHBoxLayout()
+        pill2 = QLabel()
+        pill2.setFixedSize(3, 14)
+        pill2.setStyleSheet("background: #00f2fe; border-radius: 1px; border: none;")
+        t2 = QLabel("AI & VOICE PIPELINE CONFIGURATION")
+        t2.setStyleSheet("color: #94a3b8; font-size: 11px; font-weight: 700; letter-spacing: 1px; border: none; background: transparent;")
+        h2.addWidget(pill2)
+        h2.addWidget(t2)
+        h2.addStretch()
+        r_layout.addLayout(h2)
+
+        ai_details = [
+            "Speech-To-Text (STT): Faster-Whisper Large-v3 & Google Fallback",
+            "Natural Language Parser (NLP): Gemini 3.8 Flash & Neural Intent Router",
+            "Text-To-Speech (TTS): pyttsx3 Native SAPI5 @ 175 WPM",
+            "Wake Word Detector: Vosk Acoustic Model + SpeechRecognition fallback",
+            "Execution Engine: Desktop Automation (StartApps, UWP, ShellExecute)"
+        ]
+        for a in ai_details:
+            lbl = QLabel(a)
+            lbl.setStyleSheet("color: #e2e8f0; font-size: 11px; border: none; background: transparent;")
+            r_layout.addWidget(lbl)
+
+        r_layout.addStretch()
+        btn_clear_log = QPushButton("🧹 CLEAR RECENT VOICE LOGS")
+        btn_clear_log.setFixedHeight(38)
+        btn_clear_log.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_clear_log.setStyleSheet("""
+            QPushButton {
+                background: rgba(239, 68, 68, 0.15);
+                border: 1px solid rgba(239, 68, 68, 0.4);
+                border-radius: 8px;
+                color: #f87171;
+                font-size: 11px;
+                font-weight: 700;
+            }
+            QPushButton:hover {
+                background: rgba(239, 68, 68, 0.28);
+                color: #ffffff;
+            }
+        """)
+        btn_clear_log.clicked.connect(self._clear_commands_list)
+        r_layout.addWidget(btn_clear_log)
+
+        page_layout.addWidget(card_ai, stretch=1)
+        return page
+
+    # ─── HELPER HUD CARDS (CORE HUD) ───
     def _build_left_hud_card(self) -> QFrame:
-        """Constructs the left glassmorphic HUD Status Card."""
         card = QFrame()
         card.setFixedSize(240, 210)
         card.setStyleSheet("""
@@ -915,7 +1486,6 @@ class MainWindow(QMainWindow):
         return card
 
     def _build_system_card(self) -> QFrame:
-        """Constructs the right top System Telemetry Card with Speedometer Gauge & RAM Bar."""
         card = QFrame()
         card.setFixedSize(250, 160)
         card.setStyleSheet("""
@@ -942,7 +1512,7 @@ class MainWindow(QMainWindow):
         h_sys.addStretch()
         layout.addLayout(h_sys)
 
-        # CPU Row (Label + % on left, Speedometer Semi-Gauge on right)
+        # CPU Row
         cpu_row = QHBoxLayout()
         cpu_row.setContentsMargins(8, 0, 4, 0)
         cpu_text_layout = QVBoxLayout()
@@ -963,7 +1533,7 @@ class MainWindow(QMainWindow):
         cpu_row.addWidget(self.cpu_gauge)
         layout.addLayout(cpu_row)
 
-        # RAM Row (Label + GB info + Glow Bar)
+        # RAM Row
         ram_layout = QVBoxLayout()
         ram_layout.setContentsMargins(8, 0, 8, 0)
         ram_layout.setSpacing(4)
@@ -985,7 +1555,6 @@ class MainWindow(QMainWindow):
         return card
 
     def _build_commands_card(self) -> QFrame:
-        """Constructs the right bottom Recent Voice Commands Card."""
         card = QFrame()
         card.setFixedSize(250, 150)
         card.setStyleSheet("""
@@ -999,22 +1568,19 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(16, 12, 16, 12)
         layout.setSpacing(6)
 
-        # Title: RECENT VOICE COMMANDS
         t_cmds = QLabel("RECENT VOICE COMMANDS")
         t_cmds.setStyleSheet("color: #cbd5e1; font-size: 10px; font-weight: 700; letter-spacing: 0.8px; border: none; background: transparent;")
         layout.addWidget(t_cmds)
 
-        # Command list container
         self.cmds_list_layout = QVBoxLayout()
         self.cmds_list_layout.setContentsMargins(0, 2, 0, 0)
         self.cmds_list_layout.setSpacing(4)
 
-        # Seed initial entries matching the screenshot
         now_time = datetime.now()
         initial_entries = [
             ("Open VS Code", now_time.strftime("%H:%M:%S")),
-            ("Play Lo-Fi stream", (now_time).strftime("%H:%M:%S")),
-            ("Check system diagnostics", (now_time).strftime("%H:%M:%S")),
+            ("Play Lo-Fi stream", now_time.strftime("%H:%M:%S")),
+            ("Check system diagnostics", now_time.strftime("%H:%M:%S")),
         ]
         for cmd, ts in initial_entries:
             self._add_command_entry(cmd, ts)
@@ -1024,13 +1590,11 @@ class MainWindow(QMainWindow):
         return card
 
     def _add_command_entry(self, text: str, timestamp: str):
-        """Adds or updates a voice command entry row in the card."""
         row = QWidget()
         row.setStyleSheet("background: transparent; border: none;")
         r_layout = QHBoxLayout(row)
         r_layout.setContentsMargins(0, 1, 0, 1)
 
-        # Clean display text (truncate if needed)
         clean_text = text[:17] + ("..." if len(text) > 17 else "")
         lbl_text = QLabel(clean_text)
         lbl_text.setStyleSheet("color: #7dd3fc; font-size: 10px; font-weight: 600; border: none; background: transparent;")
@@ -1042,7 +1606,6 @@ class MainWindow(QMainWindow):
         r_layout.addStretch()
         r_layout.addWidget(lbl_time)
 
-        # Prepend to layout (keep max 3 visible rows)
         if self.cmds_list_layout.count() >= 3:
             old_item = self.cmds_list_layout.takeAt(self.cmds_list_layout.count() - 1)
             if old_item.widget():
@@ -1050,8 +1613,56 @@ class MainWindow(QMainWindow):
 
         self.cmds_list_layout.insertWidget(0, row)
 
+    def _clear_commands_list(self):
+        while self.cmds_list_layout.count():
+            item = self.cmds_list_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        self.state_lbl.setText("COMMAND HISTORY CLEARED")
+
+    # ─── PAGE SWAPPING METHODS ───
+    def _set_page(self, idx: int):
+        idx = max(0, min(self.stack.count() - 1, idx))
+        self.stack.setCurrentIndex(idx)
+
+        # Update top navigation tabs
+        for i, btn in enumerate(self.nav_buttons):
+            btn.set_active(i == idx)
+
+        # Update pagination indicators
+        self.dots.set_active_page(idx)
+        if hasattr(self, 'center_dots'):
+            self.center_dots.set_active_page(idx)
+
+        self.page_indicator_lbl.setText(self.PAGE_TITLES[idx])
+
+    def _next_page(self):
+        cur = self.stack.currentIndex()
+        self._set_page((cur + 1) % self.stack.count())
+
+    def _prev_page(self):
+        cur = self.stack.currentIndex()
+        self._set_page((cur - 1) % self.stack.count())
+
+    def keyPressEvent(self, event):
+        key = event.key()
+        if key == Qt.Key.Key_1:
+            self._set_page(0)
+        elif key == Qt.Key.Key_2:
+            self._set_page(1)
+        elif key == Qt.Key.Key_3:
+            self._set_page(2)
+        elif key == Qt.Key.Key_4:
+            self._set_page(3)
+        elif key in [Qt.Key.Key_Right, Qt.Key.Key_PageDown]:
+            self._next_page()
+        elif key in [Qt.Key.Key_Left, Qt.Key.Key_PageUp]:
+            self._prev_page()
+        else:
+            super().keyPressEvent(event)
+
+    # ─── TELEMETRY & ACTIONS ───
     def _update_telemetry(self):
-        """Updates live CPU and RAM stats from psutil."""
         try:
             cpu_pct = psutil.cpu_percent(interval=None)
             self.cpu_val_lbl.setText(f"{cpu_pct:.1f}%")
@@ -1065,14 +1676,81 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
+    def _exec_action(self, title: str, intent: str, entities: dict):
+        """Executes a predefined action from the controls dashboard."""
+        cur_time = datetime.now().strftime("%H:%M:%S")
+        self._add_command_entry(title, cur_time)
+
+        self.reactor.set_processing(True)
+        self.state_lbl.setText(f"CMD: [{title.upper()}]")
+
+        threading.Thread(target=self._run_routed_command, args=(intent, entities), daemon=True).start()
+
+    def _run_routed_command(self, intent: str, entities: dict):
+        from core.ai.command_router import get_router
+        from core.voice.tts import get_tts
+
+        router = get_router()
+        tts = get_tts()
+
+        exec_result = router.route({
+            "intent": intent,
+            "entities": entities,
+            "response": ""
+        })
+
+        if exec_result.response:
+            tts.speak(exec_result.response, block=False)
+        else:
+            tts.speak("Command completed.", block=False)
+
+        QTimer.singleShot(1500, lambda: self._on_status_change("STANDBY [ACTIVE]"))
+
+    def _test_voice(self):
+        from core.voice.tts import get_tts
+        tts = get_tts()
+        tts.speak("All Jarvis systems are fully operational and responding.", block=False)
+        self.state_lbl.setText("TEST: TTS SPEECH VERIFIED")
+
+    def _copy_remote_link(self):
+        QApplication.clipboard().setText(self.remote_url_val)
+        self.state_lbl.setText("COPIED HTTPS REMOTE URL")
+
+    def _restart_mobile_server(self):
+        import subprocess, sys
+        root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        server_script = os.path.join(root_dir, "server.py")
+        DETACHED = 0x00000008 | 0x08000000
+        subprocess.Popen([sys.executable, server_script], cwd=root_dir, creationflags=DETACHED)
+        self.state_lbl.setText("REMOTE DAEMON RESTARTED")
+
     def _on_command_update(self, text: str, is_user: bool):
-        """Called when a user speaks or an assistant response arrives."""
+        clean_lower = text.lower().strip()
         if is_user:
+            # Check for page swap voice commands
+            if any(kw in clean_lower for kw in ["controls", "control page", "show controls", "open controls"]):
+                self._set_page(1)
+                return
+            elif any(kw in clean_lower for kw in ["core hud", "show hud", "open hud", "main page"]):
+                self._set_page(0)
+                return
+            elif any(kw in clean_lower for kw in ["remote page", "show remote", "open remote", "mobile remote"]):
+                self._set_page(2)
+                return
+            elif any(kw in clean_lower for kw in ["diagnostics", "system page", "show settings"]):
+                self._set_page(3)
+                return
+            elif any(kw in clean_lower for kw in ["next page", "swap page"]):
+                self._next_page()
+                return
+            elif any(kw in clean_lower for kw in ["previous page", "back page"]):
+                self._prev_page()
+                return
+
             cur_time = datetime.now().strftime("%H:%M:%S")
             self._add_command_entry(text, cur_time)
             self.state_lbl.setText(f"CMD: \"{text[:18]}\"")
         else:
-            # Assistant response feedback
             self.state_lbl.setText("STANDBY [ACTIVE]")
 
     def _on_listening_state(self, is_listening: bool):
@@ -1106,6 +1784,26 @@ class MainWindow(QMainWindow):
         if not text:
             return
         self.cmd_input.clear()
+
+        clean = text.lower()
+        if clean in ["1", "hud", "core", "main"]:
+            self._set_page(0)
+            return
+        elif clean in ["2", "controls", "ctrl", "predefined"]:
+            self._set_page(1)
+            return
+        elif clean in ["3", "remote", "mobile", "network"]:
+            self._set_page(2)
+            return
+        elif clean in ["4", "diag", "diagnostics", "settings"]:
+            self._set_page(3)
+            return
+        elif clean in ["next", "swap"]:
+            self._next_page()
+            return
+        elif clean in ["prev", "back"]:
+            self._prev_page()
+            return
 
         cur_time = datetime.now().strftime("%H:%M:%S")
         self._add_command_entry(text, cur_time)
