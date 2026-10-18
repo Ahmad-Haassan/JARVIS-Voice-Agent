@@ -118,14 +118,16 @@ class VoiceWorker(QThread):
             logger.info("Session takeover: Stopping previous session.")
             self._cancel_flag = True
             self.tts.stop()
-            time.sleep(0.3)
+            time.sleep(0.2)
 
         try:
             self._is_processing = True
             self._cancel_flag = False
+            wake.pause()
+            self.status_signal.emit("JARVIS LISTENING...")
             
             # 1. Wake Response
-            WAKE_POOL = ["Yes?", "I'm listening.", "How can I help?", "Hmm, yes?", "Go ahead, sir."]
+            WAKE_POOL = ["Yes, sir?", "I'm listening.", "How can I help you?", "Yes, go ahead."]
             import random
             resp = random.choice(WAKE_POOL)
             self.tts.speak(resp, block=True)
@@ -133,15 +135,14 @@ class VoiceWorker(QThread):
             
             # 2. Listen for Command
             self.listening_signal.emit(True)
-            wake.stop()
-            text = self.stt.listen(timeout=7.0) 
-            wake.start()
+            text = self.stt.listen(timeout=6.0) 
             self.listening_signal.emit(False)
             
             if self._cancel_flag: return
             
             if text:
                 self.update_signal.emit(text, True)
+                self.status_signal.emit("PROCESSING...")
                 
                 # 3. Process Intent
                 result = self.nlp.process(text)
@@ -188,11 +189,8 @@ class VoiceWorker(QThread):
         finally:
             self._is_processing = False
             self.listening_signal.emit(False)
-            if not wake._running:
-                wake.start()
-            self.listening_signal.emit(False)
-            if not wake._running:
-                wake.start()
+            self.status_signal.emit("SYSTEM READY")
+            wake.resume()
 
     def trigger(self):
         """Manually trigger listening."""
@@ -377,10 +375,13 @@ class MainWindow(QMainWindow):
         
         qa_btns = [
             ("⚡ Work Mode", "start work mode"), ("🚀 Antigravity", "open antigravity"),
-            ("📷 Camera", "open camera"), ("📸 Screenshot", "take screenshot"),
             ("🌐 Chrome", "open chrome"), ("🎵 YouTube", "play lofi on youtube"),
-            ("💬 WhatsApp", "open whatsapp"), ("🔓 Unlock", "unlock pc"),
-            ("📁 Folder", "create desktop folder"), ("⚙️ Settings", "open settings")
+            ("💬 WhatsApp", "open whatsapp"), ("📸 Screenshot", "take screenshot"),
+            ("📷 Camera", "open camera"), ("🔊 Vol 50%", "set volume to 50 percent"),
+            ("🔇 Mute", "mute volume"), ("⏯️ Play/Pause", "pause music"),
+            ("🪟 Windows", "list open windows"), ("🖥️ Desktop", "show desktop"),
+            ("🔓 Unlock PC", "unlock pc"), ("🔒 Lock PC", "lock pc"),
+            ("⚙️ Settings", "open settings")
         ]
         
         for i, (label, cmd) in enumerate(qa_btns):
@@ -478,7 +479,15 @@ class MainWindow(QMainWindow):
             tts.speak("Command completed.")
 
     def manual_trigger(self, cmd):
-        intent_map = {"screenshot": ("system_control", {"action": "screenshot"}), "settings": ("open_app", {"app": "settings"})}
+        if cmd == "settings":
+            try:
+                from settings_screen import SettingsScreen
+                dlg = SettingsScreen(self)
+                dlg.exec()
+            except Exception as e:
+                logger.error(f"Error opening settings screen: {e}")
+            return
+        intent_map = {"screenshot": ("system_control", {"action": "screenshot"})}
         if cmd in intent_map:
             intent, entities = intent_map[cmd]
             from core.ai.command_router import get_router
@@ -487,6 +496,9 @@ class MainWindow(QMainWindow):
 
     def _on_quick_action(self, cmd_text):
         """Handle quick action button clicks by simulating text submission."""
+        if cmd_text == "open settings":
+            self.manual_trigger("settings")
+            return
         self.input_field.setText(cmd_text)
         self._on_text_submitted()
 

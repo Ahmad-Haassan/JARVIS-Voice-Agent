@@ -98,6 +98,10 @@ class SettingsScreen(QDialog):
         self.startup = QCheckBox("Start with Windows")
         self.startup.setChecked(cfg.get("system", "startup_with_windows", False))
         sys_layout.addWidget(self.startup)
+
+        self.require_login = QCheckBox("Require password on startup")
+        self.require_login.setChecked(cfg.get("auth", "require_login", False))
+        sys_layout.addWidget(self.require_login)
         inner_layout.addWidget(sys_group)
 
         scroll.setWidget(inner)
@@ -134,6 +138,7 @@ class SettingsScreen(QDialog):
         cfg.set_value("skills", "weather_city", self.weather_city.text())
         cfg.set_value("system", "minimize_to_tray", self.min_to_tray.isChecked())
         cfg.set_value("system", "startup_with_windows", self.startup.isChecked())
+        cfg.set_value("auth", "require_login", self.require_login.isChecked())
         self.accept()
 
     def paintEvent(self, event):

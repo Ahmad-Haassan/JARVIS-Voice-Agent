@@ -14,8 +14,8 @@ class STTEngine:
         try:
             import speech_recognition as sr
             self._recognizer = sr.Recognizer()
-            self._recognizer.energy_threshold = 300
-            self._recognizer.dynamic_energy_threshold = True
+            self._recognizer.energy_threshold = 280
+            self._recognizer.dynamic_energy_threshold = False
             logger.info("SpeechRecognition engine initialized.")
         except ImportError:
             logger.warning("speech_recognition library not available.")

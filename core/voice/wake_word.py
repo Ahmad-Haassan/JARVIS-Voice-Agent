@@ -16,6 +16,7 @@ class WakeDetector:
     def __init__(self, on_detected=None):
         self.on_detected = on_detected
         self._running = False
+        self._paused = False
         self._thread = None
         self._model = None
         self._audio_queue = queue.Queue()
@@ -37,12 +38,22 @@ class WakeDetector:
         if self._running:
             return
         self._running = True
+        self._paused = False
         self._thread = threading.Thread(target=self._listen_loop, daemon=True)
         self._thread.start()
         logger.info(f"Wake word detector started for keyword '{self.wake_word}'.")
 
+    def pause(self):
+        self._paused = True
+        logger.info("Wake word detector paused.")
+
+    def resume(self):
+        self._paused = False
+        logger.info("Wake word detector resumed.")
+
     def stop(self):
         self._running = False
+        self._paused = False
         logger.info("Wake word detector stopped.")
 
     def _listen_loop(self):
@@ -63,13 +74,16 @@ class WakeDetector:
             def audio_callback(indata, frames, time_info, status):
                 if status:
                     logger.debug(f"Audio status: {status}")
-                if self._running:
+                if self._running and not self._paused:
                     self._audio_queue.put(bytes(indata))
 
             with sd.RawInputStream(samplerate=16000, blocksize=4000, dtype='int16',
                                    channels=1, callback=audio_callback):
                 logger.info("Microphone stream opened for wake word detection.")
                 while self._running:
+                    if self._paused:
+                        time.sleep(0.3)
+                        continue
                     try:
                         data = self._audio_queue.get(timeout=0.5)
                     except queue.Empty:
@@ -78,57 +92,72 @@ class WakeDetector:
                     if recognizer.AcceptWaveform(data):
                         res = json.loads(recognizer.Result())
                         text = res.get("text", "").lower()
-                        if self.wake_word in text:
-                            logger.info(f"Wake word '{self.wake_word}' detected in: '{text}'!")
+                        if self.wake_word in text or "jarvis" in text:
+                            logger.info(f"Wake word detected in: '{text}'!")
+                            self.pause()
                             if self.on_detected:
-                                self.on_detected()
+                                threading.Thread(target=self.on_detected, daemon=True).start()
                     else:
                         partial = json.loads(recognizer.PartialResult())
                         part_text = partial.get("partial", "").lower()
-                        if self.wake_word in part_text:
-                            logger.info(f"Wake word '{self.wake_word}' detected in partial: '{part_text}'!")
+                        if self.wake_word in part_text or "jarvis" in part_text:
+                            logger.info(f"Wake word detected in partial: '{part_text}'!")
                             recognizer.Reset()
+                            self.pause()
                             if self.on_detected:
-                                self.on_detected()
+                                threading.Thread(target=self.on_detected, daemon=True).start()
         except Exception as e:
             logger.warning(f"Vosk wake word loop error: {e}")
             while self._running:
                 time.sleep(1.0)
 
     def _speech_recognition_wake_loop(self):
-        try:
-            import speech_recognition as sr
-            recognizer = sr.Recognizer()
-            recognizer.energy_threshold = 300
-            recognizer.dynamic_energy_threshold = True
+        WAKE_VARIANTS = [
+            self.wake_word, "jarvis", "javis", "travis",
+            "service", "darvis", "charvis", "harvest", "starvis"
+        ]
 
-            with sr.Microphone() as source:
-                logger.info("Calibrating microphone for ambient background noise...")
-                recognizer.adjust_for_ambient_noise(source, duration=0.8)
-                logger.info(f"Microphone active. Listening continuously for '{self.wake_word}'...")
+        while self._running:
+            if self._paused:
+                time.sleep(0.3)
+                continue
 
-                while self._running:
-                    try:
-                        audio = recognizer.listen(source, timeout=3.0, phrase_time_limit=4.0)
+            try:
+                import speech_recognition as sr
+                recognizer = sr.Recognizer()
+                recognizer.energy_threshold = 280
+                recognizer.dynamic_energy_threshold = False  # Fixed threshold to prevent deafening
+
+                with sr.Microphone() as source:
+                    recognizer.adjust_for_ambient_noise(source, duration=0.3)
+                    logger.info(f"Microphone active. Listening continuously for '{self.wake_word}'...")
+
+                    while self._running and not self._paused:
                         try:
-                            text = recognizer.recognize_google(audio).lower()
-                            logger.info(f"Microphone heard: '{text}'")
-                            if self.wake_word in text or "jarvis" in text:
-                                logger.info(f"Wake word detected via speech recognition: '{text}'!")
-                                if self.on_detected:
-                                    self.on_detected()
-                        except sr.UnknownValueError:
-                            pass
+                            audio = recognizer.listen(source, timeout=3.0, phrase_time_limit=4.0)
+                            if self._paused or not self._running:
+                                break
+
+                            try:
+                                text = recognizer.recognize_google(audio).lower()
+                                logger.info(f"Microphone heard: '{text}'")
+                                if any(v in text for v in WAKE_VARIANTS):
+                                    logger.info(f"Wake word detected via speech recognition: '{text}'!")
+                                    self.pause()
+                                    if self.on_detected:
+                                        threading.Thread(target=self.on_detected, daemon=True).start()
+                                    break  # Exit with sr.Microphone() block so mic is free
+                            except sr.UnknownValueError:
+                                pass
+                            except Exception as e:
+                                logger.debug(f"Speech recognition parse error: {e}")
+                        except sr.WaitTimeoutError:
+                            continue
                         except Exception as e:
-                            logger.debug(f"Speech recognition parse error: {e}")
-                    except sr.WaitTimeoutError:
-                        continue
-                    except Exception as e:
-                        logger.debug(f"Audio listen timeout/error: {e}")
-                        time.sleep(0.5)
-        except Exception as e:
-            logger.warning(f"Continuous wake loop error: {e}")
-            while self._running:
+                            logger.debug(f"Audio listen timeout/error: {e}")
+                            time.sleep(0.3)
+            except Exception as e:
+                logger.warning(f"Continuous wake loop error: {e}")
                 time.sleep(1.0)
 
 _wake_instance = None

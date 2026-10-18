@@ -18,6 +18,7 @@ from core.auth.auth_manager import get_auth_manager
 from gui.auth_screen import AuthScreen
 from gui.main_window import MainWindow
 from core.utils.logger import get_logger
+from core.utils import config as cfg
 
 logger = get_logger("main")
 
@@ -31,8 +32,32 @@ class JarvisApp:
 
     def start(self):
         logger.info("Starting Jarvis Assistant...")
-        self.show_auth()
+        self.ensure_mobile_server()
+        require_login = cfg.get("auth", "require_login", False)
+        if require_login and not self.auth_manager.is_authenticated():
+            self.show_auth()
+        else:
+            self.launch_main()
         sys.exit(self.app.exec())
+
+    def ensure_mobile_server(self):
+        try:
+            import socket
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(0.5)
+            res = s.connect_ex(('127.0.0.1', 8000))
+            s.close()
+            if res != 0:
+                import subprocess
+                root_dir = os.path.dirname(os.path.abspath(__file__))
+                server_script = os.path.join(root_dir, "server.py")
+                DETACHED = 0x00000008 | 0x08000000
+                subprocess.Popen([sys.executable, server_script], cwd=root_dir, creationflags=DETACHED)
+                logger.info("Auto-launched background Mobile Remote server on port 8000.")
+            else:
+                logger.info("Mobile Remote server already active on port 8000.")
+        except Exception as e:
+            logger.warning(f"Failed to check/start mobile server: {e}")
 
     def show_auth(self):
         self.auth_screen = AuthScreen(self.auth_manager)
