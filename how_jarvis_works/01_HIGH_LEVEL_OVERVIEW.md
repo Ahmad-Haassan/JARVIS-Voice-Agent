@@ -41,7 +41,7 @@ JARVIS was engineered around four non-negotiable principles:
 
 ### A. Intelligent IDE & Coding Orchestration
 - **Workspace Resolution**: Automatically finds project directories on Desktop, Documents, or Downloads (e.g. `dsa`, `testing`, `jarvis`).
-- **Autonomous Prompt Dispatch**: Launches Antigravity IDE or VS Code with `--new-window`, bypasses Windows 11 foreground lock, focuses the Agent chat panel (`Ctrl + L`), pastes the user's prompt (`Ctrl + V`), and executes (`Enter`) without user intervention.
+- **Autonomous Prompt Dispatch**: Launches Antigravity IDE or VS Code with `--new-window`, bypasses Windows 11 foreground lock, focuses the Agent chat panel (`Ctrl + Shift + L` for Antigravity to prevent closing an open chat, or `Ctrl + L` for VS Code), pastes the user's prompt (`Ctrl + V`), and executes (`Enter`) without user intervention.
 
 ### B. Voice Engine & Speech Synthesis
 - **Offline Wake-Word**: Listens for the keyword *"Jarvis"* using the offline Vosk acoustic neural model without sending ambient room audio anywhere.

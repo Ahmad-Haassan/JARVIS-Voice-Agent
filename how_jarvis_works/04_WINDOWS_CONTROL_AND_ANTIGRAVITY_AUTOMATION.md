@@ -93,6 +93,6 @@ for attempt in range(24): # Poll up to 12 seconds
 ### Step 3: Automated AI Prompt Injection
 Once the new window is detected and brought to the front:
 1. **Window Center Click**: JARVIS calculates the window's bounding box `(cx, cy)` and clicks inside the canvas to guarantee focus and dismiss any workspace trust overlays.
-2. **Focus AI Agent (`Ctrl + L`)**: In Antigravity IDE, `Ctrl + L` is bound to `antigravity.toggleChatFocus` (`primary: 2090`), which focuses the AI Agent Side Panel.
-3. **Clipboard Injection (`Ctrl + V`)**: The user's prompt is copied into the system clipboard via `pyperclip` and pasted cleanly with `Ctrl + V`.
+2. **Focus AI Agent (`Ctrl + Shift + L`)**: In Antigravity IDE, `Ctrl + L` is bound to `antigravity.toggleChatFocus` which has `shouldCloseWhenFocused: true`. If the chat panel is already open and focused from a previous session, pressing `Ctrl + L` will toggle it off (closing/disabling the chat). Instead, JARVIS sends `Ctrl + Shift + L` (`antigravity.startNewConversation`, weight: 300), which sets `shouldCloseWhenFocused: false`. This guarantees that if the chat is closed it opens, if it is already open it stays open, starts a fresh conversation, and explicitly focuses the prompt input box. (For VS Code, JARVIS continues to send `Ctrl + L`).
+3. **Clipboard Injection (`Ctrl + V`)**: The user's prompt is verified in the system clipboard via `pyperclip` and pasted cleanly with `Ctrl + V`.
 4. **Execution (`Enter`)**: JARVIS sends the `Enter` keystroke. The AI Agent in the new window immediately begins coding, generating files, and solving the prompt autonomously!

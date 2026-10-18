@@ -26,9 +26,13 @@ if (-not $found) {
 # 2. Allow focus to settle
 Start-Sleep -Milliseconds 800
 
-# 3. Open/Focus AI Agent Chat (Ctrl + L)
-$ws.SendKeys("^l")
-Start-Sleep -Milliseconds 600
+# 3. Open/Focus AI Agent Chat (Skip for Antigravity as chat is already open)
+if (-not ($WindowTitle -like "*Antigravity*" -or -not $WindowTitle)) {
+    $ws.SendKeys("^l")
+    Start-Sleep -Milliseconds 600
+} else {
+    Start-Sleep -Milliseconds 400
+}
 
 # 4. Paste Prompt from Clipboard (Ctrl + V)
 $ws.SendKeys("^v")

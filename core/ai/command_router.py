@@ -86,12 +86,16 @@ class CommandRouter:
                     level = entities.get("level", 50)
                     new_vol = sys_ctrl.set_volume(level)
                     return CommandResult(success=True, response=f"Volume set to {new_vol}%.")
-                elif sub_act == "mute":
+                elif sub_act in ["mute", "silence"]:
                     sys_ctrl.set_mute(True)
                     return CommandResult(success=True, response="Master audio muted.")
-                elif sub_act == "unmute":
+                elif sub_act in ["unmute", "restore"]:
                     sys_ctrl.set_mute(False)
                     return CommandResult(success=True, response="Master audio unmuted.")
+                elif sub_act in ["toggle", "mute_toggle"]:
+                    is_muted = sys_ctrl.toggle_mute()
+                    resp = "Master audio muted." if is_muted else "Master audio unmuted."
+                    return CommandResult(success=True, response=resp)
                 else:
                     cur = sys_ctrl.get_volume()
                     return CommandResult(success=True, response=f"Current volume is {cur}%.")
@@ -148,6 +152,9 @@ class CommandRouter:
                     path = sys_ctrl.take_screenshot()
                     resp = "Screenshot captured successfully." if path else "Could not capture screenshot."
                     return CommandResult(success=bool(path), response=resp, data=path)
+                elif sub_action in ["clean_temp", "clean_cache", "clear_temp"]:
+                    ok, resp = sys_ctrl.clean_temp()
+                    return CommandResult(success=ok, response=resp)
                 elif sub_action in ["lock", "unlock", "sleep", "restart", "shutdown"]:
                     pin = entities.get("pin", "")
                     success = sys_ctrl.system_power(sub_action, pin=pin)

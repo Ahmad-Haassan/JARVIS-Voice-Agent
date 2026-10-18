@@ -159,18 +159,17 @@ class AppCatalog:
             "powershell": "powershell.exe",
             "explorer": "explorer.exe",
             "file explorer": "explorer.exe",
-            "whatsapp": "whatsapp:",
+            "whatsapp": "shell:AppsFolder\\5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App",
             "spotify": "spotify:"
         }
         if clean in PROTOCOL_MAP:
             target = PROTOCOL_MAP[clean]
-            if target.startswith("ms-") or target.startswith("microsoft.") or target.startswith("bing"):
+            if target.startswith("shell:") or target.startswith("ms-") or target.startswith("microsoft.") or target.startswith("bing"):
                 try:
-                    os.startfile(target)
-                    return True
-                except Exception:
                     subprocess.Popen(["explorer.exe", target])
                     return True
+                except Exception:
+                    pass
             return shell_execute(target)
 
         # 2. Check installed desktop & UWP apps via Get-StartApps catalog
@@ -436,16 +435,21 @@ class SystemControl:
         def _dispatch_prompt():
             user32 = ctypes.windll.user32
             kernel32 = ctypes.windll.kernel32
-            h_desk = user32.OpenDesktopW("default", 0, False, 0x1FF)
-            if h_desk:
-                user32.SetThreadDesktop(h_desk)
+            try:
+                h_desk = user32.OpenDesktopW("default", 0, False, 0x1FF)
+                if h_desk:
+                    user32.SetThreadDesktop(h_desk)
+            except Exception:
+                pass
 
             logger.info(f"Waiting for new window matching keyword: '{window_keyword}'...")
             target_hwnd = None
             target_title = ""
 
-            # Poll for up to 12 seconds for the new window to be created and visible
-            for attempt in range(24):
+            WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+
+            # Poll for up to 14 seconds for the target window to be created and visible
+            for attempt in range(28):
                 time.sleep(0.5)
                 found = []
 
@@ -456,18 +460,48 @@ class SystemControl:
                             buf = ctypes.create_unicode_buffer(l + 1)
                             user32.GetWindowTextW(hwnd, buf, l + 1)
                             title = buf.value
-                            # Match target keyword specifically so other windows are NEVER touched
+                            # If app is antigravity, avoid mistakenly capturing File Explorer windows
+                            if "antigravity" in app_clean and "explorer" in title.lower():
+                                return True
                             if window_keyword and window_keyword.lower() in title.lower():
+                                if "antigravity" in app_clean and "antigravity" in title.lower():
+                                    found.insert(0, (hwnd, title))
+                                else:
+                                    found.append((hwnd, title))
+                            elif not window_keyword and "antigravity" in app_clean and "antigravity" in title.lower():
+                                found.append((hwnd, title))
+                            elif attempt >= 22 and "antigravity" in app_clean and "antigravity" in title.lower():
+                                # Last-resort fallback after 11 seconds if folder title was not detected
                                 found.append((hwnd, title))
                     return True
 
-                W = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_int, ctypes.c_int)
-                user32.EnumWindows(W(cb), 0)
+                try:
+                    user32.EnumWindows(WNDENUMPROC(cb), 0)
+                except Exception as e:
+                    logger.debug(f"EnumWindows error: {e}")
 
                 if found:
                     target_hwnd, target_title = found[0]
                     logger.info(f"Found target window [{target_hwnd}]: '{target_title}' after {attempt * 0.5:.1f}s")
                     break
+
+            # Secondary fallback: use native WScript.Shell AppActivate if EnumWindows missed it
+            if not target_hwnd:
+                try:
+                    import win32com.client
+                    ws = win32com.client.Dispatch("WScript.Shell")
+                    if window_keyword and ws.AppActivate(window_keyword):
+                        time.sleep(0.3)
+                        target_hwnd = user32.GetForegroundWindow()
+                        target_title = window_keyword
+                        logger.info(f"Found and activated window via AppActivate('{window_keyword}') [HWND: {target_hwnd}]")
+                    elif "antigravity" in app_clean and ws.AppActivate("Antigravity"):
+                        time.sleep(0.3)
+                        target_hwnd = user32.GetForegroundWindow()
+                        target_title = "Antigravity"
+                        logger.info(f"Found and activated window via AppActivate('Antigravity') [HWND: {target_hwnd}]")
+                except Exception as e:
+                    logger.debug(f"AppActivate fallback error: {e}")
 
             if not target_hwnd:
                 logger.warning(f"Target window for '{window_keyword}' not found within timeout.")
@@ -497,28 +531,40 @@ class SystemControl:
 
             time.sleep(0.6)
 
-            # Click center of the target window to activate and trigger "Code with Agent"
+            is_antigravity = "antigravity" in app_clean or (target_title and "antigravity" in target_title.lower())
+            if not is_antigravity:
+                # For non-Antigravity apps (e.g. VS Code), click to activate and focus chat with Ctrl + L
+                try:
+                    rect = ctypes.wintypes.RECT()
+                    user32.GetWindowRect(target_hwnd, ctypes.byref(rect))
+                    cx = (rect.left + rect.right) // 2
+                    cy = (rect.top + rect.bottom) // 2
+                    pyautogui.click(cx, cy + 20)
+                    logger.info(f"Activated target window at ({cx}, {cy+20})")
+                except Exception as e:
+                    logger.warning(f"Click window error: {e}")
+
+                time.sleep(0.6)
+                pyautogui.hotkey('ctrl', 'l')
+                time.sleep(0.6)
+            else:
+                # For Antigravity, the chat is already open & focused. Skip Ctrl + L completely
+                # to prevent disabling/toggling the chat panel or stealing focus.
+                time.sleep(0.6)
+
+            # Ensure clipboard holds the user's prompt
             try:
-                rect = ctypes.wintypes.RECT()
-                user32.GetWindowRect(target_hwnd, ctypes.byref(rect))
-                cx = (rect.left + rect.right) // 2
-                cy = (rect.top + rect.bottom) // 2
-                pyautogui.click(cx, cy + 20)
-                logger.info(f"Activated target window at ({cx}, {cy+20})")
-            except Exception as e:
-                logger.warning(f"Click window error: {e}")
+                pyperclip.copy(prompt)
+            except Exception:
+                pass
 
-            time.sleep(0.8)
+            time.sleep(0.3)
 
-            # Ensure AI chat / Agent panel is open and focused
-            pyautogui.hotkey('ctrl', 'l')
-            time.sleep(0.6)
-
-            # Paste prompt from clipboard
+            # Paste prompt directly from clipboard (Ctrl + V)
             pyautogui.hotkey('ctrl', 'v')
             time.sleep(0.4)
 
-            # Submit prompt to Agent
+            # Submit prompt to Agent (Enter)
             pyautogui.press('enter')
             logger.info(f"Successfully injected prompt into '{target_title}': '{prompt}'")
 
@@ -638,13 +684,52 @@ class SystemControl:
 
         return True
 
+    def clean_temp(self) -> tuple[bool, str]:
+        """Purges temporary files from %TEMP% and empties Windows Recycle Bin."""
+        cleaned_files = 0
+        freed_bytes = 0
+        temp_dir = os.environ.get("TEMP", os.path.expanduser("~/AppData/Local/Temp"))
+        if os.path.exists(temp_dir):
+            for root, dirs, files in os.walk(temp_dir):
+                for f in files:
+                    try:
+                        fp = os.path.join(root, f)
+                        sz = os.path.getsize(fp)
+                        os.remove(fp)
+                        cleaned_files += 1
+                        freed_bytes += sz
+                    except Exception:
+                        pass
+                for d in dirs:
+                    try:
+                        os.rmdir(os.path.join(root, d))
+                    except Exception:
+                        pass
+        # Empty Recycle Bin without dialogs
+        try:
+            import ctypes
+            ctypes.windll.shell32.SHEmptyRecycleBinW(None, None, 7)
+        except Exception:
+            pass
+
+        mb_freed = freed_bytes / (1024 * 1024)
+        msg = f"System cache purged. Cleaned {cleaned_files} temporary files, freeing {mb_freed:.1f} MB disk space."
+        logger.info(msg)
+        return True, msg
+
     def get_system_diagnostics(self) -> str:
         try:
-            cpu = psutil.cpu_percent(interval=0.5)
-            ram = psutil.virtual_memory().percent
-            battery = psutil.sensors_battery()
-            bat_str = f", Battery: {battery.percent}%" if battery else ""
-            return f"CPU Usage: {cpu}%, RAM Usage: {ram}%{bat_str}."
+            cpu = psutil.cpu_percent(interval=None)
+            mem = psutil.virtual_memory()
+            disk = psutil.disk_usage('C:\\')
+            cores = psutil.cpu_count(logical=True)
+            avail_gb = mem.available / (1024 ** 3)
+            free_disk_gb = disk.free / (1024 ** 3)
+            return (
+                f"System Diagnostics: CPU load is {cpu:.1f}% across {cores} logical processors. "
+                f"RAM usage is {mem.percent}% with {avail_gb:.1f} GB memory available. "
+                f"Primary drive C has {free_disk_gb:.1f} GB free. All core services nominal."
+            )
         except Exception as e:
             return f"System info unavailable: {e}"
 

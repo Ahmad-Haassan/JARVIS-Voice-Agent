@@ -67,7 +67,7 @@ jarvis/
 - **[`core/skills/system_control.py`](file:///c:/Users/Ahmad/OneDrive/Desktop/jarvis/core/skills/system_control.py)**:
   - Class: `SystemControl`
   - Key Methods:
-    - `open_with_app_and_prompt(app_name, target_path, prompt)`: Launches separate new window (`-n`), polls specifically for the folder title, attaches thread input via Win32, sends `Ctrl+L`, pastes prompt, and hits `Enter`.
+    - `open_with_app_and_prompt(app_name, target_path, prompt)`: Launches separate new window (`-n`), polls specifically for the folder title, attaches thread input via Win32, sends `Ctrl+Shift+L` (or `Ctrl+L` for VS Code), pastes prompt, and hits `Enter`.
     - `open_with_app(app_name, target_path)`: Opens file/folder in specified app with `-n` isolation.
     - `change_volume(delta)` / `set_volume(level)`: Direct hardware audio control via `pycaw`.
     - `take_screenshot() -> str`: Captures desktop via Win32 GDI or PowerShell Drawing API.

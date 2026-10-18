@@ -1,10 +1,11 @@
 """
 Main Assistant Window — JARVIS Sci-Fi Arc Reactor HUD Edition.
-Matches the high-tech Iron Man cyberpunk interface with multi-page swapping:
+Matches the high-tech Iron Man cyberpunk interface with 5 swappable pages:
 - Page 0: CORE HUD (360-degree dynamic radial audio waveform & glowing J core, CPU/RAM telemetry)
 - Page 1: PREDEFINED CONTROLS (Apps, System/Media, Automations & Macros)
-- Page 2: MOBILE REMOTE & NETWORK (HTTPS Remote access, QR/Link, mobile microphone guide)
-- Page 3: DIAGNOSTICS & AI PIPELINE (Live system audit, voice pipeline controls)
+- Page 2: COMMAND HISTORY & ACTION RECALL (Click any command to re-run / recall!)
+- Page 3: MOBILE REMOTE & NETWORK (HTTPS Remote access, QR/Link, mobile microphone guide)
+- Page 4: DIAGNOSTICS & AI PIPELINE (Live system audit, voice pipeline controls)
 """
 import math
 import time
@@ -17,7 +18,7 @@ from datetime import datetime
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
     QPushButton, QFrame, QLineEdit, QSizePolicy, QStackedWidget,
-    QGridLayout, QApplication
+    QGridLayout, QApplication, QScrollArea
 )
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QSize, QRectF, QPointF
 from PyQt6.QtGui import (
@@ -62,15 +63,12 @@ class ArcReactorWidget(QWidget):
         self.update()
 
     def _tick(self):
-        # Rotation of outer dashed HUD ring
         speed = 2.4 if self._processing else (1.4 if self._listening else 0.4)
         self._rot_angle = (self._rot_angle + speed) % 360.0
 
-        # Sine wave phase progression
         phase_speed = 0.16 if self._listening else (0.10 if self._processing else 0.035)
         self._phase = (self._phase + phase_speed) % (math.pi * 2)
 
-        # Core breathing glow
         self._pulse_val = 0.5 + 0.5 * math.sin(self._phase * 1.5)
         self.update()
 
@@ -85,9 +83,7 @@ class ArcReactorWidget(QWidget):
         cx = self.width() / 2.0
         cy = self.height() / 2.0
 
-        # Dynamic cyan/blue tones
         cyan_neon = QColor(0, 242, 254)
-        blue_core = QColor(0, 114, 255)
         glow_cyan = QColor(0, 242, 254, int(45 + 50 * self._pulse_val))
 
         # 1. Outer Deep Cosmic Glow Halo
@@ -106,7 +102,6 @@ class ArcReactorWidget(QWidget):
             cos_a = math.cos(angle_rad)
             sin_a = math.sin(angle_rad)
 
-            # Harmonic wave function: 4 crests + oscillating phase
             cardinal_weight = math.pow(math.sin(angle_rad * 2.0), 4)
             wave1 = math.sin(angle_rad * 6.0 + self._phase * 2.0)
             wave2 = math.cos(angle_rad * 4.0 - self._phase)
@@ -119,7 +114,6 @@ class ArcReactorWidget(QWidget):
                 h = 12.0 + 24.0 * math.sin((rot_offset / self._bars_count) * math.pi * 4.0)
                 alpha = 200
             else:
-                # Idle ambient breathing
                 h = 4.0 + 14.0 * cardinal_weight * (0.5 + 0.5 * math.sin(self._phase + i * 0.1))
                 alpha = int(90 + 90 * cardinal_weight)
 
@@ -158,13 +152,11 @@ class ArcReactorWidget(QWidget):
         painter.restore()
 
         # 4. Concentric Luminous Inner Tech Circles
-        # Outer bright border
         rim_pen = QPen(cyan_neon, 2.8)
         painter.setPen(rim_pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawEllipse(QPointF(cx, cy), 94.0, 94.0)
 
-        # Intermediate glowing circle
         mid_pen = QPen(QColor(0, 180, 255, 110), 1.2)
         painter.setPen(mid_pen)
         painter.drawEllipse(QPointF(cx, cy), 88.0, 88.0)
@@ -184,23 +176,18 @@ class ArcReactorWidget(QWidget):
         j_core_pen = QPen(QColor(230, 250, 255), 3.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin)
 
         j_path = QPainterPath()
-        # Stem top
         j_path.moveTo(cx + 8, cy - 36)
-        # Vertical shaft
         j_path.lineTo(cx + 8, cy + 10)
-        # Curved bottom hook
         j_path.cubicTo(cx + 8, cy + 30, cx - 18, cy + 30, cx - 18, cy + 14)
 
-        # Glow pass
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.setPen(j_glow_pen)
         painter.drawPath(j_path)
-        # Crisp neon center pass
         painter.setPen(j_core_pen)
         painter.drawPath(j_path)
         painter.restore()
 
-        # 7. "J A R V I S" Futuristic Lettering Below Core
+        # 7. "J A R V I S" Lettering Below Core
         font = QFont("Segoe UI", 11, QFont.Weight.Black)
         font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 4.0)
         painter.setFont(font)
@@ -227,18 +214,15 @@ class CpuGaugeWidget(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         rect = QRectF(6, 6, 58, 58)
-        # Background arc (180 to 0 degrees clockwise)
         bg_pen = QPen(QColor(255, 255, 255, 25), 4.5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
         painter.setPen(bg_pen)
         painter.drawArc(rect, 0 * 16, 180 * 16)
 
-        # Active glowing cyan arc
         active_span = int((self._value / 100.0) * 180.0)
         arc_pen = QPen(QColor(0, 242, 254), 4.5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
         painter.setPen(arc_pen)
         painter.drawArc(rect, 180 * 16, -active_span * 16)
 
-        # Center small pivot dot
         cx = 35.0
         cy = 35.0
         painter.setPen(Qt.PenStyle.NoPen)
@@ -267,14 +251,12 @@ class RamBarWidget(QWidget):
         h = float(self.height())
         r = h / 2.0
 
-        # Background track
         bg_path = QPainterPath()
         bg_path.addRoundedRect(QRectF(0, 1, w, h - 2), r, r)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QBrush(QColor(255, 255, 255, 22)))
         painter.drawPath(bg_path)
 
-        # Filled active bar
         fill_w = max(h, (self._percent / 100.0) * w)
         fill_path = QPainterPath()
         fill_path.addRoundedRect(QRectF(0, 1, fill_w, h - 2), r, r)
@@ -285,7 +267,6 @@ class RamBarWidget(QWidget):
         painter.setBrush(QBrush(grad))
         painter.drawPath(fill_path)
 
-        # Head light dot
         head_pen = QPen(QColor(255, 255, 255), 2.0)
         painter.setPen(head_pen)
         painter.drawPoint(QPointF(fill_w - r, r + 0.5))
@@ -297,7 +278,7 @@ class RamBarWidget(QWidget):
 class PulseDotsWidget(QWidget):
     page_selected = pyqtSignal(int)
 
-    def __init__(self, parent=None, count=4):
+    def __init__(self, parent=None, count=5):
         super().__init__(parent)
         self._count = count
         self.setFixedSize(count * 20 + 8, 20)
@@ -342,7 +323,6 @@ class PulseDotsWidget(QWidget):
         for i in range(self._count):
             cx = start_x + i * spacing
             if i == self._active_idx:
-                # Active glowing dot with breathing halo
                 painter.setPen(Qt.PenStyle.NoPen)
                 painter.setBrush(QBrush(QColor(0, 242, 254, int(self._pulse_alpha * 0.25))))
                 painter.drawEllipse(QPointF(cx, cy), 7.0, 7.0)
@@ -350,7 +330,6 @@ class PulseDotsWidget(QWidget):
                 painter.setBrush(QBrush(QColor(0, 242, 254, self._pulse_alpha)))
                 painter.drawEllipse(QPointF(cx, cy), 3.8, 3.8)
             else:
-                # Inactive dim dot
                 painter.setPen(Qt.PenStyle.NoPen)
                 painter.setBrush(QBrush(QColor(255, 255, 255, 50)))
                 painter.drawEllipse(QPointF(cx, cy), 2.8, 2.8)
@@ -380,8 +359,8 @@ class HudNavButton(QPushButton):
                     color: #ffffff;
                     font-size: 11px;
                     font-weight: 800;
-                    letter-spacing: 1.2px;
-                    padding: 3px 12px;
+                    letter-spacing: 1.1px;
+                    padding: 3px 10px;
                 }
             """)
         else:
@@ -394,7 +373,7 @@ class HudNavButton(QPushButton):
                     font-size: 11px;
                     font-weight: 600;
                     letter-spacing: 0.8px;
-                    padding: 3px 12px;
+                    padding: 3px 10px;
                 }
                 QPushButton:hover {
                     background: rgba(0, 242, 254, 0.14);
@@ -415,7 +394,6 @@ class HudActionButton(QPushButton):
         layout.setContentsMargins(10, 4, 10, 4)
         layout.setSpacing(10)
 
-        # Icon badge
         icon_lbl = QLabel(icon_str)
         icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_lbl.setFixedSize(36, 36)
@@ -430,7 +408,6 @@ class HudActionButton(QPushButton):
         """)
         layout.addWidget(icon_lbl)
 
-        # Text container
         t_layout = QVBoxLayout()
         t_layout.setSpacing(2)
         t_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
@@ -464,7 +441,90 @@ class HudActionButton(QPushButton):
 
 
 # ==========================================
-# 6. SCI-FI HUD FRAME & BACKGROUND CONTAINER
+# 6. HISTORY ROW WIDGET (CLICKABLE RECALL)
+# ==========================================
+class HistoryItemWidget(QFrame):
+    recalled = pyqtSignal(dict)
+
+    def __init__(self, data: dict, parent=None):
+        super().__init__(parent)
+        self.data = data
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedHeight(50)
+        self.setStyleSheet("""
+            QFrame {
+                background: rgba(10, 25, 45, 0.6);
+                border: 1px solid rgba(0, 242, 254, 0.2);
+                border-radius: 8px;
+            }
+            QFrame:hover {
+                background: rgba(0, 242, 254, 0.12);
+                border: 1px solid #00f2fe;
+            }
+        """)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(12, 4, 12, 4)
+        layout.setSpacing(10)
+
+        # Source badge
+        source = data.get("source", "preset").upper()
+        badge_color = "#38bdf8" if source == "VOICE" else ("#a78bfa" if source == "TYPED" else "#10b981")
+        badge = QLabel(f"[{source}]")
+        badge.setStyleSheet(f"color: {badge_color}; font-size: 9px; font-family: 'Consolas', monospace; font-weight: 700; border: none; background: transparent;")
+        layout.addWidget(badge)
+
+        # Title and response
+        t_box = QVBoxLayout()
+        t_box.setSpacing(1)
+        t_box.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+
+        lbl_title = QLabel(data.get("title", "Command"))
+        lbl_title.setStyleSheet("color: #f1f5f9; font-size: 11px; font-weight: 700; border: none; background: transparent;")
+
+        resp_text = data.get("response", "Executed successfully.")
+        lbl_resp = QLabel(resp_text[:55] + ("..." if len(resp_text) > 55 else ""))
+        lbl_resp.setStyleSheet("color: #7dd3fc; font-size: 9px; border: none; background: transparent;")
+
+        t_box.addWidget(lbl_title)
+        t_box.addWidget(lbl_resp)
+        layout.addLayout(t_box)
+        layout.addStretch()
+
+        # Timestamp
+        lbl_time = QLabel(data.get("timestamp", ""))
+        lbl_time.setStyleSheet("color: #64748b; font-size: 9px; font-family: 'Consolas', monospace; border: none; background: transparent;")
+        layout.addWidget(lbl_time)
+
+        # Recall Action Button
+        btn_recall = QPushButton("⟳ RECALL")
+        btn_recall.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_recall.setStyleSheet("""
+            QPushButton {
+                background: rgba(0, 242, 254, 0.12);
+                border: 1px solid #00f2fe;
+                border-radius: 5px;
+                color: #00f2fe;
+                font-size: 9px;
+                font-weight: 800;
+                padding: 4px 8px;
+            }
+            QPushButton:hover {
+                background: #00f2fe;
+                color: #000000;
+            }
+        """)
+        btn_recall.clicked.connect(lambda: self.recalled.emit(self.data))
+        layout.addWidget(btn_recall)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.recalled.emit(self.data)
+        super().mousePressEvent(event)
+
+
+# ==========================================
+# 7. SCI-FI HUD FRAME & RESIZABLE CONTAINER
 # ==========================================
 class HudFrame(QFrame):
     def __init__(self, parent=None):
@@ -479,13 +539,11 @@ class HudFrame(QFrame):
         h = float(self.height())
         cut = 18.0
 
-        # 1. Main Background Gradient
         bg_grad = QLinearGradient(0, 0, 0, h)
         bg_grad.setColorAt(0.0, QColor(4, 9, 18, 255))
         bg_grad.setColorAt(0.5, QColor(6, 14, 26, 255))
         bg_grad.setColorAt(1.0, QColor(2, 6, 13, 255))
 
-        # 2. Outer Chamfered Tech Border Path
         outer_path = QPainterPath()
         outer_path.moveTo(cut, 0)
         outer_path.lineTo(w - cut, 0)
@@ -501,40 +559,32 @@ class HudFrame(QFrame):
         painter.setBrush(QBrush(bg_grad))
         painter.drawPath(outer_path)
 
-        # 3. Outer Glowing Cyan Tech Border
         border_pen = QPen(QColor(0, 242, 254, 110), 1.5)
         painter.setPen(border_pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawPath(outer_path)
 
-        # 4. Tech Corner Brackets & Accent Notches
         bracket_pen = QPen(QColor(0, 242, 254, 230), 2.2)
         painter.setPen(bracket_pen)
 
-        # Top-left corner tech lines
         painter.drawLine(QPointF(0, cut + 14), QPointF(0, cut))
         painter.drawLine(QPointF(0, cut), QPointF(cut, 0))
         painter.drawLine(QPointF(cut, 0), QPointF(cut + 24, 0))
-        # Top-left double slash decor
         painter.drawLine(QPointF(cut + 32, 2), QPointF(cut + 38, 9))
         painter.drawLine(QPointF(cut + 40, 2), QPointF(cut + 46, 9))
 
-        # Top-right corner tech lines
         painter.drawLine(QPointF(w - cut - 24, 0), QPointF(w - cut, 0))
         painter.drawLine(QPointF(w - cut, 0), QPointF(w, cut))
         painter.drawLine(QPointF(w, cut), QPointF(w, cut + 14))
 
-        # Bottom-left corner tech lines
         painter.drawLine(QPointF(0, h - cut - 14), QPointF(0, h - cut))
         painter.drawLine(QPointF(0, h - cut), QPointF(cut, h))
         painter.drawLine(QPointF(cut, h), QPointF(cut + 28, h))
 
-        # Bottom-right corner tech lines
         painter.drawLine(QPointF(w - cut - 28, h), QPointF(w - cut, h))
         painter.drawLine(QPointF(w - cut, h), QPointF(w, h - cut))
         painter.drawLine(QPointF(w, h - cut), QPointF(w, h - cut - 14))
 
-        # 5. Inner Inset Wire Guide Lines
         inner_pen = QPen(QColor(0, 242, 254, 25), 1.0)
         painter.setPen(inner_pen)
         inset = 6.0
@@ -552,7 +602,7 @@ class HudFrame(QFrame):
 
 
 # ==========================================
-# 7. VOICE WORKER THREAD
+# 8. VOICE WORKER THREAD
 # ==========================================
 class VoiceWorker(QThread):
     update_signal = pyqtSignal(str, bool)
@@ -637,7 +687,6 @@ class VoiceWorker(QThread):
         self.status_signal.emit("STANDBY [ACTIVE]")
 
     def trigger(self):
-        """Manually triggered via microphone button or reactor click."""
         threading.Thread(target=self._on_wake, daemon=True).start()
 
     def run(self):
@@ -671,14 +720,15 @@ class VoiceWorker(QThread):
 
 
 # ==========================================
-# 8. MAIN SCI-FI HUD WINDOW WITH SWAP PAGES
+# 9. MAIN SCI-FI HUD WINDOW WITH 5 PAGES
 # ==========================================
 class MainWindow(QMainWindow):
     PAGE_TITLES = [
-        "PAGE 1/4: CORE HUD",
-        "PAGE 2/4: CONTROLS",
-        "PAGE 3/4: REMOTE HUB",
-        "PAGE 4/4: DIAGNOSTICS"
+        "PAGE 1/5: CORE HUD",
+        "PAGE 2/5: CONTROLS",
+        "PAGE 3/5: HISTORY & RECALL",
+        "PAGE 4/5: REMOTE HUB",
+        "PAGE 5/5: DIAGNOSTICS"
     ]
 
     def __init__(self, auth_manager=None):
@@ -691,12 +741,14 @@ class MainWindow(QMainWindow):
                 auth_manager = None
         self.auth_manager = auth_manager
         self.setWindowTitle("JARVIS v2.4.1 [ACTIVE]")
-        self.setFixedSize(1020, 640)
+        self.resize(1020, 640)
+        self.setMinimumSize(960, 600)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
         self.drag_pos = None
         self.nav_buttons = []
+        self.history_records = []
 
         self._setup_ui()
 
@@ -712,9 +764,22 @@ class MainWindow(QMainWindow):
         self.worker.status_signal.connect(self._on_status_change)
         self.worker.start()
 
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, 'frame'):
+            self.frame.setGeometry(0, 0, self.width(), self.height())
+
+    def _toggle_maximize(self):
+        if self.isMaximized():
+            self.showNormal()
+            self.btn_max.setText("▢")
+        else:
+            self.showMaximized()
+            self.btn_max.setText("❐")
+
     def _setup_ui(self):
         self.frame = HudFrame(self)
-        self.frame.setGeometry(0, 0, 1020, 640)
+        self.frame.setGeometry(0, 0, self.width(), self.height())
 
         main_layout = QVBoxLayout(self.frame)
         main_layout.setContentsMargins(18, 14, 18, 12)
@@ -755,15 +820,16 @@ class MainWindow(QMainWindow):
         title_bar.addLayout(brand_layout)
         title_bar.addStretch()
 
-        # Center Top Cyber Navigation Tabs (Page Swapping)
+        # Center Top Cyber Navigation Tabs (5 Pages)
         nav_tabs = QHBoxLayout()
         nav_tabs.setSpacing(6)
 
         tab_specs = [
             ("◈ CORE HUD", 0),
             ("⚡ CONTROLS", 1),
-            ("📡 REMOTE", 2),
-            ("⚙ DIAGNOSTICS", 3)
+            ("📜 HISTORY", 2),
+            ("📡 REMOTE", 3),
+            ("⚙ DIAGNOSTICS", 4)
         ]
         for name, idx in tab_specs:
             btn = HudNavButton(name, idx)
@@ -796,9 +862,9 @@ class MainWindow(QMainWindow):
         btn_min.clicked.connect(self.showMinimized)
         win_ctrls.addWidget(btn_min)
 
-        btn_max = QPushButton("▢")
-        btn_max.setFixedSize(28, 24)
-        btn_max.setStyleSheet("""
+        self.btn_max = QPushButton("▢")
+        self.btn_max.setFixedSize(28, 24)
+        self.btn_max.setStyleSheet("""
             QPushButton {
                 background: transparent;
                 color: #94a3b8;
@@ -811,7 +877,8 @@ class MainWindow(QMainWindow):
                 color: white;
             }
         """)
-        win_ctrls.addWidget(btn_max)
+        self.btn_max.clicked.connect(self._toggle_maximize)
+        win_ctrls.addWidget(self.btn_max)
 
         btn_close = QPushButton("✕")
         btn_close.setFixedSize(28, 24)
@@ -834,12 +901,25 @@ class MainWindow(QMainWindow):
         title_bar.addLayout(win_ctrls)
         main_layout.addLayout(title_bar)
 
-        # ─── 2. MULTI-PAGE STACK (SWAPPABLE PAGES) ───
+        # ─── GLOBAL LIVE FEEDBACK BANNER (Visible on all pages) ───
+        self.feedback_banner = QFrame()
+        self.feedback_banner.setFixedHeight(24)
+        self.feedback_banner.setStyleSheet("background: transparent; border: none;")
+        fb_layout = QHBoxLayout(self.feedback_banner)
+        fb_layout.setContentsMargins(14, 0, 14, 0)
+
+        self.global_feedback_lbl = QLabel("SYSTEM IDLE // STANDBY [ACTIVE] // CLICK CONTROLS OR SPEAK 'JARVIS'")
+        self.global_feedback_lbl.setStyleSheet("color: #38bdf8; font-size: 10px; font-weight: 700; letter-spacing: 0.6px; border: none;")
+        fb_layout.addWidget(self.global_feedback_lbl)
+        main_layout.addWidget(self.feedback_banner)
+
+        # ─── 2. MULTI-PAGE STACK (5 SWAPPABLE PAGES) ───
         self.stack = QStackedWidget()
         self.stack.addWidget(self._build_page_core_hud())       # Index 0
         self.stack.addWidget(self._build_page_controls())       # Index 1
-        self.stack.addWidget(self._build_page_remote())         # Index 2
-        self.stack.addWidget(self._build_page_diagnostics())    # Index 3
+        self.stack.addWidget(self._build_page_history())        # Index 2
+        self.stack.addWidget(self._build_page_remote())         # Index 3
+        self.stack.addWidget(self._build_page_diagnostics())    # Index 4
 
         main_layout.addWidget(self.stack, stretch=1)
 
@@ -848,12 +928,11 @@ class MainWindow(QMainWindow):
         bottom_bar.setContentsMargins(14, 6, 14, 4)
         bottom_bar.setSpacing(12)
 
-        # Left Tech Telemetry Block
         telemetry_block = QLabel("//////  [SYS_V2.4.1] CORE NOMINAL\nSTREAM: 16KHZ MONO SYNCED")
         telemetry_block.setStyleSheet("color: #334155; font-family: 'Consolas', monospace; font-size: 9px; line-height: 1.2;")
         bottom_bar.addWidget(telemetry_block, alignment=Qt.AlignmentFlag.AlignVCenter)
 
-        # Interactive Page Swapper Controls (‹  ● ○ ○ ○  › + Label)
+        # 5-Dot Pagination Controls (‹  ● ○ ○ ○ ○  › + Label)
         swapper_box = QHBoxLayout()
         swapper_box.setSpacing(6)
 
@@ -877,7 +956,7 @@ class MainWindow(QMainWindow):
         btn_prev.clicked.connect(self._prev_page)
         swapper_box.addWidget(btn_prev)
 
-        self.dots = PulseDotsWidget(count=4)
+        self.dots = PulseDotsWidget(count=5)
         self.dots.page_selected.connect(self._set_page)
         swapper_box.addWidget(self.dots)
 
@@ -901,8 +980,8 @@ class MainWindow(QMainWindow):
         btn_next.clicked.connect(self._next_page)
         swapper_box.addWidget(btn_next)
 
-        self.page_indicator_lbl = QLabel("PAGE 1/4: CORE HUD")
-        self.page_indicator_lbl.setFixedWidth(145)
+        self.page_indicator_lbl = QLabel("PAGE 1/5: CORE HUD")
+        self.page_indicator_lbl.setFixedWidth(160)
         self.page_indicator_lbl.setStyleSheet("color: #64748b; font-size: 10px; font-weight: 700; letter-spacing: 0.8px;")
         swapper_box.addWidget(self.page_indicator_lbl)
 
@@ -911,7 +990,7 @@ class MainWindow(QMainWindow):
 
         # Center Cyber Command Line Input
         self.cmd_input = QLineEdit()
-        self.cmd_input.setPlaceholderText("Type command (e.g. 'open vs code', 'controls', 'work mode', 'remote')...")
+        self.cmd_input.setPlaceholderText("Type command (e.g. 'whatsapp', 'volume', 'weather', 'history')...")
         self.cmd_input.setStyleSheet("""
             QLineEdit {
                 background: rgba(15, 23, 42, 0.7);
@@ -973,9 +1052,12 @@ class MainWindow(QMainWindow):
         bottom_bar.addWidget(btn_trigger)
 
         main_layout.addLayout(bottom_bar)
+
+        # Initialize default history entries
+        self._seed_initial_history()
         self._set_page(0)
 
-    # ─── PAGE 0: CORE HUD (ORIGINAL LAYOUT) ───
+    # ─── PAGE 0: CORE HUD (ORIGINAL HERO INTERFACE) ───
     def _build_page_core_hud(self) -> QWidget:
         page = QWidget()
         body_layout = QHBoxLayout(page)
@@ -1005,8 +1087,7 @@ class MainWindow(QMainWindow):
         self.state_lbl.setStyleSheet("color: #00f2fe; font-size: 12px; font-weight: 800; letter-spacing: 2px;")
         center_layout.addWidget(self.state_lbl, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # Center pulse indicator
-        self.center_dots = PulseDotsWidget(count=4)
+        self.center_dots = PulseDotsWidget(count=5)
         self.center_dots.page_selected.connect(self._set_page)
         center_layout.addWidget(self.center_dots, alignment=Qt.AlignmentFlag.AlignCenter)
 
@@ -1033,7 +1114,7 @@ class MainWindow(QMainWindow):
     def _build_page_controls(self) -> QWidget:
         page = QWidget()
         page_layout = QHBoxLayout(page)
-        page_layout.setContentsMargins(10, 8, 10, 8)
+        page_layout.setContentsMargins(10, 6, 10, 6)
         page_layout.setSpacing(14)
 
         # Column 1: Application Quick Launchers
@@ -1051,7 +1132,7 @@ class MainWindow(QMainWindow):
         col_sys = self._create_hud_group("SYSTEM & AUDIO CONTROLS", [
             ("Volume +10%", "Boost Master Sound", "🔊", "#00f2fe", lambda: self._exec_action("Volume +10%", "volume_control", {"action": "up"})),
             ("Volume -10%", "Lower Master Sound", "🔉", "#38bdf8", lambda: self._exec_action("Volume -10%", "volume_control", {"action": "down"})),
-            ("Mute / Unmute", "Toggle Master Audio", "🔇", "#f87171", lambda: self._exec_action("Mute Audio", "volume_control", {"action": "mute"})),
+            ("Mute / Unmute", "Toggle Master Audio", "🔇", "#f87171", lambda: self._exec_action("Toggle Mute", "volume_control", {"action": "toggle"})),
             ("Screenshot", "Capture Display", "📸", "#38bdf8", lambda: self._exec_action("Screenshot", "system_control", {"action": "screenshot"})),
             ("Lock Workstation", "Secure Desktop Screen", "🔒", "#fb923c", lambda: self._exec_action("Lock PC", "system_control", {"action": "lock"})),
             ("Clean Temp Cache", "Free Memory & Disk", "🧹", "#ec4899", lambda: self._exec_action("Clean Temp", "system_control", {"action": "clean_temp"}))
@@ -1061,57 +1142,92 @@ class MainWindow(QMainWindow):
         # Column 3: AI Automations & Macros
         col_macro = self._create_hud_group("AUTOMATION & MACROS", [
             ("Work Mode", "Launch Dev Suite", "🚀", "#00f2fe", lambda: self._exec_action("Work Mode", "work_mode", {})),
-            ("Play Lo-Fi Stream", "Ambient Coding Audio", "🎵", "#a855f7", lambda: self._exec_action("Lo-Fi Stream", "youtube_play", {"query": "lofi hip hop radio"})),
-            ("Health Diagnostics", "CPU/RAM/Disk Audit", "🩺", "#34d399", lambda: self._exec_action("Diagnostics", "system_control", {"action": "diagnostics"})),
-            ("Weather Report", "Local Forecast", "🌤️", "#38bdf8", lambda: self._exec_action("Weather", "weather", {})),
+            ("Play Lo-Fi Stream", "Autoplay First Result", "🎵", "#a855f7", lambda: self._exec_action("Lo-Fi Stream", "youtube_play", {"query": "lofi hip hop radio"})),
+            ("Health Diagnostics", "CPU/RAM/Disk Audit", "🩺", "#34d399", lambda: self._exec_action("Health Diagnostics", "system_control", {"action": "diagnostics"})),
+            ("Weather Report", "Local Forecast", "🌤️", "#38bdf8", lambda: self._exec_action("Weather Report", "weather", {})),
             ("Minimize All", "Show Clean Desktop", "🗔", "#94a3b8", lambda: self._exec_action("Minimize Windows", "window_control", {"action": "minimize_all"})),
-            ("Voice Check", "Verify TTS Synthesis", "🎙️", "#00f2fe", lambda: self._test_voice())
+            ("Voice Check", "Verify TTS Audio", "🎙️", "#00f2fe", lambda: self._test_voice())
         ])
         page_layout.addWidget(col_macro)
 
         return page
 
-    def _create_hud_group(self, title: str, button_specs: list) -> QFrame:
-        """Constructs a glassmorphic column card containing a list of action buttons."""
-        card = QFrame()
-        card.setStyleSheet("""
-            QFrame {
-                background: rgba(10, 25, 45, 0.65);
-                border: 1px solid rgba(0, 242, 254, 0.3);
-                border-radius: 14px;
-            }
-        """)
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(14, 14, 14, 14)
-        layout.setSpacing(10)
+    # ─── PAGE 2: COMMAND HISTORY & ACTION RECALL HUB ───
+    def _build_page_history(self) -> QWidget:
+        page = QWidget()
+        page_layout = QVBoxLayout(page)
+        page_layout.setContentsMargins(14, 8, 14, 8)
+        page_layout.setSpacing(10)
 
-        # Header Title with Cyan Indicator Pill
-        h_layout = QHBoxLayout()
-        h_layout.setSpacing(6)
+        # Header Row
+        h_row = QHBoxLayout()
         pill = QLabel()
         pill.setFixedSize(3, 14)
         pill.setStyleSheet("background: #00f2fe; border-radius: 1px; border: none;")
-        t_lbl = QLabel(title)
+        t_lbl = QLabel("COMMAND EXECUTION HISTORY & RECALL (CLICK ANY ENTRY TO RE-RUN)")
         t_lbl.setStyleSheet("color: #94a3b8; font-size: 11px; font-weight: 700; letter-spacing: 1px; border: none; background: transparent;")
-        h_layout.addWidget(pill)
-        h_layout.addWidget(t_lbl)
-        h_layout.addStretch()
-        layout.addLayout(h_layout)
+        h_row.addWidget(pill)
+        h_row.addWidget(t_lbl)
+        h_row.addStretch()
 
-        # Buttons
-        for b_title, b_sub, b_icon, b_color, b_handler in button_specs:
-            btn = HudActionButton(b_title, b_sub, b_icon, b_color)
-            btn.clicked.connect(b_handler)
-            layout.addWidget(btn)
+        btn_clear_all = QPushButton("🧹 CLEAR HISTORY")
+        btn_clear_all.setFixedHeight(26)
+        btn_clear_all.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_clear_all.setStyleSheet("""
+            QPushButton {
+                background: rgba(239, 68, 68, 0.12);
+                border: 1px solid rgba(239, 68, 68, 0.4);
+                border-radius: 5px;
+                color: #f87171;
+                font-size: 10px;
+                font-weight: 700;
+                padding: 2px 10px;
+            }
+            QPushButton:hover {
+                background: rgba(239, 68, 68, 0.28);
+                color: white;
+            }
+        """)
+        btn_clear_all.clicked.connect(self._clear_all_history)
+        h_row.addWidget(btn_clear_all)
+        page_layout.addLayout(h_row)
 
-        layout.addStretch()
-        return card
+        # Scrollable History Container
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("""
+            QScrollArea {
+                background: rgba(10, 25, 45, 0.4);
+                border: 1px solid rgba(0, 242, 254, 0.25);
+                border-radius: 12px;
+            }
+            QScrollBar:vertical {
+                background: rgba(15, 23, 42, 0.5);
+                width: 6px;
+                border-radius: 3px;
+            }
+            QScrollBar::handle:vertical {
+                background: #00f2fe;
+                border-radius: 3px;
+            }
+        """)
 
-    # ─── PAGE 2: MOBILE REMOTE & NETWORK HUB ───
+        self.history_scroll_widget = QWidget()
+        self.history_scroll_layout = QVBoxLayout(self.history_scroll_widget)
+        self.history_scroll_layout.setContentsMargins(10, 10, 10, 10)
+        self.history_scroll_layout.setSpacing(6)
+        self.history_scroll_layout.addStretch()
+
+        scroll.setWidget(self.history_scroll_widget)
+        page_layout.addWidget(scroll, stretch=1)
+
+        return page
+
+    # ─── PAGE 3: MOBILE REMOTE & NETWORK HUB ───
     def _build_page_remote(self) -> QWidget:
         page = QWidget()
         page_layout = QHBoxLayout(page)
-        page_layout.setContentsMargins(12, 10, 12, 10)
+        page_layout.setContentsMargins(12, 8, 12, 8)
         page_layout.setSpacing(16)
 
         # Left Card: Remote Telemetry & Links
@@ -1127,7 +1243,6 @@ class MainWindow(QMainWindow):
         l_layout.setContentsMargins(20, 18, 20, 18)
         l_layout.setSpacing(12)
 
-        # Header
         h_box = QHBoxLayout()
         pill = QLabel()
         pill.setFixedSize(3, 14)
@@ -1139,7 +1254,6 @@ class MainWindow(QMainWindow):
         h_box.addStretch()
         l_layout.addLayout(h_box)
 
-        # Online Status Banner
         status_box = QLabel("●  REMOTE ENGINE ONLINE [PORT 8443 / 8000]")
         status_box.setStyleSheet("""
             color: #10b981; 
@@ -1153,7 +1267,6 @@ class MainWindow(QMainWindow):
         """)
         l_layout.addWidget(status_box)
 
-        # Network IP URLs
         l_layout.addSpacing(4)
         lbl_url_hdr = QLabel("LOCAL NETWORK ACCESS (HTTPS REQUIRED FOR MIC):")
         lbl_url_hdr.setStyleSheet("color: #7dd3fc; font-size: 10px; font-weight: 700; border: none; background: transparent;")
@@ -1179,7 +1292,6 @@ class MainWindow(QMainWindow):
 
         l_layout.addSpacing(10)
 
-        # Actions
         btn_open = QPushButton("🌐 OPEN MOBILE REMOTE IN BROWSER")
         btn_open.setFixedHeight(42)
         btn_open.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1223,7 +1335,7 @@ class MainWindow(QMainWindow):
         l_layout.addStretch()
         page_layout.addWidget(left_card, stretch=1)
 
-        # Right Card: Connection Guide & Security Bypass
+        # Right Card: Connection Guide
         right_card = QFrame()
         right_card.setStyleSheet("""
             QFrame {
@@ -1286,11 +1398,11 @@ class MainWindow(QMainWindow):
         page_layout.addWidget(right_card, stretch=1)
         return page
 
-    # ─── PAGE 3: SYSTEM DIAGNOSTICS & TELEMETRY ───
+    # ─── PAGE 4: SYSTEM DIAGNOSTICS & TELEMETRY ───
     def _build_page_diagnostics(self) -> QWidget:
         page = QWidget()
         page_layout = QHBoxLayout(page)
-        page_layout.setContentsMargins(12, 10, 12, 10)
+        page_layout.setContentsMargins(12, 8, 12, 8)
         page_layout.setSpacing(16)
 
         # Left Card: Hardware & OS Audit
@@ -1306,7 +1418,6 @@ class MainWindow(QMainWindow):
         l_layout.setContentsMargins(20, 18, 20, 18)
         l_layout.setSpacing(12)
 
-        # Header
         h1 = QHBoxLayout()
         pill1 = QLabel()
         pill1.setFixedSize(3, 14)
@@ -1318,11 +1429,10 @@ class MainWindow(QMainWindow):
         h1.addStretch()
         l_layout.addLayout(h1)
 
-        # Live Stats
         cores = psutil.cpu_count(logical=True)
         freq = psutil.cpu_freq().current if psutil.cpu_freq() else 0.0
         mem = psutil.virtual_memory()
-        disk = psutil.disk_usage('/')
+        disk = psutil.disk_usage('C:\\')
 
         stats = [
             f"CPU Cores: {cores} Logical Processors @ {freq:.0f} MHz",
@@ -1353,7 +1463,7 @@ class MainWindow(QMainWindow):
                 background: rgba(0, 242, 254, 0.3);
             }
         """)
-        btn_audit.clicked.connect(lambda: self._exec_action("Diagnostics Audit", "system_control", {"action": "diagnostics"}))
+        btn_audit.clicked.connect(lambda: self._exec_action("Health Diagnostics", "system_control", {"action": "diagnostics"}))
         l_layout.addWidget(btn_audit)
 
         page_layout.addWidget(card_hw, stretch=1)
@@ -1371,7 +1481,6 @@ class MainWindow(QMainWindow):
         r_layout.setContentsMargins(20, 18, 20, 18)
         r_layout.setSpacing(12)
 
-        # Header
         h2 = QHBoxLayout()
         pill2 = QLabel()
         pill2.setFixedSize(3, 14)
@@ -1420,6 +1529,39 @@ class MainWindow(QMainWindow):
         return page
 
     # ─── HELPER HUD CARDS (CORE HUD) ───
+    def _create_hud_group(self, title: str, button_specs: list) -> QFrame:
+        card = QFrame()
+        card.setStyleSheet("""
+            QFrame {
+                background: rgba(10, 25, 45, 0.65);
+                border: 1px solid rgba(0, 242, 254, 0.3);
+                border-radius: 14px;
+            }
+        """)
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
+
+        h_layout = QHBoxLayout()
+        h_layout.setSpacing(6)
+        pill = QLabel()
+        pill.setFixedSize(3, 14)
+        pill.setStyleSheet("background: #00f2fe; border-radius: 1px; border: none;")
+        t_lbl = QLabel(title)
+        t_lbl.setStyleSheet("color: #94a3b8; font-size: 11px; font-weight: 700; letter-spacing: 1px; border: none; background: transparent;")
+        h_layout.addWidget(pill)
+        h_layout.addWidget(t_lbl)
+        h_layout.addStretch()
+        layout.addLayout(h_layout)
+
+        for b_title, b_sub, b_icon, b_color, b_handler in button_specs:
+            btn = HudActionButton(b_title, b_sub, b_icon, b_color)
+            btn.clicked.connect(b_handler)
+            layout.addWidget(btn)
+
+        layout.addStretch()
+        return card
+
     def _build_left_hud_card(self) -> QFrame:
         card = QFrame()
         card.setFixedSize(240, 210)
@@ -1434,7 +1576,6 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(18, 18, 18, 18)
         layout.setSpacing(14)
 
-        # 1. Wake-Word Section
         sec1 = QVBoxLayout()
         sec1.setSpacing(4)
         h1 = QHBoxLayout()
@@ -1454,13 +1595,11 @@ class MainWindow(QMainWindow):
         sec1.addWidget(val1)
         layout.addLayout(sec1)
 
-        # Divider line
         div = QFrame()
         div.setFixedHeight(1)
         div.setStyleSheet("background: rgba(255, 255, 255, 0.06); border: none;")
         layout.addWidget(div)
 
-        # 2. Local STT Section
         sec2 = QVBoxLayout()
         sec2.setSpacing(4)
         h2 = QHBoxLayout()
@@ -1499,7 +1638,6 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(18, 14, 18, 14)
         layout.setSpacing(8)
 
-        # Header: SYSTEM:
         h_sys = QHBoxLayout()
         h_sys.setSpacing(6)
         bar_sys = QLabel()
@@ -1512,7 +1650,6 @@ class MainWindow(QMainWindow):
         h_sys.addStretch()
         layout.addLayout(h_sys)
 
-        # CPU Row
         cpu_row = QHBoxLayout()
         cpu_row.setContentsMargins(8, 0, 4, 0)
         cpu_text_layout = QVBoxLayout()
@@ -1533,7 +1670,6 @@ class MainWindow(QMainWindow):
         cpu_row.addWidget(self.cpu_gauge)
         layout.addLayout(cpu_row)
 
-        # RAM Row
         ram_layout = QVBoxLayout()
         ram_layout.setContentsMargins(8, 0, 8, 0)
         ram_layout.setSpacing(4)
@@ -1576,15 +1712,6 @@ class MainWindow(QMainWindow):
         self.cmds_list_layout.setContentsMargins(0, 2, 0, 0)
         self.cmds_list_layout.setSpacing(4)
 
-        now_time = datetime.now()
-        initial_entries = [
-            ("Open VS Code", now_time.strftime("%H:%M:%S")),
-            ("Play Lo-Fi stream", now_time.strftime("%H:%M:%S")),
-            ("Check system diagnostics", now_time.strftime("%H:%M:%S")),
-        ]
-        for cmd, ts in initial_entries:
-            self._add_command_entry(cmd, ts)
-
         layout.addLayout(self.cmds_list_layout)
         layout.addStretch()
         return card
@@ -1613,23 +1740,57 @@ class MainWindow(QMainWindow):
 
         self.cmds_list_layout.insertWidget(0, row)
 
+    def _seed_initial_history(self):
+        now_time = datetime.now().strftime("%H:%M:%S")
+        seeds = [
+            {"title": "Open WhatsApp", "intent": "open_app", "entities": {"app": "whatsapp"}, "source": "voice", "timestamp": now_time, "response": "Opened WhatsApp client."},
+            {"title": "Weather Report", "intent": "weather", "entities": {}, "source": "preset", "timestamp": now_time, "response": "Karachi weather retrieved."},
+            {"title": "Play Lo-Fi Stream", "intent": "youtube_play", "entities": {"query": "lofi hip hop radio"}, "source": "preset", "timestamp": now_time, "response": "Autoplaying live Lo-Fi stream."},
+            {"title": "Health Diagnostics", "intent": "system_control", "entities": {"action": "diagnostics"}, "source": "voice", "timestamp": now_time, "response": "All core system metrics nominal."},
+            {"title": "VS Code", "intent": "open_app", "entities": {"app": "code"}, "source": "preset", "timestamp": now_time, "response": "Visual Studio Code launched."}
+        ]
+        for s in seeds:
+            self._add_history_record(s)
+            self._add_command_entry(s["title"], s["timestamp"])
+
+    def _add_history_record(self, data: dict):
+        self.history_records.insert(0, data)
+        # Add widget to History page scroll area
+        item_widget = HistoryItemWidget(data)
+        item_widget.recalled.connect(self._recall_action)
+        self.history_scroll_layout.insertWidget(0, item_widget)
+
+    def _clear_all_history(self):
+        self.history_records.clear()
+        while self.history_scroll_layout.count() > 1:
+            item = self.history_scroll_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        self._clear_commands_list()
+        self.global_feedback_lbl.setText("COMMAND HISTORY PURGED")
+
     def _clear_commands_list(self):
         while self.cmds_list_layout.count():
             item = self.cmds_list_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
-        self.state_lbl.setText("COMMAND HISTORY CLEARED")
+        self.state_lbl.setText("LOGS CLEARED")
+
+    def _recall_action(self, item_data: dict):
+        title = item_data.get("title", "")
+        intent = item_data.get("intent", "")
+        entities = item_data.get("entities", {})
+        self.global_feedback_lbl.setText(f"RECALLING ACTION: [{title.upper()}]...")
+        self._exec_action(f"Recall: {title}", intent, entities, source="history")
 
     # ─── PAGE SWAPPING METHODS ───
     def _set_page(self, idx: int):
         idx = max(0, min(self.stack.count() - 1, idx))
         self.stack.setCurrentIndex(idx)
 
-        # Update top navigation tabs
         for i, btn in enumerate(self.nav_buttons):
             btn.set_active(i == idx)
 
-        # Update pagination indicators
         self.dots.set_active_page(idx)
         if hasattr(self, 'center_dots'):
             self.center_dots.set_active_page(idx)
@@ -1654,6 +1815,8 @@ class MainWindow(QMainWindow):
             self._set_page(2)
         elif key == Qt.Key.Key_4:
             self._set_page(3)
+        elif key == Qt.Key.Key_5:
+            self._set_page(4)
         elif key in [Qt.Key.Key_Right, Qt.Key.Key_PageDown]:
             self._next_page()
         elif key in [Qt.Key.Key_Left, Qt.Key.Key_PageUp]:
@@ -1676,17 +1839,17 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
-    def _exec_action(self, title: str, intent: str, entities: dict):
-        """Executes a predefined action from the controls dashboard."""
+    def _exec_action(self, title: str, intent: str, entities: dict, source: str = "preset"):
         cur_time = datetime.now().strftime("%H:%M:%S")
         self._add_command_entry(title, cur_time)
 
         self.reactor.set_processing(True)
         self.state_lbl.setText(f"CMD: [{title.upper()}]")
+        self.global_feedback_lbl.setText(f"EXECUTING: [{title.upper()}]...")
 
-        threading.Thread(target=self._run_routed_command, args=(intent, entities), daemon=True).start()
+        threading.Thread(target=self._run_routed_command, args=(title, intent, entities, source), daemon=True).start()
 
-    def _run_routed_command(self, intent: str, entities: dict):
+    def _run_routed_command(self, title: str, intent: str, entities: dict, source: str):
         from core.ai.command_router import get_router
         from core.voice.tts import get_tts
 
@@ -1699,22 +1862,56 @@ class MainWindow(QMainWindow):
             "response": ""
         })
 
-        if exec_result.response:
-            tts.speak(exec_result.response, block=False)
-        else:
-            tts.speak("Command completed.", block=False)
+        resp = exec_result.response or f"{title} completed."
+        tts.speak(resp, block=True)
 
-        QTimer.singleShot(1500, lambda: self._on_status_change("STANDBY [ACTIVE]"))
+        # Update feedback and history
+        cur_time = datetime.now().strftime("%H:%M:%S")
+        record = {
+            "title": title,
+            "intent": intent,
+            "entities": entities,
+            "source": source,
+            "timestamp": cur_time,
+            "response": resp
+        }
+
+        # Safely update GUI elements on Qt thread
+        QTimer.singleShot(0, lambda: self._on_action_finished(record))
+
+    def _on_action_finished(self, record: dict):
+        self._add_history_record(record)
+        resp = record.get("response", "")
+        self.global_feedback_lbl.setText(f"DONE: {resp}")
+        self.state_lbl.setText("STANDBY [ACTIVE]")
+        self.reactor.set_processing(False)
 
     def _test_voice(self):
-        from core.voice.tts import get_tts
-        tts = get_tts()
-        tts.speak("All Jarvis systems are fully operational and responding.", block=False)
-        self.state_lbl.setText("TEST: TTS SPEECH VERIFIED")
+        cur_time = datetime.now().strftime("%H:%M:%S")
+        self._add_command_entry("Voice Check", cur_time)
+        self.global_feedback_lbl.setText("TESTING VOICE ENGINE...")
+        self.reactor.set_processing(True)
+
+        def _voice_run():
+            from core.voice.tts import get_tts
+            tts = get_tts()
+            msg = "Jarvis voice and speech synthesis verified. All systems nominal and fully operational."
+            tts.speak(msg, block=True)
+            record = {
+                "title": "Voice Check",
+                "intent": "chat",
+                "entities": {},
+                "source": "preset",
+                "timestamp": datetime.now().strftime("%H:%M:%S"),
+                "response": msg
+            }
+            QTimer.singleShot(0, lambda: self._on_action_finished(record))
+
+        threading.Thread(target=_voice_run, daemon=True).start()
 
     def _copy_remote_link(self):
         QApplication.clipboard().setText(self.remote_url_val)
-        self.state_lbl.setText("COPIED HTTPS REMOTE URL")
+        self.global_feedback_lbl.setText("COPIED HTTPS REMOTE URL TO CLIPBOARD")
 
     def _restart_mobile_server(self):
         import subprocess, sys
@@ -1722,23 +1919,25 @@ class MainWindow(QMainWindow):
         server_script = os.path.join(root_dir, "server.py")
         DETACHED = 0x00000008 | 0x08000000
         subprocess.Popen([sys.executable, server_script], cwd=root_dir, creationflags=DETACHED)
-        self.state_lbl.setText("REMOTE DAEMON RESTARTED")
+        self.global_feedback_lbl.setText("MOBILE REMOTE DAEMON RESTARTED")
 
     def _on_command_update(self, text: str, is_user: bool):
         clean_lower = text.lower().strip()
         if is_user:
-            # Check for page swap voice commands
             if any(kw in clean_lower for kw in ["controls", "control page", "show controls", "open controls"]):
                 self._set_page(1)
                 return
-            elif any(kw in clean_lower for kw in ["core hud", "show hud", "open hud", "main page"]):
-                self._set_page(0)
-                return
-            elif any(kw in clean_lower for kw in ["remote page", "show remote", "open remote", "mobile remote"]):
+            elif any(kw in clean_lower for kw in ["history", "history page", "show history", "recent commands"]):
                 self._set_page(2)
                 return
-            elif any(kw in clean_lower for kw in ["diagnostics", "system page", "show settings"]):
+            elif any(kw in clean_lower for kw in ["remote page", "show remote", "open remote", "mobile remote"]):
                 self._set_page(3)
+                return
+            elif any(kw in clean_lower for kw in ["diagnostics", "system page", "show settings"]):
+                self._set_page(4)
+                return
+            elif any(kw in clean_lower for kw in ["core hud", "show hud", "open hud", "main page"]):
+                self._set_page(0)
                 return
             elif any(kw in clean_lower for kw in ["next page", "swap page"]):
                 self._next_page()
@@ -1750,7 +1949,9 @@ class MainWindow(QMainWindow):
             cur_time = datetime.now().strftime("%H:%M:%S")
             self._add_command_entry(text, cur_time)
             self.state_lbl.setText(f"CMD: \"{text[:18]}\"")
+            self.global_feedback_lbl.setText(f"VOICE INSTRUCTION: \"{text}\"")
         else:
+            self.global_feedback_lbl.setText(f"JARVIS: {text}")
             self.state_lbl.setText("STANDBY [ACTIVE]")
 
     def _on_listening_state(self, is_listening: bool):
@@ -1760,6 +1961,7 @@ class MainWindow(QMainWindow):
             self.state_lbl.setStyleSheet("color: #00f2fe; font-size: 12px; font-weight: 800; letter-spacing: 2px;")
             self.status_tag.setText("[LISTENING]")
             self.status_tag.setStyleSheet("color: #00f2fe; font-weight: 800; font-size: 13px;")
+            self.global_feedback_lbl.setText("MICROPHONE ACTIVE // LISTENING FOR VOICE INSTRUCTION...")
         else:
             self.state_lbl.setText("STANDBY [ACTIVE]")
             self.state_lbl.setStyleSheet("color: #10b981; font-size: 12px; font-weight: 800; letter-spacing: 2px;")
@@ -1792,11 +1994,14 @@ class MainWindow(QMainWindow):
         elif clean in ["2", "controls", "ctrl", "predefined"]:
             self._set_page(1)
             return
-        elif clean in ["3", "remote", "mobile", "network"]:
+        elif clean in ["3", "history", "log", "logs", "recent"]:
             self._set_page(2)
             return
-        elif clean in ["4", "diag", "diagnostics", "settings"]:
+        elif clean in ["4", "remote", "mobile", "network"]:
             self._set_page(3)
+            return
+        elif clean in ["5", "diag", "diagnostics", "settings"]:
+            self._set_page(4)
             return
         elif clean in ["next", "swap"]:
             self._next_page()
@@ -1807,9 +2012,9 @@ class MainWindow(QMainWindow):
 
         cur_time = datetime.now().strftime("%H:%M:%S")
         self._add_command_entry(text, cur_time)
-
         self.reactor.set_processing(True)
         self.state_lbl.setText("PROCESSING...")
+        self.global_feedback_lbl.setText(f"PROCESSING: \"{text}\"")
 
         threading.Thread(target=self._process_text_command, args=(text,), daemon=True).start()
 
@@ -1833,23 +2038,22 @@ class MainWindow(QMainWindow):
             "response": nlp_resp
         })
 
-        final_resp = exec_result.response or nlp_resp
+        final_resp = exec_result.response or nlp_resp or "Command completed."
         if exec_result.response and exec_result.response != nlp_resp:
             tts.speak(exec_result.response)
         elif not nlp_resp and final_resp:
             tts.speak(final_resp)
 
-        TASK_INTENTS = [
-            "open_app", "close_app", "open_folder", "open_file",
-            "open_in", "system_control", "file_action", "write_content",
-            "send_whatsapp", "youtube_play", "work_mode"
-        ]
-        if exec_result.success and result.get("intent") in TASK_INTENTS:
-            tts.speak("Command completed.")
+        record = {
+            "title": text,
+            "intent": result.get("intent", "chat"),
+            "entities": result.get("entities", {}),
+            "source": "typed",
+            "timestamp": datetime.now().strftime("%H:%M:%S"),
+            "response": final_resp
+        }
+        QTimer.singleShot(0, lambda: self._on_action_finished(record))
 
-        QTimer.singleShot(0, lambda: self._on_status_change("STANDBY [ACTIVE]"))
-
-    # Window Dragging support for Frameless Window
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.drag_pos = event.globalPosition().toPoint()

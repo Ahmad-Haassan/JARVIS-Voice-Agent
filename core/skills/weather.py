@@ -12,10 +12,13 @@ class WeatherSkill:
         target_city = city or cfg.get("skills", "weather_city", "Karachi")
         logger.info(f"Querying weather for: '{target_city}'")
         try:
-            url = f"https://wttr.in/{target_city}?format=%C+%t+(feels+like+%f)+with+humidity+%h"
+            url = f"https://wttr.in/{target_city}?format=%C,+%t+(feels+like+%f)+with+humidity+%h"
             res = requests.get(url, timeout=5)
             if res.status_code == 200:
-                report = f"The weather in {target_city} is {res.text.strip()}."
+                raw = res.text.strip()
+                cleaned = raw.replace("°C", " degrees Celsius").replace("°F", " degrees Fahrenheit").replace("+", "")
+                cleaned = " ".join(cleaned.split())
+                report = f"The weather in {target_city} is {cleaned}."
                 return report
         except Exception as e:
             logger.warning(f"Weather lookup error: {e}")
