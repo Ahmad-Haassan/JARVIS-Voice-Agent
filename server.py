@@ -5,6 +5,7 @@ import os
 import sys
 import time
 import socket
+import asyncio
 import psutil
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
@@ -14,10 +15,31 @@ from pydantic import BaseModel
 
 # Ensure project root in sys.path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-try:
-    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-except Exception:
-    pass
+# Ensure safe stdio streams even when run silently with pythonw.exe or detached background
+class _NullStream:
+    def write(self, *args, **kwargs): pass
+    def flush(self, *args, **kwargs): pass
+    def isatty(self): return False
+    def fileno(self): return -1
+    def read(self, *args, **kwargs): return ""
+    def readline(self, *args, **kwargs): return ""
+
+_is_silent = (sys.stdout is None)
+if sys.stdout is None:
+    sys.stdout = _NullStream()
+    sys.__stdout__ = sys.stdout
+else:
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
+if sys.stderr is None:
+    sys.stderr = _NullStream()
+    sys.__stderr__ = sys.stderr
+if sys.stdin is None:
+    sys.stdin = _NullStream()
+    sys.__stdin__ = sys.stdin
 
 from core.utils.logger import get_logger
 from core.ai.nlp_engine import get_nlp
@@ -76,9 +98,28 @@ async def serve_home():
         content = f.read()
     return HTMLResponse(content=content, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
+COMMAND_TIMEOUT_SECONDS = 30
+
 @app.post("/api/command")
 async def execute_command(req: CommandRequest):
+    """Runs the (blocking) command pipeline in a worker thread so a slow or hung
+    PC action can never freeze the server's event loop."""
     text = req.text.strip()
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(_execute_command_sync, text),
+            timeout=COMMAND_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        logger.warning(f"Command timed out after {COMMAND_TIMEOUT_SECONDS}s: '{text}'")
+        return {"success": False, "response": "That command is taking too long on the PC.", "intent": "timeout",
+                "action": "", "screenshot_url": None, "camera_url": None}
+    except Exception as e:
+        logger.error(f"Command error: {e}")
+        return {"success": False, "response": f"Command error: {e}", "intent": "error",
+                "action": "", "screenshot_url": None, "camera_url": None}
+
+def _execute_command_sync(text: str):
     logger.info(f"Mobile Remote Command received: '{text}'")
 
     nlp = get_nlp()
@@ -166,7 +207,10 @@ async def get_screenshot():
         return FileResponse(path, media_type="image/png", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
     sys_ctrl = get_system_control()
-    fresh_path = sys_ctrl.take_screenshot()
+    try:
+        fresh_path = await asyncio.wait_for(asyncio.to_thread(sys_ctrl.take_screenshot), timeout=15)
+    except Exception:
+        fresh_path = None
     if fresh_path and os.path.exists(fresh_path):
         return FileResponse(fresh_path, media_type="image/png", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     elif os.path.exists(path):
@@ -193,32 +237,80 @@ def camera_snapshot():
 
 @app.post("/api/voice")
 async def process_voice_audio(audio: UploadFile = File(...)):
-    """Receives voice audio from mobile, transcribes via Google STT, and executes command."""
+    """Receives voice audio from mobile (webm/mp4/wav), converts via ffmpeg if needed, transcribes, and executes command."""
+    import tempfile
+    import subprocess
+    import speech_recognition as sr
+
+    in_path = None
+    wav_path = None
     try:
-        import speech_recognition as sr
-        import tempfile
-        
         contents = await audio.read()
-        suffix = os.path.splitext(audio.filename or "")[1] or ".wav"
+        suffix = os.path.splitext(audio.filename or "")[1] or ".webm"
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tf:
             tf.write(contents)
-            tmp_audio_path = tf.name
+            in_path = tf.name
 
-        recognizer = sr.Recognizer()
-        with sr.AudioFile(tmp_audio_path) as source:
-            recorded = recognizer.record(source)
-            text = recognizer.recognize_google(recorded)
-
+        wav_path = in_path + "_converted.wav"
+        
+        # Convert any incoming mobile audio container (webm, mp4, aac, ogg) to 16kHz mono WAV using ffmpeg
         try:
-            os.remove(tmp_audio_path)
-        except Exception:
-            pass
+            await asyncio.to_thread(
+                subprocess.run,
+                ["ffmpeg", "-y", "-i", in_path, "-vn", "-ar", "16000", "-ac", "1", "-f", "wav", wav_path],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=True,
+                timeout=6
+            )
+            target_audio = wav_path
+        except Exception as fe:
+            logger.warning(f"ffmpeg conversion note: {fe}, attempting direct read...")
+            target_audio = in_path
+
+        def _transcribe():
+            recognizer = sr.Recognizer()
+            with sr.AudioFile(target_audio) as source:
+                recorded = recognizer.record(source)
+                return recognizer.recognize_google(recorded)
+
+        text = await asyncio.wait_for(asyncio.to_thread(_transcribe), timeout=20)
 
         logger.info(f"Mobile voice transcribed: '{text}'")
-        return await execute_command(CommandRequest(text=text))
+        res = await execute_command(CommandRequest(text=text))
+        if isinstance(res, dict):
+            res["transcription"] = text
+        return res
     except Exception as e:
         logger.warning(f"Voice upload processing error: {e}")
-        return {"success": False, "response": f"Voice transcription error: {e}"}
+        return {"success": False, "response": f"Voice transcription error: {e}", "transcription": ""}
+    finally:
+        for p in [in_path, wav_path]:
+            if p and os.path.exists(p):
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
+
+@app.post("/api/voice/pc_listen")
+async def trigger_pc_listen():
+    """Triggers the computer's physical microphone to listen for a spoken command (desktop app mode)."""
+    try:
+        from core.voice.stt import get_stt
+        stt = get_stt()
+        logger.info("PC physical microphone listening triggered from mobile...")
+        text = await asyncio.wait_for(asyncio.to_thread(stt.listen, timeout=6.0), timeout=20)
+        if text:
+            logger.info(f"PC microphone captured: '{text}'")
+            res = await execute_command(CommandRequest(text=text))
+            if isinstance(res, dict):
+                res["transcription"] = text
+            return res
+        else:
+            return {"success": False, "response": "No speech detected on PC microphone.", "transcription": ""}
+    except Exception as e:
+        logger.error(f"PC mic listen error: {e}")
+        return {"success": False, "response": f"PC microphone error: {e}", "transcription": ""}
 
 # ==========================================
 # AUTONOMOUS COMPUTER CONTROL & TOUCHPAD
@@ -282,30 +374,153 @@ def get_computer_logs():
     agent = get_computer_agent()
     return {"logs": agent.get_logs(limit=25)}
 
-def print_banner(host_ip, port):
-    url = f"http://{host_ip}:{port}"
-    print("\n" + "=" * 60)
-    print("   [+] JARVIS MOBILE REMOTE SERVER IS ACTIVE!")
-    print("=" * 60)
-    print(f"\n>>> OPEN THIS URL ON YOUR IPHONE (Safari/Chrome):")
-    print(f"    {url}\n")
-    print("    Make sure your iPhone is connected to the same Wi-Fi!\n")
+@app.get("/api/ssl_info")
+def get_ssl_info():
+    ip = get_local_ip()
+    key_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "key.pem")
+    cert_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cert.pem")
+    https_ready = os.path.exists(key_path) and os.path.exists(cert_path)
+    return {
+        "https_enabled": https_ready,
+        "https_port": 8443,
+        "http_port": 8000,
+        "local_ip": ip,
+        "https_url": f"https://{ip}:8443",
+        "http_url": f"http://{ip}:8000"
+    }
 
-    # Generate QR Code in terminal
+def ensure_ssl_certificates(host_ip: str):
+    root_dir = os.path.dirname(os.path.abspath(__file__))
+    key_path = os.path.join(root_dir, "key.pem")
+    cert_path = os.path.join(root_dir, "cert.pem")
+    if os.path.exists(key_path) and os.path.exists(cert_path):
+        return key_path, cert_path
+
     try:
-        import qrcode
-        qr = qrcode.QRCode(border=1)
-        qr.add_data(url)
-        qr.make(fit=True)
-        print("[*] SCAN THIS QR CODE WITH YOUR IPHONE CAMERA:")
-        qr.print_ascii(invert=True)
+        import datetime
+        import ipaddress
+        from cryptography import x509
+        from cryptography.x509.oid import NameOID
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.hazmat.primitives import serialization
+
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        subject = issuer = x509.Name([
+            x509.NameAttribute(NameOID.COMMON_NAME, u"JARVIS Mobile Server"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"JARVIS OS"),
+        ])
+
+        alt_names = [
+            x509.DNSName(u"localhost"),
+            x509.IPAddress(ipaddress.IPv4Address("127.0.0.1")),
+        ]
+        try:
+            alt_names.append(x509.IPAddress(ipaddress.IPv4Address(host_ip)))
+        except Exception:
+            pass
+
+        cert = (
+            x509.CertificateBuilder()
+            .subject_name(subject)
+            .issuer_name(issuer)
+            .public_key(key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(datetime.datetime.utcnow() - datetime.timedelta(days=1))
+            .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=3650))
+            .add_extension(x509.SubjectAlternativeName(alt_names), critical=False)
+            .sign(key, hashes.SHA256())
+        )
+
+        with open(key_path, "wb") as f:
+            f.write(key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption(),
+            ))
+
+        with open(cert_path, "wb") as f:
+            f.write(cert.public_bytes(serialization.Encoding.PEM))
+
+        return key_path, cert_path
+    except Exception as e:
+        logger.warning(f"Could not generate SSL certificates: {e}")
+        return None, None
+
+def print_banner(host_ip, http_port, https_port=None):
+    try:
+        http_url = f"http://{host_ip}:{http_port}"
+        https_url = f"https://{host_ip}:{https_port}" if https_port else None
+
+        print("\n" + "=" * 65)
+        print("       [+] JARVIS MOBILE REMOTE SERVER IS ACTIVE!")
+        print("=" * 65)
+        
+        if https_url:
+            print(f"\n>>> 🔒 SECURE HTTPS (Unlocks iPhone Mic & 'Jarvis' Wake Word):")
+            print(f"    {https_url}")
+            print(f"    (Tap 'Show Details' -> 'Visit this website' once on iPhone)\n")
+
+        print(f">>> 🌐 STANDARD HTTP:")
+        print(f"    {http_url}\n")
+        print("    Make sure your iPhone is connected to the same Wi-Fi!\n")
+
+        # Generate QR Code for HTTPS if available, otherwise HTTP
+        target_qr = https_url or http_url
+        try:
+            import qrcode
+            qr = qrcode.QRCode(border=1)
+            qr.add_data(target_qr)
+            qr.make(fit=True)
+            print(f"[*] SCAN THIS QR CODE WITH YOUR IPHONE CAMERA ({'HTTPS' if https_url else 'HTTP'}):")
+            qr.print_ascii(invert=True)
+        except Exception:
+            pass
+        print("=" * 65 + "\n")
     except Exception:
         pass
-    print("=" * 60 + "\n")
 
 if __name__ == "__main__":
-    import uvicorn
-    local_ip = get_local_ip()
-    port = 8000
-    print_banner(local_ip, port)
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
+    try:
+        import uvicorn
+        import threading
+        local_ip = get_local_ip()
+        http_port = 8000
+        https_port = 8443
+
+        key_path, cert_path = ensure_ssl_certificates(local_ip)
+
+        if not _is_silent:
+            print_banner(local_ip, http_port, https_port if key_path else None)
+
+        # Run HTTPS on 8443 in a background thread if certificates exist
+        if key_path and cert_path:
+            def run_https():
+                try:
+                    uvicorn.run(
+                        app,
+                        host="0.0.0.0",
+                        port=https_port,
+                        ssl_keyfile=key_path,
+                        ssl_certfile=cert_path,
+                        log_level="warning" if not _is_silent else "critical"
+                    )
+                except Exception as ex:
+                    logger.warning(f"HTTPS server error: {ex}")
+
+            t_https = threading.Thread(target=run_https, daemon=True)
+            t_https.start()
+
+        # Run HTTP on 8000 in main thread
+        if not _is_silent:
+            uvicorn.run(app, host="0.0.0.0", port=http_port, log_level="warning")
+        else:
+            uvicorn.run(app, host="0.0.0.0", port=http_port, log_config=None)
+    except BaseException as e:
+        import traceback
+        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "logs", "server_crash.log")
+        try:
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(f"\n[{time.ctime()}] CRASH: {type(e)} {e}\n{traceback.format_exc()}\n")
+        except Exception:
+            pass

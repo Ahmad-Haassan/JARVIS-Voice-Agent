@@ -36,6 +36,21 @@ def get_antigravity_path():
             return p
     return None
 
+def get_antigravity_cli_path():
+    candidates = [
+        r"C:\Users\Ahmad\Desktop\Antigravity IDE\bin\antigravity-ide.cmd",
+        os.path.expandvars(r"%USERPROFILE%\Desktop\Antigravity IDE\bin\antigravity-ide.cmd"),
+        os.path.expandvars(r"%USERPROFILE%\OneDrive\Desktop\Antigravity IDE\bin\antigravity-ide.cmd"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs\antigravity\bin\antigravity-ide.cmd"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs\Antigravity\bin\antigravity-ide.cmd"),
+        os.path.expandvars(r"%USERPROFILE%\.gemini\antigravity-ide\bin\antigravity.cmd"),
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    import shutil
+    return shutil.which("antigravity-ide") or shutil.which("agy")
+
 def shell_execute(target: str, args: str = "") -> bool:
     """Launches an application or URL directly on the user's interactive Windows desktop using Windows Shell."""
     try:
@@ -60,6 +75,167 @@ def shell_execute(target: str, args: str = "") -> bool:
         except Exception as se:
             logger.error(f"Fallback start error: {se}")
             return False
+
+import threading
+import json
+import difflib
+
+class AppCatalog:
+    _instance = None
+
+    def __init__(self):
+        self._apps = []
+        self._loaded = False
+        self._load_lock = threading.Lock()
+        self._start_async_load()
+
+    @classmethod
+    def get_instance(cls):
+        if cls._instance is None:
+            cls._instance = AppCatalog()
+        return cls._instance
+
+    def _start_async_load(self):
+        t = threading.Thread(target=self._load_installed_apps, daemon=True)
+        t.start()
+
+    def _load_installed_apps(self):
+        with self._load_lock:
+            try:
+                cmd = ["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", "Get-StartApps | ConvertTo-Json"]
+                proc = subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=12)
+                if proc.returncode == 0 and proc.stdout.strip():
+                    data = json.loads(proc.stdout)
+                    if isinstance(data, list):
+                        self._apps = data
+                    elif isinstance(data, dict):
+                        self._apps = [data]
+                    logger.info(f"Loaded {len(self._apps)} Windows StartApps into catalog.")
+            except Exception as e:
+                logger.warning(f"Failed to load StartApps: {e}")
+            self._loaded = True
+
+    def find_and_launch(self, app_name: str) -> bool:
+        if not self._loaded:
+            self._load_installed_apps()
+
+        clean = (app_name or "").lower().strip()
+        for prefix in ["app ", "the ", "program ", "application ", "software ", "my "]:
+            if clean.startswith(prefix):
+                clean = clean[len(prefix):].strip()
+
+        # 1. Direct protocol URI mappings (UWP & Built-in Windows features)
+        PROTOCOL_MAP = {
+            "clock": "ms-clock:",
+            "alarm": "ms-clock:",
+            "alarms": "ms-clock:",
+            "timer": "ms-clock:",
+            "stopwatch": "ms-clock:",
+            "microsoft store": "ms-windows-store:",
+            "store": "ms-windows-store:",
+            "app store": "ms-windows-store:",
+            "settings": "ms-settings:",
+            "system settings": "ms-settings:",
+            "pc settings": "ms-settings:",
+            "camera": "microsoft.windows.camera:",
+            "webcam": "microsoft.windows.camera:",
+            "calculator": "calc.exe",
+            "calc": "calc.exe",
+            "notepad": "notepad.exe",
+            "paint": "mspaint.exe",
+            "photos": "ms-photos:",
+            "photo viewer": "ms-photos:",
+            "weather": "bingweather:",
+            "maps": "bingmaps:",
+            "feedback": "feedback-hub:",
+            "snipping tool": "snippingtool.exe",
+            "snip": "snippingtool.exe",
+            "task manager": "taskmgr.exe",
+            "taskmgr": "taskmgr.exe",
+            "control panel": "control.exe",
+            "cmd": "cmd.exe",
+            "command prompt": "cmd.exe",
+            "terminal": "powershell.exe",
+            "powershell": "powershell.exe",
+            "explorer": "explorer.exe",
+            "file explorer": "explorer.exe",
+            "whatsapp": "whatsapp:",
+            "spotify": "spotify:"
+        }
+        if clean in PROTOCOL_MAP:
+            target = PROTOCOL_MAP[clean]
+            if target.startswith("ms-") or target.startswith("microsoft.") or target.startswith("bing"):
+                try:
+                    os.startfile(target)
+                    return True
+                except Exception:
+                    subprocess.Popen(["explorer.exe", target])
+                    return True
+            return shell_execute(target)
+
+        # 2. Check installed desktop & UWP apps via Get-StartApps catalog
+        match = self._match_start_app(clean)
+        if match:
+            appid = match.get("AppID", "")
+            if appid:
+                logger.info(f"AppCatalog launching match: '{match.get('Name')}' ({appid})")
+                if appid.endswith(".exe") and os.path.exists(appid):
+                    try:
+                        os.startfile(appid)
+                        return True
+                    except Exception:
+                        subprocess.Popen([appid])
+                        return True
+                else:
+                    try:
+                        subprocess.Popen(["explorer.exe", f"shell:AppsFolder\\{appid}"])
+                        return True
+                    except Exception as e:
+                        logger.error(f"Failed to launch shell:AppsFolder\\{appid}: {e}")
+
+        # 3. Web Services & AI assistants
+        WEB_APPS = {
+            "gemini": "https://gemini.google.com",
+            "chatgpt": "https://chatgpt.com",
+            "claude": "https://claude.ai",
+            "youtube": "https://www.youtube.com",
+            "github": "https://github.com",
+            "gmail": "https://mail.google.com",
+            "google": "https://www.google.com",
+            "reddit": "https://reddit.com",
+            "netflix": "https://netflix.com",
+            "twitter": "https://x.com",
+            "x": "https://x.com",
+            "linkedin": "https://linkedin.com",
+            "canva": "https://canva.com",
+            "instagram": "https://instagram.com",
+            "facebook": "https://facebook.com",
+            "deepseek": "https://chat.deepseek.com"
+        }
+        if clean in WEB_APPS:
+            url = WEB_APPS[clean]
+            cp = get_chrome_path()
+            if cp:
+                return shell_execute(cp, url)
+            return shell_execute(url)
+
+        return False
+
+    def _match_start_app(self, clean: str):
+        for a in self._apps:
+            if a.get("Name", "").lower() == clean:
+                return a
+        for a in self._apps:
+            name = a.get("Name", "").lower()
+            if clean in name or name in clean:
+                return a
+        names = [a.get("Name", "") for a in self._apps]
+        matches = difflib.get_close_matches(clean, names, n=1, cutoff=0.7)
+        if matches:
+            for a in self._apps:
+                if a.get("Name") == matches[0]:
+                    return a
+        return None
 
 APP_MAP = {
     "whatsapp": "whatsapp:",
@@ -95,32 +271,262 @@ class SystemControl:
             return shell_execute("antigravity")
 
         # 2. Chrome
-        if "chrome" in app_clean or "google chrome" in app_clean:
+        if app_clean in ["chrome", "google chrome", "browser"]:
             cp = get_chrome_path()
             if cp:
                 return shell_execute(cp, "https://www.google.com")
             return shell_execute("chrome.exe", "https://www.google.com")
 
-        # 3. YouTube (opens directly in Chrome or default browser)
-        if "youtube" in app_clean:
-            cp = get_chrome_path()
-            if cp:
-                return shell_execute(cp, "https://www.youtube.com")
-            return shell_execute("https://www.youtube.com")
+        # 3. Universal AppCatalog (matches any installed PC app, UWP app, or web service)
+        if AppCatalog.get_instance().find_and_launch(app_clean):
+            return True
 
-        # 4. WhatsApp
-        if "whatsapp" in app_clean:
-            return shell_execute("whatsapp:")
-
-        # 5. Check known map
+        # 4. Check known map
         for name, cmd in APP_MAP.items():
             if name in app_clean or app_clean in name:
                 return shell_execute(cmd)
 
-        # Fallback
-        return shell_execute(app_clean)
+        # 5. Check if target is a folder or directory
+        try:
+            from core.skills.file_manager import get_file_manager
+            fm = get_file_manager()
+            f_ok, _, _ = fm.open_folder(app_clean)
+            if f_ok:
+                return True
+        except Exception as fe:
+            logger.debug(f"Folder check skipped: {fe}")
+
+        # 6. Fallback shell execute or URL
+        res = shell_execute(app_clean)
+        if not res:
+            if "." in app_clean and " " not in app_clean:
+                target_url = app_clean if app_clean.startswith("http") else f"https://{app_clean}"
+                return shell_execute(target_url)
+        return res
+
+    def open_with_app(self, app_name: str, target_path: str) -> bool:
+        """Launches an application and passes a specific file or folder path as its workspace/target."""
+        app_clean = (app_name or "").lower().strip()
+        logger.info(f"Opening target '{target_path}' with application '{app_clean}'")
+
+        # 1. Antigravity IDE (Always use -n to open a separate, new window and preserve other workspaces)
+        if "antigravity" in app_clean:
+            cli = get_antigravity_cli_path()
+            ag = get_antigravity_path()
+            exe = cli or ag
+            if exe:
+                if target_path:
+                    try:
+                        if not os.path.exists(target_path) and "." not in os.path.basename(target_path):
+                            os.makedirs(target_path, exist_ok=True)
+                        if os.path.exists(target_path):
+                            subprocess.Popen([exe, "-n", target_path], shell=True if exe.endswith(('.cmd', '.bat')) else False)
+                            return True
+                    except Exception as e:
+                        logger.warning(f"Popen antigravity error: {e}")
+                return shell_execute(exe, f'-n "{target_path}"' if target_path else "-n")
+            return shell_execute("antigravity", f'-n "{target_path}"' if target_path else "-n")
+
+        # 2. VS Code (Always use -n to open a separate, new window)
+        if app_clean in ["code", "vscode", "vs code", "visual studio code"]:
+            try:
+                subprocess.Popen(f'code -n "{target_path}"', shell=True)
+                return True
+            except Exception:
+                return shell_execute("code", f'-n "{target_path}"')
+
+        # 3. Notepad
+        if "notepad" in app_clean:
+            try:
+                subprocess.Popen(["notepad.exe", target_path])
+                return True
+            except Exception:
+                return shell_execute("notepad.exe", f'"{target_path}"')
+
+        # 4. Chrome
+        if "chrome" in app_clean or "browser" in app_clean:
+            cp = get_chrome_path() or "chrome.exe"
+            try:
+                subprocess.Popen([cp, target_path])
+                return True
+            except Exception:
+                return shell_execute(cp, f'"{target_path}"')
+
+        # 5. Explorer
+        if "explorer" in app_clean:
+            try:
+                subprocess.Popen(["explorer.exe", target_path])
+                return True
+            except Exception:
+                pass
+
+        # 6. Generic shell execute with arguments
+        return shell_execute(app_clean, f'"{target_path}"')
+
+    def focus_window_by_name(self, name: str) -> bool:
+        """Brings the matching window to the foreground."""
+        try:
+            import ctypes
+            user32 = ctypes.windll.user32
+            found_hwnd = [None]
+            target_name = name.lower().strip()
+
+            WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+
+            def enum_cb(hwnd, lparam):
+                if user32.IsWindowVisible(hwnd):
+                    length = user32.GetWindowTextLengthW(hwnd)
+                    if length > 0:
+                        buff = ctypes.create_unicode_buffer(length + 1)
+                        user32.GetWindowTextW(hwnd, buff, length + 1)
+                        if target_name in buff.value.lower():
+                            found_hwnd[0] = hwnd
+                            return False
+                return True
+
+            user32.EnumWindows(WNDENUMPROC(enum_cb), 0)
+            if found_hwnd[0]:
+                hwnd = found_hwnd[0]
+                user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+                user32.SetForegroundWindow(hwnd)
+                return True
+        except Exception as e:
+            logger.debug(f"focus_window_by_name error: {e}")
+        return False
+
+    def open_with_app_and_prompt(self, app_name: str, target_path: str, prompt: str) -> bool:
+        """
+        Opens a target workspace/file in a separate, brand new window (-n) and autonomously
+        injects and submits the user's prompt directly into the AI chat.
+        Guarantees that existing workspaces and open files are NEVER closed or modified.
+        """
+        import time
+        import threading
+        import pyperclip
+        import pyautogui
+        import ctypes
+        import ctypes.wintypes
+
+        pyautogui.FAILSAFE = False
+        app_clean = (app_name or "").lower().strip()
+        logger.info(f"Opening '{target_path}' in '{app_clean}' (NEW WINDOW) with prompt: '{prompt}'")
+
+        # 1. Launch the application in a separate, NEW window (-n)
+        ok = self.open_with_app(app_clean, target_path) if target_path else self.open_app(app_clean)
+        if not ok:
+            return False
+
+        if not prompt:
+            return True
+
+        # Determine target window title keyword (e.g. folder name 'testing' or 'dsa', or app name)
+        window_keyword = ""
+        if target_path:
+            window_keyword = os.path.basename(target_path.rstrip(r'\/'))
+        if not window_keyword:
+            window_keyword = "Antigravity" if "antigravity" in app_clean else app_clean
+
+        # 2. Copy prompt to system clipboard
+        try:
+            pyperclip.copy(prompt)
+        except Exception as e:
+            logger.warning(f"pyperclip error: {e}")
+
+        # 3. Direct Win32 Injector in background thread
+        def _dispatch_prompt():
+            user32 = ctypes.windll.user32
+            kernel32 = ctypes.windll.kernel32
+            h_desk = user32.OpenDesktopW("default", 0, False, 0x1FF)
+            if h_desk:
+                user32.SetThreadDesktop(h_desk)
+
+            logger.info(f"Waiting for new window matching keyword: '{window_keyword}'...")
+            target_hwnd = None
+            target_title = ""
+
+            # Poll for up to 12 seconds for the new window to be created and visible
+            for attempt in range(24):
+                time.sleep(0.5)
+                found = []
+
+                def cb(hwnd, _):
+                    if user32.IsWindowVisible(hwnd):
+                        l = user32.GetWindowTextLengthW(hwnd)
+                        if l > 0:
+                            buf = ctypes.create_unicode_buffer(l + 1)
+                            user32.GetWindowTextW(hwnd, buf, l + 1)
+                            title = buf.value
+                            # Match target keyword specifically so other windows are NEVER touched
+                            if window_keyword and window_keyword.lower() in title.lower():
+                                found.append((hwnd, title))
+                    return True
+
+                W = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_int, ctypes.c_int)
+                user32.EnumWindows(W(cb), 0)
+
+                if found:
+                    target_hwnd, target_title = found[0]
+                    logger.info(f"Found target window [{target_hwnd}]: '{target_title}' after {attempt * 0.5:.1f}s")
+                    break
+
+            if not target_hwnd:
+                logger.warning(f"Target window for '{window_keyword}' not found within timeout.")
+                return
+
+            # Bring target window to front and bypass Windows 11 foreground lock
+            try:
+                fg_hwnd = user32.GetForegroundWindow()
+                fg_tid = user32.GetWindowThreadProcessId(fg_hwnd, None)
+                cur_tid = kernel32.GetCurrentThreadId()
+
+                if fg_tid != cur_tid:
+                    user32.AttachThreadInput(cur_tid, fg_tid, True)
+
+                # Tap Alt key to allow foreground switch
+                user32.keybd_event(0x12, 0, 0, 0)
+                user32.keybd_event(0x12, 0, 2, 0)
+
+                user32.ShowWindow(target_hwnd, 9)  # SW_RESTORE
+                user32.BringWindowToTop(target_hwnd)
+                user32.SetForegroundWindow(target_hwnd)
+
+                if fg_tid != cur_tid:
+                    user32.AttachThreadInput(cur_tid, fg_tid, False)
+            except Exception as e:
+                logger.warning(f"Foreground attach error: {e}")
+
+            time.sleep(0.6)
+
+            # Click center of the target window to activate and trigger "Code with Agent"
+            try:
+                rect = ctypes.wintypes.RECT()
+                user32.GetWindowRect(target_hwnd, ctypes.byref(rect))
+                cx = (rect.left + rect.right) // 2
+                cy = (rect.top + rect.bottom) // 2
+                pyautogui.click(cx, cy + 20)
+                logger.info(f"Activated target window at ({cx}, {cy+20})")
+            except Exception as e:
+                logger.warning(f"Click window error: {e}")
+
+            time.sleep(0.8)
+
+            # Ensure AI chat / Agent panel is open and focused
+            pyautogui.hotkey('ctrl', 'l')
+            time.sleep(0.6)
+
+            # Paste prompt from clipboard
+            pyautogui.hotkey('ctrl', 'v')
+            time.sleep(0.4)
+
+            # Submit prompt to Agent
+            pyautogui.press('enter')
+            logger.info(f"Successfully injected prompt into '{target_title}': '{prompt}'")
+
+        threading.Thread(target=_dispatch_prompt, daemon=True).start()
+        return True
 
     def close_app(self, app_name: str) -> bool:
+
         app_clean = (app_name or "").lower().strip()
         logger.info(f"Closing app: '{app_clean}'")
         killed = False

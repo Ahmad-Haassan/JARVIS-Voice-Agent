@@ -179,7 +179,7 @@ class VoiceWorker(QThread):
                 if self._cancel_flag: return
                 
                 # 7. Task Confirmation
-                TASK_INTENTS = ["open_app", "close_app", "system_control", "file_action", "write_content", "send_whatsapp", "youtube_play", "work_mode"]
+                TASK_INTENTS = ["open_app", "close_app", "open_folder", "open_file", "open_in", "system_control", "file_action", "write_content", "send_whatsapp", "youtube_play", "work_mode"]
                 if exec_result.success and intent in TASK_INTENTS:
                     self.tts.speak("Command completed.", block=True)
             else:
@@ -473,7 +473,7 @@ class MainWindow(QMainWindow):
             tts.speak(exec_result.response)
             
         # After completing a TASK (not a chat), say "Command completed"
-        TASK_INTENTS = ["open_app", "close_app", "system_control", "file_action", "write_content", "send_whatsapp", "youtube_play", "work_mode"]
+        TASK_INTENTS = ["open_app", "close_app", "open_folder", "open_file", "open_in", "system_control", "file_action", "write_content", "send_whatsapp", "youtube_play", "work_mode"]
         if exec_result.success and result.get("intent") in TASK_INTENTS:
             logger.info(f"Task '{result.get('intent')}' successful, speaking completion feedback.")
             tts.speak("Command completed.")

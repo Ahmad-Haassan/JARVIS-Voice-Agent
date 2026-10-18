@@ -25,6 +25,10 @@
 
 ---
 
+> 📖 **Comprehensive System Documentation & Technical Handbook**: For an exhaustive, chapter-by-chapter walkthrough of how JARVIS works, deep Win32 OS automation, the mobile wireless bridge, architecture diagrams, and technical interview Q&A, explore the [**`how_jarvis_works/`**](how_jarvis_works/README.md) handbook!
+
+---
+
 ## 🌟 Core Capabilities
 
 ### 1. 🛡️ Dual-Stage Speech Engine (100% Private & Offline)

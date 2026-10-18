@@ -54,8 +54,8 @@ class NLPEngine:
         action = self._match_direct_command(query)
         if action:
             self._record_turn(query, action.get("response", ""))
-            if action.get("intent") == "open_app":
-                self._last_opened_app = action.get("entities", {}).get("app")
+            if action.get("intent") in ["open_app", "open_folder"]:
+                self._last_opened_app = action.get("entities", {}).get("app") or action.get("entities", {}).get("folder")
             logger.info(f"Resolved intent: {action.get('intent')} with entities: {action.get('entities')}")
             return action
 
@@ -66,6 +66,7 @@ class NLPEngine:
                     "You are JARVIS, Tony Stark's sophisticated, polite, and witty AI running locally on Windows. "
                     "Analyze the user query and return ONLY valid JSON with keys 'intent', 'entities', and 'response'.\n"
                     "Possible intents:\n"
+                    "- 'open_folder' (entities: {'folder': str})\n"
                     "- 'open_app' (entities: {'app': str})\n"
                     "- 'close_app' (entities: {'app': str})\n"
                     "- 'volume_control' (entities: {'action': 'up'|'down'|'mute'|'unmute'|'set', 'level': int})\n"
@@ -75,6 +76,7 @@ class NLPEngine:
                     "- 'send_whatsapp' (entities: {'contact': str, 'message': str})\n"
                     "- 'youtube_play' (entities: {'query': str})\n"
                     "- 'work_mode' (entities: {})\n"
+                    "- 'file_action' (entities: {'action': 'create'|'open', 'name': str})\n"
                     "- 'system_control' (entities: {'action': 'screenshot' | 'diagnostics' | 'lock' | 'unlock' | 'sleep' | 'shutdown' | 'restart'})\n"
                     "- 'search_web' (entities: {'query': str})\n"
                     "- 'chat' (general conversation or question)\n\n"
@@ -171,11 +173,89 @@ class NLPEngine:
         if any(w in q for w in ["camera", "webcam", "take photo", "view camera", "access camera", "pc camera"]):
             return {"intent": "camera", "entities": {"action": "stream"}, "response": "Opening computer camera feed."}
 
-        # 7. Antigravity IDE (Explicit)
+        # 7a. Open Target in App WITH Prompt (e.g. "open dsa folder in antigravity and solve assignment 3", "open testing forlder in antigravity , 5 lines on elon musk")
+        open_in_prompt_match = re.search(
+            r"^(?:open|launch)\s+(?:the\s+|my\s+)?(.+?)\s+(?:in|with|using)\s+([a-zA-Z0-9_\-\s]+?)(?:[\,\;\:\-]\s*|\s+(?:and\s+give\s+(?:the\s+|a\s+)?(?:same\s+)?(?:prompt|promt)\s*(?:as\s+i\s+give\s+from\s+mobile\s*)?|and\s+(?:prompt|promt)\s+|with\s+(?:prompt|promt)\s+|and\s+ask\s+(?:it\s+|him\s+)?(?:to\s+)?|and\s+tell\s+(?:it\s+|him\s+)?(?:to\s+)?|then\s+(?:prompt|promt)\s+|dispatch\s+(?:prompt|promt)\s*|and\s+|then\s+)|\s*[\"\'\“\”])\s*(.+)$",
+            q,
+            re.IGNORECASE
+        )
+        if open_in_prompt_match:
+            raw_target = open_in_prompt_match.group(1).strip()
+            raw_app = open_in_prompt_match.group(2).strip()
+            prompt_raw = open_in_prompt_match.group(3).strip(' "\'“”')
+            prompt_text = re.sub(r'(?i)[\s"\']*(?:enter|press enter|hit enter|submit|send)[\s"\']*$', '', prompt_raw).strip(' "\'“”')
+            clean_target = re.sub(r"\s+(?:folder|forlder|fldr|directory|dir|file)$", "", raw_target, flags=re.IGNORECASE).strip()
+            return {
+                "intent": "open_in",
+                "entities": {"target": clean_target or raw_target, "app": raw_app, "prompt": prompt_text},
+                "response": f"Opening {clean_target or raw_target} in {raw_app} and running your prompt."
+            }
+
+        # 7b. Give / Send / Dispatch Prompt to App (e.g. "give promt to antigravity make three files")
+        give_prompt_to_app = re.search(
+            r"^(?:give|send|dispatch|pass|run)\s+(?:the\s+|a\s+)?(?:prompt|promt)\s+(?:to|in)\s+([a-zA-Z0-9_\-\s]+?)\s*[:\"\'\“\”\s]\s*(.+)$",
+            q,
+            re.IGNORECASE
+        )
+        if give_prompt_to_app:
+            raw_app = give_prompt_to_app.group(1).strip()
+            prompt_raw = give_prompt_to_app.group(2).strip(' "\'“”')
+            prompt_text = re.sub(r'(?i)[\s"\']*(?:enter|press enter|hit enter|submit|send)[\s"\']*$', '', prompt_raw).strip(' "\'“”')
+            return {
+                "intent": "open_in",
+                "entities": {"target": "", "app": raw_app, "prompt": prompt_text},
+                "response": f"Dispatching prompt to {raw_app}: '{prompt_text}'."
+            }
+
+        # 7c. Dispatch Prompt Directly (e.g. "dispatch prompt write intro of mine")
+        dispatch_prompt_only = re.search(
+            r"^(?:dispatch|send|run|give)\s+(?:the\s+|a\s+)?(?:prompt|promt)\s*[:\"\'\“\”\s]\s*(.+)$",
+            q,
+            re.IGNORECASE
+        )
+        if dispatch_prompt_only:
+            prompt_raw = dispatch_prompt_only.group(1).strip(' "\'“”')
+            prompt_text = re.sub(r'(?i)[\s"\']*(?:enter|press enter|hit enter|submit|send)[\s"\']*$', '', prompt_raw).strip(' "\'“”')
+            return {
+                "intent": "open_in",
+                "entities": {"target": "", "app": "antigravity", "prompt": prompt_text},
+                "response": f"Dispatching prompt to Antigravity: '{prompt_text}'."
+            }
+
+        # 7d. Open App Directly WITH Prompt (e.g. "open antigravity and solve assignment 3")
+        app_prompt_match = re.search(
+            r"^(?:open|launch)\s+(antigravity|vs\s*code|vscode|code|cursor|notepad|chrome)\s+(?:and\s+give\s+(?:the\s+|a\s+)?(?:same\s+)?(?:prompt|promt)\s*|and\s+(?:prompt|promt)\s+|with\s+(?:prompt|promt)\s+|and\s+ask\s+(?:it\s+|him\s+)?(?:to\s+)?|and\s+tell\s+(?:it\s+|him\s+)?(?:to\s+)?|then\s+(?:prompt|promt)\s+|and\s+|then\s+)(.+)$",
+            q,
+            re.IGNORECASE
+        )
+        if app_prompt_match:
+            raw_app = app_prompt_match.group(1).strip()
+            prompt_raw = app_prompt_match.group(2).strip(' "\'“”')
+            prompt_text = re.sub(r'(?i)[\s"\']*(?:enter|press enter|hit enter|submit|send)[\s"\']*$', '', prompt_raw).strip(' "\'“”')
+            return {
+                "intent": "open_in",
+                "entities": {"target": "", "app": raw_app, "prompt": prompt_text},
+                "response": f"Opening {raw_app} and dispatching prompt: {prompt_text}."
+            }
+
+        # 7c. Open Target in Specific Application WITHOUT Prompt (e.g. "open dsa folder in antigravity")
+        open_in_match = re.search(r"^(?:open|launch)\s+(?:the\s+|my\s+)?(.+?)\s+(?:in|with|using)\s+([a-zA-Z0-9_\-\s]+)$", q)
+        if open_in_match:
+            raw_target = open_in_match.group(1).strip()
+            raw_app = open_in_match.group(2).strip()
+            clean_target = re.sub(r"\s+(?:folder|directory|file)$", "", raw_target).strip()
+            return {
+                "intent": "open_in",
+                "entities": {"target": clean_target or raw_target, "app": raw_app},
+                "response": f"Opening {clean_target or raw_target} in {raw_app}."
+            }
+
+        # 8. Antigravity IDE (Explicit)
         if "antigravity" in q:
             if "close" in q or "kill" in q or "exit" in q:
                 return {"intent": "close_app", "entities": {"app": "antigravity"}, "response": "Closing Antigravity IDE."}
             return {"intent": "open_app", "entities": {"app": "antigravity"}, "response": "Opening Antigravity IDE."}
+
 
         # 8. Chrome
         if "chrome" in q or "google chrome" in q:
@@ -183,7 +263,72 @@ class NLPEngine:
                 return {"intent": "close_app", "entities": {"app": "chrome"}, "response": "Closing Google Chrome."}
             return {"intent": "open_app", "entities": {"app": "chrome"}, "response": "Opening Google Chrome."}
 
-        # 9. App Open / Close
+        # 9. Folder & Directory Opening Patterns
+        # e.g., "open my downloads folder", "open the jarvis folder", "open uni assignments folder"
+        folder_match1 = re.search(r"^(?:open|launch|show|explore)\s+(?:my\s+|the\s+)?([a-zA-Z0-9_\-\s]+?)\s+(?:folder|directory)$", q)
+        # e.g., "open folder downloads", "open directory test"
+        folder_match2 = re.search(r"^(?:open|launch|show|explore)\s+(?:folder|directory)\s+(?:called\s+|named\s+|for\s+)?([a-zA-Z0-9_\-\s]+)$", q)
+        
+        if folder_match1:
+            target = folder_match1.group(1).strip()
+            if target:
+                return {
+                    "intent": "open_folder",
+                    "entities": {"folder": target},
+                    "response": f"Opening {target} folder."
+                }
+
+        if folder_match2:
+            target = folder_match2.group(1).strip()
+            if target:
+                return {
+                    "intent": "open_folder",
+                    "entities": {"folder": target},
+                    "response": f"Opening {target} folder."
+                }
+
+        # Direct folder triggers (e.g. "open downloads", "open documents", "open my pc", "open this pc")
+        direct_folder_triggers = {
+            "downloads": ["open downloads", "open my downloads", "open download", "open my download", "show downloads"],
+            "documents": ["open documents", "open my documents", "open document", "open docs", "open my docs"],
+            "desktop": ["open desktop", "open my desktop", "open desktop folder"],
+            "pictures": ["open pictures", "open my pictures", "open photos", "open my photos", "open images", "open my images"],
+            "videos": ["open videos", "open my videos", "open movies", "open my movies"],
+            "music": ["open music", "open my music", "open songs", "open my songs"],
+            "this pc": ["open this pc", "open my pc", "open pc", "open computer", "open my computer", "open file explorer", "open explorer"],
+            "c drive": ["open c drive", "open drive c", "open c:", "open local disk c"],
+            "d drive": ["open d drive", "open drive d", "open d:", "open local disk d"],
+            "jarvis": ["open jarvis", "open jarvis folder", "open my jarvis folder", "open project", "open project folder", "open my project folder", "open workspace"]
+        }
+        for f_name, triggers in direct_folder_triggers.items():
+            if q in triggers:
+                return {
+                    "intent": "open_folder",
+                    "entities": {"folder": f_name},
+                    "response": f"Opening {f_name}."
+                }
+
+        # Folder Creation Patterns
+        create_folder_match = re.search(r"^(?:create|make|new)\s+(?:a\s+)?folder\s+(?:named\s+|called\s+)?([a-zA-Z0-9_\-\s]+)$", q)
+        if create_folder_match:
+            f_name = create_folder_match.group(1).strip()
+            return {
+                "intent": "file_action",
+                "entities": {"action": "create", "name": f_name},
+                "response": f"Creating desktop folder '{f_name}'."
+            }
+
+        # Open File Pattern (e.g. "open file resume.pdf", "open document lab.docx")
+        file_match = re.search(r"^(?:open|launch|view|show)\s+(?:file|document)\s+(.+)$", q)
+        if file_match:
+            f_target = file_match.group(1).strip()
+            return {"intent": "open_file", "entities": {"file": f_target}, "response": f"Opening file {f_target}."}
+
+        if re.search(r"\.[a-zA-Z0-9]{2,4}$", q) and (q.startswith("open ") or q.startswith("show ")):
+            clean_f = re.sub(r"^(?:open|show)\s+", "", q).strip()
+            return {"intent": "open_file", "entities": {"file": clean_f}, "response": f"Opening {clean_f}."}
+
+        # 10. App Open / Close
         if q.startswith("close ") or q.startswith("kill ") or q.startswith("exit "):
             app_to_close = q.split(" ", 1)[1].strip()
             return {"intent": "close_app", "entities": {"app": app_to_close}, "response": f"Closing {app_to_close}."}
@@ -191,10 +336,15 @@ class NLPEngine:
         if q.startswith("open ") or q.startswith("launch ") or q.startswith("start ") or q.startswith("bring up "):
             app_to_open = q.split(" ", 1)[1].strip()
             # Clean filler phrases
-            for prefix in ["app ", "program ", "the "]:
+            for prefix in ["app ", "program ", "the ", "my "]:
                 if app_to_open.startswith(prefix):
                     app_to_open = app_to_open[len(prefix):].strip()
+            # Check if user said e.g. "open folder ..." or "open ... folder"
+            if "folder" in app_to_open or "directory" in app_to_open:
+                clean_target = re.sub(r"\b(?:folder|directory|my|the)\b", "", app_to_open).strip()
+                return {"intent": "open_folder", "entities": {"folder": clean_target or app_to_open}, "response": f"Opening {clean_target or app_to_open} folder."}
             return {"intent": "open_app", "entities": {"app": app_to_open}, "response": f"Opening {app_to_open}."}
+
 
         # 10. YouTube Media Playback
         if "youtube" in q or q.startswith("play ") or q.startswith("listen to "):

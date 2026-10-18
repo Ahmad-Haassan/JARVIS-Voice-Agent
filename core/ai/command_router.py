@@ -32,9 +32,33 @@ class CommandRouter:
             # 1. Open App
             if intent == "open_app":
                 app_name = entities.get("app", "")
+                fm = get_file_manager()
+
+                # If user EXPLICITLY requested a folder (e.g. "open downloads folder")
+                if "folder" in app_name.lower() or "directory" in app_name.lower():
+                    import re
+                    clean_folder = re.sub(r"\b(?:folder|directory|my|the)\b", "", app_name).strip()
+                    success, resp, path = fm.open_folder(clean_folder or app_name)
+                    if success:
+                        return CommandResult(success=True, response=resp, data=path)
+
+                # Prioritize application execution (UWP, StartApps, protocols, web apps)
                 success = sys_ctrl.open_app(app_name)
-                resp = f"Opened {app_name}." if success else f"Could not open {app_name}."
-                return CommandResult(success=success, response=resp)
+                if success:
+                    return CommandResult(success=True, response=f"Opened {app_name}.")
+
+                # Fallback: check if target matches a folder
+                f_ok, f_resp, f_path = fm.open_folder(app_name)
+                if f_ok:
+                    return CommandResult(success=True, response=f_resp, data=f_path)
+
+                # Fallback: check if target matches a file
+                f_ok, f_resp, f_path = fm.open_file(app_name)
+                if f_ok:
+                    return CommandResult(success=True, response=f_resp, data=f_path)
+
+                return CommandResult(success=False, response=f"Could not find or open {app_name}.")
+
 
             # 2. Close App
             elif intent == "close_app":
@@ -183,12 +207,70 @@ class CommandRouter:
                 resp = f"Playing {query} on YouTube." if success else "Could not open YouTube."
                 return CommandResult(success=success, response=resp)
 
-            # 13. File Actions
+            # 13. Open Folder / Directory
+            elif intent == "open_folder":
+                folder_target = entities.get("folder") or entities.get("name") or entities.get("path") or ""
+                success, resp, path = get_file_manager().open_folder(folder_target)
+                if not success:
+                    if sys_ctrl.open_app(folder_target):
+                        return CommandResult(success=True, response=f"Opened {folder_target}.")
+                    f_ok, f_resp, f_path = get_file_manager().open_file(folder_target)
+                    if f_ok:
+                        return CommandResult(success=True, response=f_resp, data=f_path)
+                return CommandResult(success=success, response=resp, data=path)
+
+            # 14. Open Specific File
+            elif intent == "open_file":
+                file_target = entities.get("file") or entities.get("name") or ""
+                success, resp, path = get_file_manager().open_file(file_target)
+                if not success:
+                    success = sys_ctrl.open_app(file_target)
+                    resp = f"Opened {file_target}." if success else f"Could not find file '{file_target}'."
+                return CommandResult(success=success, response=resp, data=path)
+
+            # 15. Open Target in Specific App (e.g. "open dsa folder in antigravity and solve assignment 3")
+            elif intent == "open_in":
+                target_name = entities.get("target", "")
+                app_name = entities.get("app", "")
+                prompt = entities.get("prompt", "")
+                
+                resolved_path = None
+                display_name = target_name
+                if target_name:
+                    fm = get_file_manager()
+                    resolved_path, display_name = fm.resolve_folder(target_name)
+                    if not resolved_path:
+                        _, _, file_path = fm.open_file(target_name)
+                        if file_path and os.path.exists(file_path):
+                            resolved_path = file_path
+                        else:
+                            desktop_path = os.path.join(fm.desktop, target_name)
+                            resolved_path = desktop_path
+                            display_name = target_name
+
+                if prompt:
+                    success = sys_ctrl.open_with_app_and_prompt(app_name, resolved_path, prompt)
+                    if target_name:
+                        resp = f"Opened {display_name or target_name} in {app_name} and dispatched prompt: '{prompt}'."
+                    else:
+                        resp = f"Opened {app_name} and dispatched prompt: '{prompt}'."
+                else:
+                    success = sys_ctrl.open_with_app(app_name, resolved_path)
+                    resp = f"Opened {display_name or target_name} in {app_name}." if success else f"Could not open {target_name} in {app_name}."
+                return CommandResult(success=success, response=resp, data=resolved_path)
+
+
+            # 14. File & Folder Actions
             elif intent == "file_action":
-                name = entities.get("name", "New Folder")
-                path = get_file_manager().create_desktop_folder(name)
-                resp = f"Created desktop folder '{name}'." if path else "Failed to create folder."
-                return CommandResult(success=bool(path), response=resp, data=path)
+                action_type = entities.get("action", "")
+                name = entities.get("name") or entities.get("folder") or "New Folder"
+                if action_type in ["open", "view", "show", "explore"] or "open" in action_type:
+                    success, resp, path = get_file_manager().open_folder(name)
+                    return CommandResult(success=success, response=resp, data=path)
+                else:
+                    path = get_file_manager().create_desktop_folder(name)
+                    resp = f"Created desktop folder '{name}'." if path else "Failed to create folder."
+                    return CommandResult(success=bool(path), response=resp, data=path)
 
             # 14. Weather
             elif intent == "weather":

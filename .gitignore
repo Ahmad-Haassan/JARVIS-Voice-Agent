@@ -22,3 +22,8 @@ data/
 sample_video.mp4
 scratch_frames/
 
+# Auto-generated SSL certificates and private keys
+*.pem
+key.pem
+cert.pem
+

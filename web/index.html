@@ -6,18 +6,22 @@
   <title>JARVIS Mobile Commander</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #020617;
-      --card-bg: rgba(15, 23, 42, 0.65);
+      --card-bg: rgba(15, 23, 42, 0.72);
+      --card-border: rgba(255, 255, 255, 0.08);
       --accent: #6366f1;
-      --accent-glow: rgba(99, 102, 241, 0.4);
+      --accent-glow: rgba(99, 102, 241, 0.45);
       --cyan: #00f2fe;
       --cyan-glow: rgba(0, 242, 254, 0.35);
       --text: #f8fafc;
       --text-dim: #94a3b8;
       --success: #10b981;
+      --danger: #ef4444;
+      --danger-glow: rgba(239, 68, 68, 0.45);
+      --warning: #f59e0b;
     }
 
     * {
@@ -31,21 +35,22 @@
     body {
       background-color: var(--bg);
       background-image: 
-        radial-gradient(circle at 50% 10%, rgba(99, 102, 241, 0.15) 0%, transparent 60%),
-        radial-gradient(circle at 80% 90%, rgba(0, 242, 254, 0.1) 0%, transparent 50%);
+        radial-gradient(circle at 50% 10%, rgba(99, 102, 241, 0.16) 0%, transparent 60%),
+        radial-gradient(circle at 80% 90%, rgba(0, 242, 254, 0.12) 0%, transparent 50%);
       color: var(--text);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
-      padding: env(safe-area-inset-top, 20px) 16px env(safe-area-inset-bottom, 20px);
+      padding: env(safe-area-inset-top, 16px) 16px calc(env(safe-area-inset-bottom, 20px) + 76px);
       overflow-x: hidden;
     }
 
+    /* Top Header */
     header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 12px 6px 20px;
+      padding: 8px 4px 16px;
     }
 
     .brand {
@@ -100,58 +105,173 @@
       50% { opacity: 0.4; transform: scale(0.85); }
     }
 
+    .wake-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      background: rgba(148, 163, 184, 0.1);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-dim);
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      user-select: none;
+    }
+
+    .wake-badge.active {
+      background: rgba(0, 242, 254, 0.12);
+      border-color: rgba(0, 242, 254, 0.4);
+      color: var(--cyan);
+      box-shadow: 0 0 12px var(--cyan-glow);
+    }
+
+    .wake-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      transition: background 0.25s, box-shadow 0.25s;
+    }
+
+    .wake-badge.active .wake-dot {
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan);
+      animation: pulse-dot 1.2s infinite;
+    }
+
+    .https-unlock-btn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 11px;
+      border-radius: 20px;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      color: #fbbf24;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      cursor: pointer;
+      animation: pulse-dot 2s infinite;
+      transition: all 0.2s ease;
+    }
+
+    .https-unlock-btn:active {
+      transform: scale(0.95);
+      background: rgba(245, 158, 11, 0.3);
+    }
+
     /* Telemetry Bar */
     .telemetry-row {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 10px;
-      margin-bottom: 24px;
+      margin-bottom: 16px;
     }
 
     .telemetry-card {
       background: var(--card-bg);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--card-border);
       backdrop-filter: blur(15px);
       -webkit-backdrop-filter: blur(15px);
-      border-radius: 16px;
-      padding: 12px;
+      border-radius: 14px;
+      padding: 10px;
       text-align: center;
     }
 
     .telemetry-label {
-      font-size: 0.7rem;
+      font-size: 0.68rem;
       color: var(--text-dim);
       font-weight: 600;
       letter-spacing: 0.5px;
       text-transform: uppercase;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
 
     .telemetry-value {
       font-family: 'Space Grotesk', sans-serif;
-      font-size: 1.15rem;
+      font-size: 1.1rem;
       font-weight: 700;
       color: #fff;
     }
 
-    /* Glowing Cyber Orb Area */
+    /* Primary Mode Selector: Speak vs Text vs Controls */
+    .mode-bar {
+      display: flex;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      padding: 5px;
+      margin-bottom: 18px;
+      gap: 5px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .mode-btn {
+      flex: 1;
+      padding: 12px 6px;
+      border: none;
+      background: transparent;
+      color: var(--text-dim);
+      font-size: 0.82rem;
+      font-weight: 700;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      letter-spacing: 0.3px;
+    }
+
+    .mode-btn.active {
+      background: linear-gradient(135deg, var(--accent), #4f46e5);
+      color: #fff;
+      box-shadow: 0 0 15px var(--accent-glow);
+    }
+
+    .mode-panel {
+      display: none;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    .mode-panel.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ========================================= */
+    /* 1. SPEAK MODE HUD                         */
+    /* ========================================= */
     .orb-section {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 20px 0 30px;
+      padding: 10px 0 20px;
       position: relative;
     }
 
     .orb-container {
-      width: 220px;
-      height: 220px;
+      width: 200px;
+      height: 200px;
       position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
+      user-select: none;
     }
 
     .ring {
@@ -162,8 +282,8 @@
     }
 
     .ring-outer {
-      width: 210px;
-      height: 210px;
+      width: 195px;
+      height: 195px;
       border-top-color: var(--cyan);
       border-bottom-color: var(--cyan);
       box-shadow: 0 0 25px var(--cyan-glow);
@@ -171,8 +291,8 @@
     }
 
     .ring-middle {
-      width: 170px;
-      height: 170px;
+      width: 155px;
+      height: 155px;
       border-left-color: var(--accent);
       border-right-color: var(--accent);
       box-shadow: 0 0 20px var(--accent-glow);
@@ -180,15 +300,15 @@
     }
 
     .ring-inner {
-      width: 130px;
-      height: 130px;
+      width: 120px;
+      height: 120px;
       border: 2px dashed rgba(255, 255, 255, 0.25);
       animation: rotate-cw 12s linear infinite;
     }
 
     .orb-core {
-      width: 90px;
-      height: 90px;
+      width: 82px;
+      height: 82px;
       border-radius: 50%;
       background: radial-gradient(circle at 35% 35%, #ffffff 0%, #6366f1 60%, #312e81 100%);
       box-shadow: 0 0 30px var(--accent-glow), inset 0 0 15px rgba(255, 255, 255, 0.6);
@@ -203,85 +323,453 @@
       transform: scale(0.92);
     }
 
-    .mic-icon {
+    .mic-icon-large {
       width: 32px;
       height: 32px;
       fill: #ffffff;
-      filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
+      filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.7));
     }
 
     /* Listening and Processing Orb States */
     .orb-container.listening .ring-outer {
-      border-top-color: #ef4444;
-      border-bottom-color: #ef4444;
-      box-shadow: 0 0 35px rgba(239, 68, 68, 0.6);
-      animation-duration: 3s;
+      border-top-color: var(--danger);
+      border-bottom-color: var(--danger);
+      box-shadow: 0 0 35px var(--danger-glow);
+      animation-duration: 2.5s;
     }
     .orb-container.listening .orb-core {
-      background: radial-gradient(circle, #ffffff 0%, #ef4444 60%, #991b1b 100%);
-      animation: pulse-core 0.8s ease-in-out infinite alternate;
+      background: radial-gradient(circle, #ffffff 0%, var(--danger) 60%, #991b1b 100%);
+      animation: pulse-core 0.7s ease-in-out infinite alternate;
     }
 
     .orb-container.processing .ring-middle {
-      border-left-color: #f59e0b;
-      border-right-color: #f59e0b;
-      animation-duration: 1.5s;
+      border-left-color: var(--warning);
+      border-right-color: var(--warning);
+      animation-duration: 1.2s;
     }
 
     @keyframes rotate-cw { 100% { transform: rotate(360deg); } }
     @keyframes rotate-ccw { 100% { transform: rotate(-360deg); } }
-    @keyframes pulse-core { 0% { transform: scale(0.95); } 100% { transform: scale(1.08); } }
+    @keyframes pulse-core { 0% { transform: scale(0.95); } 100% { transform: scale(1.1); } }
 
-    .orb-hint {
+    /* Soundwave Equalizer Animation */
+    .soundwave-box {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      height: 24px;
       margin-top: 14px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--text-dim);
-      letter-spacing: 1px;
-      text-transform: uppercase;
+      opacity: 0.35;
+      transition: opacity 0.3s ease;
+    }
+    .soundwave-box.active {
+      opacity: 1;
+    }
+    .wave-bar {
+      width: 4px;
+      height: 8px;
+      background: linear-gradient(180deg, var(--cyan), var(--accent));
+      border-radius: 3px;
+      transition: height 0.15s ease;
+    }
+    .soundwave-box.active .wave-bar {
+      animation: wave-bounce 0.8s ease-in-out infinite alternate;
+    }
+    .soundwave-box.active .wave-bar:nth-child(1) { animation-delay: 0.1s; }
+    .soundwave-box.active .wave-bar:nth-child(2) { animation-delay: 0.25s; }
+    .soundwave-box.active .wave-bar:nth-child(3) { animation-delay: 0.4s; }
+    .soundwave-box.active .wave-bar:nth-child(4) { animation-delay: 0.15s; }
+    .soundwave-box.active .wave-bar:nth-child(5) { animation-delay: 0.3s; }
+
+    @keyframes wave-bounce {
+      0% { height: 6px; }
+      100% { height: 26px; }
     }
 
-    /* Chat / Response Box */
-    .console-feed {
-      background: var(--card-bg);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border-radius: 20px;
-      padding: 16px;
-      min-height: 90px;
-      max-height: 140px;
-      overflow-y: auto;
-      margin-bottom: 20px;
+    /* Primary Speak Trigger Button */
+    .voice-action-row {
       display: flex;
       flex-direction: column;
-      justify-content: flex-end;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
     }
 
-    .feed-text {
+    .primary-speak-btn {
+      width: 100%;
+      max-width: 320px;
+      padding: 16px 24px;
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: linear-gradient(135deg, var(--accent), #4f46e5);
+      color: white;
+      font-size: 1.05rem;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      cursor: pointer;
+      box-shadow: 0 4px 25px var(--accent-glow);
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .primary-speak-btn:active {
+      transform: scale(0.96);
+    }
+
+    .primary-speak-btn.listening {
+      background: linear-gradient(135deg, var(--danger), #b91c1c);
+      box-shadow: 0 4px 30px var(--danger-glow);
+      animation: pulse-danger-btn 1.2s infinite;
+    }
+
+    @keyframes pulse-danger-btn {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+    }
+
+    /* Mic Source Switcher */
+    .mic-source-row {
+      display: flex;
+      gap: 8px;
+      width: 100%;
+      max-width: 320px;
+    }
+
+    .source-chip {
+      flex: 1;
+      padding: 8px 10px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      color: var(--text-dim);
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s ease;
+    }
+
+    .source-chip.active {
+      background: rgba(99, 102, 241, 0.2);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* Live Response Card */
+    .speech-response-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 18px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .speech-bubble {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .speech-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .speech-label.user { color: var(--cyan); }
+    .speech-label.jarvis { color: var(--accent); }
+
+    .speech-content {
       font-size: 0.95rem;
-      line-height: 1.5;
+      line-height: 1.45;
       color: #f1f5f9;
       font-weight: 500;
     }
 
-    .feed-time {
-      font-size: 0.7rem;
+    .voice-reply-toggle {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 0.76rem;
       color: var(--text-dim);
-      margin-top: 6px;
+      font-weight: 600;
     }
 
-    /* Quick Action Commands */
-    .section-title {
-      font-size: 0.75rem;
-      text-transform: uppercase;
+    /* Hands-Free Wake Word HUD Card */
+    .wake-word-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 18px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .wake-word-card.active {
+      border-color: var(--cyan);
+      box-shadow: 0 0 25px rgba(0, 242, 254, 0.18), inset 0 0 15px rgba(0, 242, 254, 0.05);
+    }
+
+    .wake-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .wake-card-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .wake-status-indicator {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .wake-pulse-ring {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      border: 2px solid var(--cyan);
+      opacity: 0;
+    }
+
+    .wake-word-card.active .wake-pulse-ring {
+      animation: wake-ring-pulse 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+
+    .wake-pulse-core {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #64748b;
+      transition: all 0.25s ease;
+    }
+
+    .wake-word-card.active .wake-pulse-core {
+      background: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan);
+    }
+
+    .wake-word-card.triggered .wake-pulse-core {
+      background: var(--danger);
+      box-shadow: 0 0 15px var(--danger);
+      transform: scale(1.3);
+    }
+
+    @keyframes wake-ring-pulse {
+      0% { transform: scale(0.9); opacity: 0.8; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+
+    .wake-card-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.95rem;
       font-weight: 700;
-      letter-spacing: 1.5px;
-      color: var(--text-dim);
-      margin-bottom: 12px;
-      padding-left: 4px;
+      letter-spacing: 0.5px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
+    .wake-card-subtitle {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      margin-top: 2px;
+      transition: color 0.2s ease;
+    }
+
+    .wake-word-card.active .wake-card-subtitle {
+      color: #7dd3fc;
+    }
+
+    /* iOS Style Switch Toggle */
+    .switch-toggle {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 28px;
+      flex-shrink: 0;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+      cursor: pointer;
+    }
+
+    .switch-toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+      pointer-events: none;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #334155;
+      transition: background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+      border-radius: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      border-radius: 50%;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
+    }
+
+    .switch-toggle input:checked + .slider {
+      background: linear-gradient(135deg, var(--cyan), var(--accent));
+      border-color: var(--cyan);
+      box-shadow: 0 0 14px var(--cyan-glow);
+    }
+
+    .switch-toggle input:checked + .slider:before {
+      transform: translateX(22px);
+    }
+
+    .wake-card-hints {
+      display: flex;
+      gap: 6px;
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      flex-wrap: wrap;
+    }
+
+    .wake-tag {
+      font-size: 0.68rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      color: #cbd5e1;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+
+    /* ========================================= */
+    /* 2. TEXT MODE & CHAT LOG                   */
+    /* ========================================= */
+    .chat-history {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 18px;
+      padding: 16px;
+      min-height: 240px;
+      max-height: 340px;
+      overflow-y: auto;
+      margin-bottom: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .msg-bubble {
+      padding: 12px 14px;
+      border-radius: 14px;
+      max-width: 88%;
+      font-size: 0.9rem;
+      line-height: 1.4;
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    .msg-bubble.user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.35), rgba(79, 70, 229, 0.35));
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      color: #fff;
+    }
+
+    .msg-bubble.jarvis {
+      align-self: flex-start;
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #e2e8f0;
+    }
+
+    .msg-time {
+      font-size: 0.65rem;
+      color: #94a3b8;
+      margin-top: 4px;
+      text-align: right;
+    }
+
+    /* Quick Prompt Suggestion Chips */
+    .chips-row {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      margin-bottom: 14px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .chips-row::-webkit-scrollbar { display: none; }
+
+    .prompt-chip {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 8px 14px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      white-space: nowrap;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      transition: all 0.15s ease;
+    }
+
+    .prompt-chip:active {
+      background: rgba(99, 102, 241, 0.25);
+      border-color: var(--accent);
+      color: #fff;
+      transform: scale(0.96);
+    }
+
+    /* ========================================= */
+    /* 3. QUICK CONTROLS MODE                    */
+    /* ========================================= */
     .quick-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -291,25 +779,25 @@
 
     .quick-btn {
       background: var(--card-bg);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--card-border);
       border-radius: 14px;
-      padding: 14px 8px;
+      padding: 13px 6px;
       color: #e2e8f0;
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       font-weight: 600;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.15s ease;
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
     }
 
     .quick-btn:active {
-      transform: scale(0.95);
-      background: rgba(99, 102, 241, 0.2);
+      transform: scale(0.94);
+      background: rgba(99, 102, 241, 0.25);
       border-color: var(--accent);
     }
 
@@ -317,134 +805,10 @@
       font-size: 1.25rem;
     }
 
-    /* Input Bar */
-    .input-row {
-      display: flex;
-      gap: 10px;
-      margin-top: auto;
-    }
-
-    .command-input {
-      flex: 1;
-      background: var(--card-bg);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 16px;
-      padding: 14px 18px;
-      color: #fff;
-      font-size: 0.95rem;
-      outline: none;
-      backdrop-filter: blur(15px);
-      -webkit-backdrop-filter: blur(15px);
-    }
-
-    .command-input:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 15px var(--accent-glow);
-    }
-
-    .send-btn {
-      background: linear-gradient(135deg, var(--accent), #4f46e5);
-      border: none;
-      border-radius: 16px;
-      width: 50px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      cursor: pointer;
-      box-shadow: 0 0 15px var(--accent-glow);
-    }
-
-    .send-btn:active {
-      transform: scale(0.92);
-    }
-
-    /* Screenshot Modal */
-    .modal {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.88);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      z-index: 999;
-      padding: 16px;
-    }
-    .modal.active { display: flex; }
-    .modal img { max-width: 100%; max-height: 75vh; border-radius: 12px; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 10px 30px rgba(0,0,0,0.8); object-fit: contain; }
-    .modal-close { margin-top: 14px; width: 100%; max-width: 280px; padding: 12px 24px; border-radius: 12px; background: linear-gradient(135deg, #ef4444, #dc2626); color: white; border: none; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
-
-    /* Segmented Tab Bar */
-    .tab-nav {
-      display: flex;
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 14px;
-      padding: 4px;
-      margin-bottom: 14px;
-      gap: 4px;
-      backdrop-filter: blur(15px);
-      -webkit-backdrop-filter: blur(15px);
-    }
-    .tab-btn {
-      flex: 1;
-      padding: 10px 6px;
-      border: none;
-      background: transparent;
-      color: var(--text-dim);
-      font-size: 0.72rem;
-      font-weight: 700;
-      border-radius: 10px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .tab-btn.active {
-      background: linear-gradient(135deg, var(--accent), #4f46e5);
-      color: #fff;
-      box-shadow: 0 0 12px var(--accent-glow);
-    }
-    .tab-panel {
-      display: none;
-      margin-bottom: 16px;
-    }
-    .tab-panel.active {
-      display: block;
-    }
-
-    /* Stonic AI Agent Terminal */
-    .agent-terminal {
-      background: #020617;
-      border: 1px solid rgba(0, 242, 254, 0.3);
-      border-radius: 14px;
-      padding: 12px;
-      font-family: 'Space Grotesk', monospace;
-      font-size: 0.75rem;
-      color: #00f2fe;
-      min-height: 90px;
-      max-height: 130px;
-      overflow-y: auto;
-      margin-bottom: 12px;
-      box-shadow: inset 0 0 15px rgba(0, 242, 254, 0.05);
-    }
-    .term-line {
-      margin-bottom: 4px;
-      line-height: 1.35;
-      display: flex;
-      gap: 6px;
-    }
-    .term-time { color: #64748b; font-size: 0.7rem; }
-    .term-cat { color: #10b981; font-weight: bold; }
-    .term-msg { color: #e2e8f0; }
-
     /* Touchpad Area */
     .touchpad-box {
       width: 100%;
-      height: 175px;
+      height: 160px;
       background: rgba(15, 23, 42, 0.85);
       border: 2px dashed rgba(99, 102, 241, 0.45);
       border-radius: 16px;
@@ -455,7 +819,7 @@
       touch-action: none;
       user-select: none;
       -webkit-user-select: none;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
       position: relative;
       cursor: crosshair;
     }
@@ -465,25 +829,27 @@
     }
     .touchpad-hint {
       color: var(--text-dim);
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       pointer-events: none;
       text-transform: uppercase;
       letter-spacing: 1px;
+      text-align: center;
+      line-height: 1.4;
     }
     .mouse-btn-row {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 8px;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
     .mouse-btn {
-      padding: 12px;
+      padding: 10px;
       background: var(--card-bg);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      border: 1px solid var(--card-border);
       border-radius: 12px;
       color: #fff;
       font-weight: 700;
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       cursor: pointer;
       text-align: center;
       transition: all 0.15s ease;
@@ -492,6 +858,151 @@
       background: var(--accent);
       transform: scale(0.95);
     }
+
+    /* Stonic AI Agent Terminal */
+    .agent-terminal {
+      background: #020617;
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      border-radius: 14px;
+      padding: 10px;
+      font-family: 'Space Grotesk', monospace;
+      font-size: 0.72rem;
+      color: #00f2fe;
+      min-height: 80px;
+      max-height: 110px;
+      overflow-y: auto;
+      margin-bottom: 12px;
+      box-shadow: inset 0 0 15px rgba(0, 242, 254, 0.05);
+    }
+    .term-line {
+      margin-bottom: 3px;
+      line-height: 1.35;
+      display: flex;
+      gap: 6px;
+    }
+    .term-time { color: #64748b; font-size: 0.68rem; }
+    .term-cat { color: #10b981; font-weight: bold; }
+    .term-msg { color: #e2e8f0; }
+
+    /* ========================================= */
+    /* PERMANENT STICKY BOTTOM COMMAND BAR       */
+    /* (BOTH OPTIONS: SPEAK & TEXT SIDE-BY-SIDE) */
+    /* ========================================= */
+    .sticky-bottom-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(2, 6, 23, 0.92);
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      padding: 10px 16px env(safe-area-inset-bottom, 12px);
+      z-index: 100;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    /* Dedicated Speak / Mic Button in Bottom Bar */
+    .bottom-mic-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: var(--card-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--cyan);
+      box-shadow: 0 0 12px rgba(0, 242, 254, 0.2);
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      flex-shrink: 0;
+    }
+
+    .bottom-mic-btn:active {
+      transform: scale(0.92);
+    }
+
+    .bottom-mic-btn.listening {
+      background: linear-gradient(135deg, var(--danger), #b91c1c);
+      color: #fff;
+      border-color: var(--danger);
+      box-shadow: 0 0 20px var(--danger-glow);
+      animation: pulse-mic 1s infinite alternate;
+    }
+
+    @keyframes pulse-mic {
+      0% { transform: scale(0.96); box-shadow: 0 0 10px var(--danger-glow); }
+      100% { transform: scale(1.06); box-shadow: 0 0 25px var(--danger-glow); }
+    }
+
+    .command-input {
+      flex: 1;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      padding: 12px 14px;
+      color: #fff;
+      font-size: 0.9rem;
+      outline: none;
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .command-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    .send-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      border: none;
+      background: linear-gradient(135deg, var(--accent), #4f46e5);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 0 15px var(--accent-glow);
+      transition: transform 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .send-btn:active {
+      transform: scale(0.92);
+    }
+
+    /* Modals */
+    .modal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(2, 6, 23, 0.94);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      z-index: 1005;
+      padding: 16px;
+      overflow-y: auto;
+      touch-action: pan-y;
+      -webkit-tap-highlight-color: transparent;
+      cursor: pointer;
+    }
+    .modal.active { display: flex; }
+    .modal-card-box {
+      cursor: default;
+      pointer-events: auto;
+      -webkit-tap-highlight-color: transparent;
+      position: relative;
+      z-index: 1006;
+    }
+    .modal img { max-width: 100%; max-height: 75vh; border-radius: 12px; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 10px 30px rgba(0,0,0,0.8); object-fit: contain; }
+    .modal-close { margin-top: 14px; width: 100%; max-width: 280px; padding: 12px 24px; border-radius: 12px; background: linear-gradient(135deg, #ef4444, #dc2626); color: white; border: none; font-weight: 700; font-size: 0.9rem; cursor: pointer; touch-action: manipulation; }
 
     .settings-btn {
       background: var(--card-bg);
@@ -511,6 +1022,32 @@
       transform: scale(0.9);
       background: rgba(99, 102, 241, 0.3);
     }
+
+    /* Toast Notifications */
+    .toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-30px);
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid var(--cyan);
+      border-radius: 12px;
+      padding: 10px 18px;
+      color: #fff;
+      font-size: 0.82rem;
+      font-weight: 600;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s ease;
+      z-index: 1000;
+      text-align: center;
+      max-width: 90%;
+    }
+    .toast.active {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
@@ -522,15 +1059,20 @@
       <div class="brand-title">JARVIS OS</div>
     </div>
     <div style="display: flex; gap: 8px; align-items: center;">
+      <button class="https-unlock-btn" id="https-unlock-btn" onclick="openHttpsModal()" title="Enable iPhone Microphone (HTTPS)" style="display: none;">🔒 Enable Mic</button>
+      <div class="wake-badge" id="wake-badge" onclick="toggleWakeWordMode()" title="Toggle 'Jarvis' Wake Word">
+        <div class="wake-dot"></div>
+        <span id="wake-badge-text">WAKE: OFF</span>
+      </div>
       <button class="settings-btn" onclick="openSettingsModal()" title="AI & Settings">⚙️</button>
       <div class="status-badge">
         <div class="status-dot"></div>
-        <span>CONNECTED</span>
+        <span id="header-status">ONLINE</span>
       </div>
     </div>
   </header>
 
-  <!-- Telemetry Row (Live Windows Metrics) -->
+  <!-- Live Windows Telemetry Row -->
   <div class="telemetry-row">
     <div class="telemetry-card">
       <div class="telemetry-label">CPU</div>
@@ -546,168 +1088,211 @@
     </div>
   </div>
 
-  <!-- Cyber Arc Reactor Orb -->
-  <div class="orb-section">
-    <div class="orb-container" id="orb" onclick="toggleVoice()">
-      <div class="ring ring-outer"></div>
-      <div class="ring ring-middle"></div>
-      <div class="ring ring-inner"></div>
-      <div class="orb-core">
-        <svg class="mic-icon" viewBox="0 0 24 24">
-          <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-          <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-        </svg>
+  <!-- Primary Dual Mode Switcher: SPEAK vs TEXT vs CONTROLS -->
+  <div class="mode-bar">
+    <button class="mode-btn active" id="btn-mode-speak" onclick="switchMode('speak')">
+      <span>🎙️ Speak Mode</span>
+    </button>
+    <button class="mode-btn" id="btn-mode-text" onclick="switchMode('text')">
+      <span>⌨️ Text Mode</span>
+    </button>
+    <button class="mode-btn" id="btn-mode-controls" onclick="switchMode('controls')">
+      <span>⚡ Controls</span>
+    </button>
+  </div>
+
+  <!-- ==================================================== -->
+  <!-- 1. SPEAK MODE HUD                                   -->
+  <!-- ==================================================== -->
+  <div class="mode-panel active" id="panel-speak">
+    <div class="orb-section">
+      <div class="orb-container" id="orb" onclick="toggleVoice()">
+        <div class="ring ring-outer"></div>
+        <div class="ring ring-middle"></div>
+        <div class="ring ring-inner"></div>
+        <div class="orb-core">
+          <svg class="mic-icon-large" viewBox="0 0 24 24">
+            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+          </svg>
+        </div>
+      </div>
+      
+      <!-- Audio Wave Equalizer Animation -->
+      <div class="soundwave-box" id="soundwave">
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
       </div>
     </div>
-    <div class="orb-hint" id="orb-hint">Tap Orb to Speak</div>
-  </div>
 
-  <!-- Live Speech/Response Log -->
-  <div class="console-feed">
-    <div class="feed-text" id="feed-text">JARVIS Online. Awaiting voice command from your mobile device...</div>
-    <div class="feed-time" id="feed-time">Ready</div>
-  </div>
+    <!-- Voice Actions & Source Controls -->
+    <div class="voice-action-row">
+      <button class="primary-speak-btn" id="primary-speak-btn" onclick="toggleVoice()">
+        <span id="speak-btn-icon">🎙️</span>
+        <span id="speak-btn-text">TAP TO SPEAK</span>
+      </button>
 
-  <!-- Segmented Navigation Tabs -->
-  <div class="tab-nav">
-    <button class="tab-btn active" id="tab-btn-commands" onclick="switchTab('commands')">⚡ Commands</button>
-    <button class="tab-btn" id="tab-btn-agent" onclick="switchTab('agent')">🤖 Stonic AI</button>
-    <button class="tab-btn" id="tab-btn-touchpad" onclick="switchTab('touchpad')">🖱️ Touchpad</button>
-  </div>
+      <div class="mic-source-row">
+        <button class="source-chip active" id="chip-phone" onclick="selectMicSource('phone')">📱 Phone Mic</button>
+        <button class="source-chip" id="chip-pc" onclick="selectMicSource('pc')">💻 PC Room Mic</button>
+      </div>
+    </div>
 
-  <!-- Tab 1: Quick Command Buttons -->
-  <div class="tab-panel active" id="panel-commands">
-    <div class="quick-grid">
-      <button class="quick-btn" onclick="sendCommand('start work mode')">
-        <span class="btn-icon">⚡</span>
-        <span>Work Mode</span>
-      </button>
-      <button class="quick-btn" onclick="sendCommand('open antigravity')">
-        <span class="btn-icon">🚀</span>
-        <span>Antigravity</span>
-      </button>
-      <button class="quick-btn" onclick="sendCommand('what is on my screen')">
-        <span class="btn-icon">🖥️</span>
-        <span>Screen Info</span>
-      </button>
-      <button class="quick-btn" onclick="sendCommand('take screenshot')">
-        <span class="btn-icon">📸</span>
-        <span>Screenshot</span>
-      </button>
-      <button class="quick-btn" onclick="openCameraModal()">
-        <span class="btn-icon">📷</span>
-        <span>PC Camera</span>
-      </button>
-      <button class="quick-btn" onclick="sendCommand('volume up')">
-        <span class="btn-icon">🔊</span>
-        <span>Vol Up</span>
-      </button>
-      <button class="quick-btn" onclick="sendCommand('volume down')">
-        <span class="btn-icon">🔉</span>
-        <span>Vol Down</span>
-      </button>
-      <button class="quick-btn" onclick="sendCommand('mute')">
-        <span class="btn-icon">🔇</span>
-        <span>Mute</span>
-      </button>
-      <button class="quick-btn" onclick="sendCommand('pause the music')">
-        <span class="btn-icon">⏯️</span>
-        <span>Play/Pause</span>
-      </button>
-      <button class="quick-btn" onclick="sendCommand('what is open')">
-        <span class="btn-icon">🗂️</span>
-        <span>Open Apps</span>
-      </button>
-      <button class="quick-btn" onclick="sendCommand('open chrome')">
-        <span class="btn-icon">🌐</span>
-        <span>Chrome</span>
-      </button>
-      <button class="quick-btn" onclick="sendCommand('play lofi on youtube')">
-        <span class="btn-icon">🎵</span>
-        <span>YouTube</span>
-      </button>
-      <button class="quick-btn" onclick="sendCommand('open whatsapp')">
-        <span class="btn-icon">💬</span>
-        <span>WhatsApp</span>
-      </button>
-      <button class="quick-btn" onclick="promptUnlock()">
-        <span class="btn-icon">🔓</span>
-        <span>Unlock PC</span>
-      </button>
-      <button class="quick-btn" onclick="sendCommand('lock pc')">
-        <span class="btn-icon">🔒</span>
-        <span>Lock PC</span>
-      </button>
-      <button class="quick-btn" onclick="sendCommand('minimize all')">
-        <span class="btn-icon">🪟</span>
-        <span>Desktop</span>
-      </button>
+    <!-- Hands-Free Wake Word Card -->
+    <div class="wake-word-card" id="wake-card">
+      <div class="wake-card-header">
+        <div class="wake-card-left" onclick="toggleWakeWordMode()" style="cursor: pointer; -webkit-tap-highlight-color: transparent;">
+          <div class="wake-status-indicator" id="wake-indicator">
+            <div class="wake-pulse-ring"></div>
+            <div class="wake-pulse-core"></div>
+          </div>
+          <div>
+            <div class="wake-card-title">WAKE WORD: "JARVIS"</div>
+            <div class="wake-card-subtitle" id="wake-status-desc">Say "Jarvis" hands-free anytime</div>
+          </div>
+        </div>
+        <label class="switch-toggle" title="Toggle Wake Word Detection" onclick="event.stopPropagation()">
+          <input type="checkbox" id="wake-toggle" onchange="toggleWakeWordMode(this.checked)">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="wake-card-hints">
+        <span class="wake-tag">✨ Hands-Free Mode</span>
+        <span class="wake-tag">⚡ Say "Jarvis &lt;command&gt;"</span>
+        <span class="wake-tag">🔔 Audio Chime</span>
+      </div>
+    </div>
+
+    <!-- Real-time Speech Response Card -->
+    <div class="speech-response-card">
+      <div class="speech-bubble">
+        <span class="speech-label user">You Spoke</span>
+        <span class="speech-content" id="speak-user-text">"Tap to speak or say 'Jarvis'..."</span>
+      </div>
+      <div class="speech-bubble" style="margin-bottom: 0;">
+        <span class="speech-label jarvis">JARVIS Response</span>
+        <span class="speech-content" id="speak-jarvis-text">JARVIS Systems online. Ready for your command, sir.</span>
+      </div>
+      <div class="voice-reply-toggle">
+        <span>🔊 Read Answers Aloud on Phone</span>
+        <input type="checkbox" id="voice-reply-toggle" checked style="accent-color: #6366f1; width: 16px; height: 16px; cursor: pointer;">
+      </div>
     </div>
   </div>
 
-  <!-- Tab 2: Autonomous Agent (Stonic AI Workflows) -->
-  <div class="tab-panel" id="panel-agent">
-    <div class="agent-terminal" id="agent-terminal">
-      <div class="term-line"><span class="term-time">[SYS]</span> <span class="term-cat">READY:</span> <span class="term-msg">Autonomous Computer Control online</span></div>
+  <!-- ==================================================== -->
+  <!-- 2. TEXT MODE & CHAT LOG                             -->
+  <!-- ==================================================== -->
+  <div class="mode-panel" id="panel-text">
+    <!-- Conversation History -->
+    <div class="chat-history" id="chat-history">
+      <div class="msg-bubble jarvis">
+        <div>Greetings, sir. How may I assist you today? You can type commands below or tap the microphone to speak.</div>
+        <div class="msg-time">Online</div>
+      </div>
     </div>
-    <div class="quick-grid">
-      <button class="quick-btn" onclick="triggerWorkflow('ask_ai')">
-        <span class="btn-icon">🤖</span>
-        <span>Ask AI / GPT</span>
-      </button>
-      <button class="quick-btn" onclick="triggerWorkflow('search_youtube')">
-        <span class="btn-icon">▶️</span>
-        <span>Auto-YouTube</span>
-      </button>
-      <button class="quick-btn" onclick="triggerWorkflow('notepad')">
-        <span class="btn-icon">📝</span>
-        <span>Auto-Memo</span>
-      </button>
-      <button class="quick-btn" onclick="triggerWorkflow('start_menu')">
-        <span class="btn-icon">🪟</span>
-        <span>Start Hijack</span>
-      </button>
-      <button class="quick-btn" onclick="triggerWorkflow('snap_left')">
-        <span class="btn-icon">⬅️</span>
-        <span>Snap Left</span>
-      </button>
-      <button class="quick-btn" onclick="triggerWorkflow('snap_right')">
-        <span class="btn-icon">➡️</span>
-        <span>Snap Right</span>
-      </button>
-      <button class="quick-btn" onclick="triggerWorkflow('maximize')">
-        <span class="btn-icon">⛶</span>
-        <span>Maximize</span>
-      </button>
-      <button class="quick-btn" onclick="triggerWorkflow('alt_tab')">
-        <span class="btn-icon">🔄</span>
-        <span>Alt+Tab</span>
-      </button>
+
+    <!-- Fast Quick-Prompt Chips -->
+    <div class="chips-row">
+      <button class="prompt-chip" onclick="submitPrompt('Open dsa folder in antigravity')">🚀 Open DSA in Antigravity</button>
+      <button class="prompt-chip" onclick="submitPrompt('Start work mode')">⚡ Work Mode</button>
+      <button class="prompt-chip" onclick="submitPrompt('Take screenshot')">📸 Screenshot</button>
+      <button class="prompt-chip" onclick="submitPrompt('Play lofi on youtube')">🎵 Play Music</button>
+      <button class="prompt-chip" onclick="submitPrompt('Open whatsapp')">💬 WhatsApp</button>
+      <button class="prompt-chip" onclick="submitPrompt('Set volume to 50 percent')">🔊 Vol 50%</button>
+      <button class="prompt-chip" onclick="submitPrompt('Mute')">🔇 Mute</button>
     </div>
   </div>
 
-  <!-- Tab 3: Virtual Mouse Touchpad -->
-  <div class="tab-panel" id="panel-touchpad">
-    <div class="touchpad-box" id="touchpad" onclick="sendMouseClick('left')">
-      <span class="touchpad-hint">📱 Slide Finger to Move PC Cursor<br>Tap to Left-Click</span>
+  <!-- ==================================================== -->
+  <!-- 3. CONTROLS MODE (Shortcuts, AI Agent, Touchpad)     -->
+  <!-- ==================================================== -->
+  <div class="mode-panel" id="panel-controls">
+    <!-- Segmented Navigation for Controls -->
+    <div class="mode-bar" style="margin-bottom: 12px; background: rgba(15, 23, 42, 0.65);">
+      <button class="mode-btn active" id="sub-btn-commands" onclick="switchControlSubTab('commands')">⚡ Commands</button>
+      <button class="mode-btn" id="sub-btn-agent" onclick="switchControlSubTab('agent')">🤖 Stonic AI</button>
+      <button class="mode-btn" id="sub-btn-touchpad" onclick="switchControlSubTab('touchpad')">🖱️ Touchpad</button>
     </div>
-    <div class="mouse-btn-row">
-      <button class="mouse-btn" onclick="sendMouseClick('left')">🖱️ Left Click</button>
-      <button class="mouse-btn" onclick="sendMouseClick('double')">⚡ Double</button>
-      <button class="mouse-btn" onclick="sendMouseClick('right')">📋 Right Click</button>
+
+    <!-- Subtab 1: Command Buttons -->
+    <div id="sub-panel-commands">
+      <div class="quick-grid">
+        <button class="quick-btn" onclick="sendCommand('start work mode')"><span class="btn-icon">⚡</span><span>Work Mode</span></button>
+        <button class="quick-btn" onclick="sendCommand('open antigravity')"><span class="btn-icon">🚀</span><span>Antigravity</span></button>
+        <button class="quick-btn" onclick="sendCommand('what is on my screen')"><span class="btn-icon">🖥️</span><span>Screen Info</span></button>
+        <button class="quick-btn" onclick="sendCommand('take screenshot')"><span class="btn-icon">📸</span><span>Screenshot</span></button>
+        <button class="quick-btn" onclick="openCameraModal()"><span class="btn-icon">📷</span><span>PC Camera</span></button>
+        <button class="quick-btn" onclick="sendCommand('volume up')"><span class="btn-icon">🔊</span><span>Vol Up</span></button>
+        <button class="quick-btn" onclick="sendCommand('volume down')"><span class="btn-icon">🔉</span><span>Vol Down</span></button>
+        <button class="quick-btn" onclick="sendCommand('mute')"><span class="btn-icon">🔇</span><span>Mute</span></button>
+        <button class="quick-btn" onclick="sendCommand('pause the music')"><span class="btn-icon">⏯️</span><span>Play/Pause</span></button>
+        <button class="quick-btn" onclick="sendCommand('what is open')"><span class="btn-icon">🗂️</span><span>Open Apps</span></button>
+        <button class="quick-btn" onclick="sendCommand('open chrome')"><span class="btn-icon">🌐</span><span>Chrome</span></button>
+        <button class="quick-btn" onclick="sendCommand('play lofi on youtube')"><span class="btn-icon">🎵</span><span>YouTube</span></button>
+        <button class="quick-btn" onclick="sendCommand('open whatsapp')"><span class="btn-icon">💬</span><span>WhatsApp</span></button>
+        <button class="quick-btn" onclick="promptUnlock()"><span class="btn-icon">🔓</span><span>Unlock PC</span></button>
+        <button class="quick-btn" onclick="sendCommand('lock pc')"><span class="btn-icon">🔒</span><span>Lock PC</span></button>
+        <button class="quick-btn" onclick="sendCommand('minimize all')"><span class="btn-icon">🪟</span><span>Desktop</span></button>
+      </div>
     </div>
-    <div class="mouse-btn-row">
-      <button class="mouse-btn" onclick="sendMouseScroll(400)">▲ Scroll Up</button>
-      <button class="mouse-btn" onclick="sendMouseScroll(-400)">▼ Scroll Down</button>
-      <button class="mouse-btn" onclick="promptRemoteType()">⌨️ Type Text</button>
+
+    <!-- Subtab 2: Stonic AI Workflows -->
+    <div id="sub-panel-agent" style="display: none;">
+      <div class="agent-terminal" id="agent-terminal">
+        <div class="term-line"><span class="term-time">[SYS]</span> <span class="term-cat">READY:</span> <span class="term-msg">Autonomous Computer Control online</span></div>
+      </div>
+      <div class="quick-grid">
+        <button class="quick-btn" onclick="triggerWorkflow('ask_ai')"><span class="btn-icon">🤖</span><span>Ask AI / GPT</span></button>
+        <button class="quick-btn" onclick="triggerWorkflow('search_youtube')"><span class="btn-icon">▶️</span><span>Auto-YouTube</span></button>
+        <button class="quick-btn" onclick="triggerWorkflow('notepad')"><span class="btn-icon">📝</span><span>Auto-Memo</span></button>
+        <button class="quick-btn" onclick="triggerWorkflow('start_menu')"><span class="btn-icon">🪟</span><span>Start Hijack</span></button>
+        <button class="quick-btn" onclick="triggerWorkflow('snap_left')"><span class="btn-icon">⬅️</span><span>Snap Left</span></button>
+        <button class="quick-btn" onclick="triggerWorkflow('snap_right')"><span class="btn-icon">➡️</span><span>Snap Right</span></button>
+        <button class="quick-btn" onclick="triggerWorkflow('maximize')"><span class="btn-icon">⛶</span><span>Maximize</span></button>
+        <button class="quick-btn" onclick="triggerWorkflow('alt_tab')"><span class="btn-icon">🔄</span><span>Alt+Tab</span></button>
+      </div>
+    </div>
+
+    <!-- Subtab 3: Virtual Mouse Touchpad -->
+    <div id="sub-panel-touchpad" style="display: none;">
+      <div class="touchpad-box" id="touchpad" onclick="sendMouseClick('left')">
+        <span class="touchpad-hint">📱 Slide Finger to Move PC Cursor<br>Tap to Left-Click</span>
+      </div>
+      <div class="mouse-btn-row">
+        <button class="mouse-btn" onclick="sendMouseClick('left')">🖱️ Left Click</button>
+        <button class="mouse-btn" onclick="sendMouseClick('double')">⚡ Double</button>
+        <button class="mouse-btn" onclick="sendMouseClick('right')">📋 Right Click</button>
+      </div>
+      <div class="mouse-btn-row">
+        <button class="mouse-btn" onclick="sendMouseScroll(400)">▲ Scroll Up</button>
+        <button class="mouse-btn" onclick="sendMouseScroll(-400)">▼ Scroll Down</button>
+        <button class="mouse-btn" onclick="promptRemoteType()">⌨️ Type Text</button>
+      </div>
     </div>
   </div>
 
+  <!-- ==================================================== -->
+  <!-- PERMANENT STICKY BOTTOM BAR                         -->
+  <!-- (BOTH OPTIONS: SPEAK & TEXT DIRECTLY ACCESSIBLE)    -->
+  <!-- ==================================================== -->
+  <div class="sticky-bottom-bar">
+    <!-- Dedicated Speak / Mic Button -->
+    <button class="bottom-mic-btn" id="bottom-mic-btn" onclick="toggleVoice()" title="Tap to Speak">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+      </svg>
+    </button>
 
-  <!-- Bottom Input Bar -->
-  <div class="input-row">
-    <input type="text" id="cmd-input" class="command-input" placeholder="Type or tap keyboard mic..." onkeypress="handleKey(event)">
-    <button class="send-btn" onclick="submitText()">
+    <!-- Text Input Field -->
+    <input type="text" id="cmd-input" class="command-input" placeholder="Type command or tap 🎙️ to speak..." onkeypress="handleKey(event)">
+
+    <!-- Text Send Button -->
+    <button class="send-btn" id="bottom-send-btn" onclick="submitText()" title="Send">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
         <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
       </svg>
@@ -724,7 +1309,7 @@
 
   <!-- Live Computer Camera Feed Modal -->
   <div class="modal" id="camera-modal" onclick="closeCameraModal()">
-    <div style="display:flex; flex-direction:column; align-items:center; max-width:100%; width: 100%; max-width: 460px; background: rgba(15,23,42,0.9); padding: 16px; border-radius: 16px; border: 1px solid rgba(0, 242, 254, 0.3);" onclick="event.stopPropagation()">
+    <div style="display:flex; flex-direction:column; align-items:center; max-width:100%; width: 100%; max-width: 460px; background: rgba(15,23,42,0.92); padding: 16px; border-radius: 16px; border: 1px solid rgba(0, 242, 254, 0.3);" onclick="event.stopPropagation()">
       <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 10px;">
         <span style="font-weight: 700; color: #00f2fe; letter-spacing: 1px; font-size: 0.9rem;">LIVE COMPUTER WEBCAM</span>
         <span style="color: #10b981; font-size: 0.75rem; display: flex; align-items: center; gap: 4px;">
@@ -749,7 +1334,7 @@
 
       <div style="margin-bottom: 16px; font-size: 0.85rem; color: #cbd5e1; background: rgba(30, 41, 59, 0.7); padding: 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.06);">
         <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-          <span>AI Intelligence:</span>
+          <span>AI Engine:</span>
           <span id="ai-engine-badge" style="color: #00f2fe; font-weight: 700;">Smart Natural Engine</span>
         </div>
         <div style="display: flex; justify-content: space-between;">
@@ -768,121 +1353,831 @@
     </div>
   </div>
 
+  <!-- Secure HTTPS Unlock Modal for iPhone / Mobile -->
+  <div class="modal" id="https-modal" onclick="closeHttpsModal(event)">
+    <div class="modal-card-box" style="display:flex; flex-direction:column; max-width:100%; width: 100%; max-width: 440px; background: rgba(15,23,42,0.98); padding: 22px; border-radius: 18px; border: 1px solid rgba(0, 242, 254, 0.45); box-shadow: 0 10px 40px rgba(0,0,0,0.8);">
+      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 14px;">
+        <span style="font-weight: 700; color: #00f2fe; letter-spacing: 1px; font-size: 1rem;">🔒 UNLOCK IPHONE WAKE WORD</span>
+        <button type="button" class="modal-close-trigger" onclick="closeHttpsModal()" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;">✕</button>
+      </div>
+
+      <div style="font-size: 0.88rem; color: #e2e8f0; line-height: 1.5; margin-bottom: 14px;">
+        Apple iOS Safari & Chrome require a <b>Secure HTTPS</b> connection to unlock your phone's microphone for the hands-free <b>"Jarvis"</b> wake word.
+      </div>
+
+      <div style="background: rgba(30, 41, 59, 0.7); padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 16px; font-size: 0.8rem; color: #cbd5e1; line-height: 1.45;">
+        <b style="color: #f59e0b;">📱 Quick iPhone Step (One-Time):</b><br>
+        When opening the secure link, Safari will display: <i>"This Connection Is Not Private"</i>.<br>
+        Tap <b>Show Details</b> ➔ <b>Visit this website</b>.<br>
+        This unlocks speech recognition and the wake word permanently!
+      </div>
+
+      <!-- Real native <a> tag: Works 100% of the time on iOS Safari without JS event reliance -->
+      <a id="btn-switch-https" href="https://192.168.0.115:8443/" style="display: flex; align-items: center; justify-content: center; width: 100%; padding: 15px; border-radius: 14px; background: linear-gradient(135deg, #00f2fe, #6366f1); color: #020617; text-decoration: none; font-weight: 800; font-size: 0.95rem; cursor: pointer; margin-bottom: 10px; box-shadow: 0 0 20px rgba(0, 242, 254, 0.4); text-align: center; -webkit-tap-highlight-color: transparent; touch-action: manipulation; user-select: none; -webkit-user-select: none;">
+        ⚡ SWITCH TO SECURE HTTPS (PORT 8443)
+      </a>
+
+      <button type="button" onclick="switchToPcMic()" style="width: 100%; padding: 12px; border-radius: 12px; background: rgba(255,255,255,0.08); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.15); font-weight: 600; font-size: 0.82rem; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; margin-bottom: 4px;">
+        💻 Or Use PC Room Microphone (Zero Setup)
+      </button>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast"></div>
+
   <script>
-    const orb = document.getElementById('orb');
-    const orbHint = document.getElementById('orb-hint');
-    const feedText = document.getElementById('feed-text');
-    const feedTime = document.getElementById('feed-time');
-    const cmdInput = document.getElementById('cmd-input');
+    // State variables
+    let currentMode = 'speak';
     let isListening = false;
-    let recognition = null;
+    let selectedMicSource = 'phone'; // 'phone' or 'pc'
+    let mediaRecorder = null;
+    let audioChunks = [];
 
-    // Initialize Web Speech API if supported
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    // ==========================================
+    // UNIFIED BULLETPROOF SPEECH ENGINE
+    // ==========================================
+    let speechRecognition = null;
+    let isSpeechRunning = false;
+    let isExecutingCommand = false;
+    let isSpeakingTTS = false;
+    let wakeWordActive = false;
+    let awaitingFollowupCommand = false;
+    let followupTimer = null;
+    let silenceTimer = null;
+    let autoRestartTimer = null;
+    let hasChimedForCurrentPhrase = false;
+    let audioCtx = null;
+    let sessionStartTime = 0;
+    let consecutiveErrors = 0;
+    let rapidCrashCount = 0;
+    let isTogglingWakeWord = false;
+
+    // Detect Apple iOS (iPhone / iPad / iPod)
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    // Wake regex matching "jarvis" and common mobile STT mishearings
+    const WAKE_REGEX = /\b(jarvis|travis|service|charvis|javis|jarves|tarvis|starvis)\b/i;
+
+    // DOM references
+    const orb = document.getElementById('orb');
+    const soundwave = document.getElementById('soundwave');
+    const primarySpeakBtn = document.getElementById('primary-speak-btn');
+    const speakBtnText = document.getElementById('speak-btn-text');
+    const speakBtnIcon = document.getElementById('speak-btn-icon');
+    const bottomMicBtn = document.getElementById('bottom-mic-btn');
+    const cmdInput = document.getElementById('cmd-input');
+    const speakUserText = document.getElementById('speak-user-text');
+    const speakJarvisText = document.getElementById('speak-jarvis-text');
+    const chatHistory = document.getElementById('chat-history');
+    const voiceReplyToggle = document.getElementById('voice-reply-toggle');
+    const toast = document.getElementById('toast');
+
+    // ==========================================
+    // AUDIO SYNTHESIS & PERMISSIONS
+    // ==========================================
+    function unlockAudioContext() {
       try {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        recognition = new SpeechRecognition();
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        recognition.lang = 'en-US';
+        const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtxClass && !audioCtx) audioCtx = new AudioCtxClass();
+        if (audioCtx && audioCtx.state === 'suspended') {
+          audioCtx.resume().catch(() => {});
+        }
+      } catch(e) {}
+    }
 
-        recognition.onstart = () => {
-          isListening = true;
-          orb.classList.add('listening');
-          orbHint.innerText = 'Listening... Speak now';
+    function playWakeChime() {
+      try {
+        unlockAudioContext();
+        if (!audioCtx) return;
+        const now = audioCtx.currentTime;
+
+        // Tone 1: High crisp blip (D5 587.33Hz -> A5 880Hz)
+        const osc1 = audioCtx.createOscillator();
+        const gain1 = audioCtx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(587.33, now);
+        osc1.frequency.linearRampToValueAtTime(880, now + 0.09);
+        gain1.gain.setValueAtTime(0.22, now);
+        gain1.gain.linearRampToValueAtTime(0.001, now + 0.2);
+        osc1.connect(gain1);
+        gain1.connect(audioCtx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.2);
+
+        // Tone 2: Futuristic confirmation chime (D6 1174.66Hz)
+        const osc2 = audioCtx.createOscillator();
+        const gain2 = audioCtx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(1174.66, now + 0.08);
+        gain2.gain.setValueAtTime(0.001, now);
+        gain2.gain.linearRampToValueAtTime(0.18, now + 0.1);
+        gain2.gain.linearRampToValueAtTime(0.001, now + 0.32);
+        osc2.connect(gain2);
+        gain2.connect(audioCtx.destination);
+        osc2.start(now + 0.08);
+        osc2.stop(now + 0.32);
+      } catch(e) {}
+    }
+
+    // ==========================================
+    // CORE SPEECH ENGINE LIFECYCLE
+    // ==========================================
+    function createSpeechRecognitionInstance() {
+      const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognitionClass) return null;
+
+      try {
+        const rec = new SpeechRecognitionClass();
+        // iOS Safari WebKit is notoriously unstable with continuous = true.
+        // Single-utterance mode on iOS captures cleanly without hardware acquisition thrashing!
+        rec.continuous = !isIOS;
+        rec.interimResults = true;
+        rec.lang = 'en-US';
+        rec.maxAlternatives = 1;
+
+        rec.onstart = () => {
+          isSpeechRunning = true;
+          sessionStartTime = Date.now();
         };
 
-        recognition.onresult = (event) => {
-          const transcript = event.results[0][0].transcript;
-          feedText.innerText = `"${transcript}"`;
-          feedTime.innerText = 'Transcribed';
-          sendCommand(transcript);
+        rec.onresult = (event) => {
+          if (isSpeakingTTS || isExecutingCommand) return;
+
+          let interim = '';
+          let finalPhrase = '';
+
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            const item = event.results[i];
+            if (item.isFinal) {
+              finalPhrase += item[0].transcript;
+            } else {
+              interim += item[0].transcript;
+            }
+          }
+
+          const activeText = (finalPhrase || interim).trim();
+          if (!activeText) return;
+
+          // Live feedback in UI
+          speakUserText.innerText = `"${activeText}..."`;
+          cmdInput.value = activeText;
+
+          // Wake word chime trigger while speaking
+          if (wakeWordActive && !awaitingFollowupCommand && !hasChimedForCurrentPhrase) {
+            if (WAKE_REGEX.test(activeText)) {
+              hasChimedForCurrentPhrase = true;
+              playWakeChime();
+              setListeningVisuals(true);
+            }
+          }
+
+          // Handle phrase execution
+          if (finalPhrase) {
+            handleCompletedPhrase(finalPhrase);
+          } else {
+            // Debounce silence: Wait until user finishes speaking
+            clearTimeout(silenceTimer);
+            silenceTimer = setTimeout(() => {
+              if (activeText && !isExecutingCommand && !isSpeakingTTS) {
+                handleCompletedPhrase(activeText);
+              }
+            }, 1400);
+          }
         };
 
-        recognition.onerror = (e) => {
-          console.warn('Speech error:', e);
-          stopListening();
-          // If iOS Safari restricts microphone on HTTP, prompt user to use keyboard dictation
-          orbHint.innerText = 'Use keyboard mic on iPhone';
-          cmdInput.placeholder = 'Tap microphone on keyboard to speak...';
-          cmdInput.focus();
+        rec.onerror = (e) => {
+          console.warn('Speech engine event:', e.error);
+          consecutiveErrors++;
+
+          if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+            abortWakeWordMode('⚠️ Microphone access blocked. Check browser permissions.');
+            if (window.location.protocol === 'http:' && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+              openHttpsModal();
+            }
+            return;
+          }
+
+          if (e.error === 'audio-capture') {
+            abortWakeWordMode('⚠️ Microphone in use by another app or disconnected.');
+            return;
+          }
+
+          if (consecutiveErrors >= 3) {
+            abortWakeWordMode('⚠️ Microphone paused after repeated errors. Tap to restart.');
+            return;
+          }
         };
 
-        recognition.onend = () => {
-          stopListening();
+        rec.onend = () => {
+          isSpeechRunning = false;
+          hasChimedForCurrentPhrase = false;
+
+          // If wake word or push-to-talk was turned off, do not restart
+          if (!wakeWordActive && !isListening) return;
+
+          // If executing command or speaking response, resumeListeningIfActive handles restart
+          if (isExecutingCommand || isSpeakingTTS) return;
+
+          const sessionDuration = Date.now() - sessionStartTime;
+
+          // Circuit breaker: Rapid crash detection (< 400ms session duration)
+          if (sessionDuration < 400) {
+            rapidCrashCount++;
+            if (rapidCrashCount >= 3) {
+              abortWakeWordMode('⚠️ Microphone standby paused to protect device. Tap toggle to resume.');
+              return;
+            }
+          } else {
+            rapidCrashCount = 0;
+            consecutiveErrors = 0;
+          }
+
+          // Safe restart backoff: 1200ms ensures mobile OS / WebKit releases audio hardware cleanly
+          // and processes DOM touch events without freezing or starving the GUI!
+          clearTimeout(autoRestartTimer);
+          autoRestartTimer = setTimeout(() => {
+            if (wakeWordActive && !isSpeechRunning && !isExecutingCommand && !isSpeakingTTS) {
+              startSpeechEngine();
+            }
+          }, 1200);
         };
-      } catch(e) {
-        console.warn('SpeechRecognition init error:', e);
+
+        return rec;
+      } catch(err) {
+        console.warn('Failed to initialize speech recognition:', err);
+        return null;
       }
     }
 
-    function toggleVoice() {
-      if (!recognition) {
-        orbHint.innerText = 'Tap keyboard mic on iPhone';
-        cmdInput.placeholder = 'Tap microphone key on keyboard to speak...';
-        cmdInput.focus();
+    function abortWakeWordMode(reason) {
+      wakeWordActive = false;
+      isListening = false;
+      awaitingFollowupCommand = false;
+      clearTimeout(autoRestartTimer);
+      clearTimeout(followupTimer);
+      clearTimeout(silenceTimer);
+      autoRestartTimer = null;
+
+      const toggleInput = document.getElementById('wake-toggle');
+      if (toggleInput) toggleInput.checked = false;
+
+      stopSpeechEngine();
+      setListeningVisuals(false);
+      updateWakeWordUI(false, 'Say "Jarvis" hands-free anytime');
+
+      if (reason) showToast(reason, 4000);
+    }
+
+    function handleCompletedPhrase(rawPhrase) {
+      clearTimeout(silenceTimer);
+      const text = rawPhrase.trim();
+      if (!text) return;
+
+      hasChimedForCurrentPhrase = false;
+
+      // Case 1: Active command listening state (user was awaiting follow-up or tapped Speak)
+      if (awaitingFollowupCommand || (!wakeWordActive && isListening)) {
+        clearTimeout(followupTimer);
+        awaitingFollowupCommand = false;
+        if (!wakeWordActive) isListening = false;
+
+        // Strip leading wake word if spoken again
+        let finalCmd = text;
+        const match = text.match(WAKE_REGEX);
+        if (match) {
+          finalCmd = text.substring(match.index + match[0].length).replace(/^[,.:\s]+/, '').trim();
+        }
+        if (!finalCmd) finalCmd = text;
+
+        if (finalCmd.length > 1) {
+          sendCommand(finalCmd);
+        }
         return;
       }
-      if (isListening) {
-        recognition.stop();
-        stopListening();
-      } else {
-        try {
-          recognition.start();
-        } catch(e) {
-          orbHint.innerText = 'Tap keyboard mic on iPhone';
-          cmdInput.focus();
+
+      // Case 2: Wake word mode active
+      if (wakeWordActive) {
+        const match = text.match(WAKE_REGEX);
+        if (match) {
+          const afterWake = text.substring(match.index + match[0].length).replace(/^[,.:\s]+/, '').trim();
+
+          if (afterWake.length > 2) {
+            // Single-breath command (e.g. "Jarvis open dsa folder in antigravity")
+            sendCommand(afterWake);
+          } else {
+            // Standalone "Jarvis" wake word
+            awaitingFollowupCommand = true;
+            setListeningVisuals(true);
+            speakUserText.innerText = '"Jarvis"';
+            speakJarvisText.innerText = 'Yes, sir? Listening for your command...';
+            updateWakeWordUI(true, '✨ "Yes, sir?" Listening for your command...');
+
+            if (voiceReplyToggle && voiceReplyToggle.checked && 'speechSynthesis' in window) {
+              speakUtterance('Yes, sir?', () => {
+                resumeListeningIfActive();
+              });
+            } else {
+              resumeListeningIfActive();
+            }
+
+            clearTimeout(followupTimer);
+            followupTimer = setTimeout(() => {
+              if (awaitingFollowupCommand) {
+                awaitingFollowupCommand = false;
+                setListeningVisuals(false);
+                updateWakeWordUI(true, '👂 Listening for "Jarvis"...');
+                speakJarvisText.innerText = 'Standby resumed. Say "Jarvis" anytime.';
+              }
+            }, 8000);
+          }
         }
       }
     }
 
-    function stopListening() {
-      isListening = false;
-      orb.classList.remove('listening');
-      orbHint.innerText = 'Tap Orb to Speak';
+    function startSpeechEngine() {
+      // Discard any existing stopped instance and create fresh one to avoid WebKit InvalidStateError
+      if (speechRecognition) {
+        try {
+          speechRecognition.onresult = null;
+          speechRecognition.onerror = null;
+          speechRecognition.onend = null;
+          speechRecognition.stop();
+        } catch(e) {}
+        speechRecognition = null;
+      }
+
+      speechRecognition = createSpeechRecognitionInstance();
+      if (!speechRecognition) return false;
+
+      try {
+        speechRecognition.start();
+        isSpeechRunning = true;
+        sessionStartTime = Date.now();
+        return true;
+      } catch(e) {
+        console.warn('Speech engine start warning:', e);
+        isSpeechRunning = false;
+        return false;
+      }
     }
 
+    function stopSpeechEngine() {
+      clearTimeout(autoRestartTimer);
+      autoRestartTimer = null;
+
+      if (speechRecognition) {
+        try {
+          speechRecognition.onresult = null;
+          speechRecognition.onerror = null;
+          speechRecognition.onend = null;
+          speechRecognition.stop();
+        } catch(e) {}
+        speechRecognition = null;
+      }
+      isSpeechRunning = false;
+    }
+
+    function toggleWakeWordMode(forceState) {
+      if (isTogglingWakeWord) return;
+      isTogglingWakeWord = true;
+      setTimeout(() => { isTogglingWakeWord = false; }, 300);
+
+      const toggleInput = document.getElementById('wake-toggle');
+      const targetState = (forceState !== undefined) ? !!forceState : !wakeWordActive;
+
+      unlockAudioContext();
+
+      // Insecure HTTP Guard: Mobile browsers strictly forbid Web Speech API on non-localhost HTTP
+      if (targetState && window.location.protocol === 'http:' && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+        abortWakeWordMode('🔒 Secure HTTPS required for mobile microphone.');
+        openHttpsModal();
+        return;
+      }
+
+      if (targetState) {
+        wakeWordActive = true;
+        if (toggleInput) toggleInput.checked = true;
+        consecutiveErrors = 0;
+        rapidCrashCount = 0;
+
+        const started = startSpeechEngine();
+        if (started) {
+          playWakeChime();
+          showToast('👂 Wake Word Active: Say "Jarvis" followed by your command!');
+          updateWakeWordUI(true, '👂 Listening for "Jarvis"...');
+        } else {
+          abortWakeWordMode('⚠️ Microphone not supported or blocked in this browser.');
+          if (window.location.protocol === 'http:') openHttpsModal();
+        }
+      } else {
+        abortWakeWordMode(null);
+        showToast('Wake Word Standby Paused');
+      }
+    }
+
+    function toggleVoice() {
+      if (selectedMicSource === 'pc') {
+        triggerPcMic();
+        return;
+      }
+
+      unlockAudioContext();
+
+      if (wakeWordActive) {
+        if (awaitingFollowupCommand) {
+          awaitingFollowupCommand = false;
+          clearTimeout(followupTimer);
+          setListeningVisuals(false);
+          updateWakeWordUI(true, '👂 Listening for "Jarvis"...');
+        } else {
+          playWakeChime();
+          awaitingFollowupCommand = true;
+          setListeningVisuals(true);
+          speakUserText.innerText = '"Listening..."';
+          speakJarvisText.innerText = 'Listening for your command, sir...';
+          updateWakeWordUI(true, '✨ Listening for command...');
+          startSpeechEngine();
+
+          clearTimeout(followupTimer);
+          followupTimer = setTimeout(() => {
+            if (awaitingFollowupCommand) {
+              awaitingFollowupCommand = false;
+              setListeningVisuals(false);
+              updateWakeWordUI(true, '👂 Listening for "Jarvis"...');
+            }
+          }, 8000);
+        }
+        return;
+      }
+
+      // Standard Push-to-Talk Mode
+      if (isListening) {
+        isListening = false;
+        stopSpeechEngine();
+        setListeningVisuals(false);
+      } else {
+        isListening = true;
+        setListeningVisuals(true);
+        speakUserText.innerText = '"Listening... Speak now..."';
+        playWakeChime();
+        const started = startSpeechEngine();
+        if (!started) {
+          isListening = false;
+          setListeningVisuals(false);
+          if (window.location.protocol === 'http:') {
+            openHttpsModal();
+          } else {
+            fallbackMediaRecorder();
+          }
+        }
+      }
+    }
+
+    function setListeningVisuals(active) {
+      orb.classList.toggle('listening', active);
+      bottomMicBtn.classList.toggle('listening', active);
+      soundwave.classList.toggle('active', active);
+
+      const card = document.getElementById('wake-card');
+      if (card) card.classList.toggle('triggered', active);
+
+      if (active) {
+        primarySpeakBtn.classList.add('listening');
+        speakBtnIcon.innerText = '👂';
+        speakBtnText.innerText = 'LISTENING...';
+        cmdInput.placeholder = 'Listening to your voice...';
+      } else {
+        primarySpeakBtn.classList.remove('listening');
+        speakBtnIcon.innerText = '🎙️';
+        speakBtnText.innerText = selectedMicSource === 'pc' ? 'TRIGGER PC MIC' : 'TAP TO SPEAK';
+        cmdInput.placeholder = 'Type command or tap 🎙️ to speak...';
+      }
+    }
+
+    function updateWakeWordUI(active, statusText) {
+      const card = document.getElementById('wake-card');
+      const badge = document.getElementById('wake-badge');
+      const badgeText = document.getElementById('wake-badge-text');
+      const statusDesc = document.getElementById('wake-status-desc');
+
+      if (card) card.classList.toggle('active', active);
+      if (badge) badge.classList.toggle('active', active);
+      if (badgeText) badgeText.innerText = active ? 'WAKE: ON' : 'WAKE: OFF';
+      if (statusDesc && statusText) statusDesc.innerText = statusText;
+    }
+
+    function speakUtterance(text, onComplete) {
+      try {
+        if (!('speechSynthesis' in window)) {
+          if (onComplete) onComplete();
+          return;
+        }
+        window.speechSynthesis.cancel();
+        const utt = new SpeechSynthesisUtterance(text);
+        utt.rate = 1.05;
+        isSpeakingTTS = true;
+
+        utt.onstart = () => { isSpeakingTTS = true; };
+        utt.onend = () => {
+          setTimeout(() => {
+            isSpeakingTTS = false;
+            if (onComplete) onComplete();
+            else resumeListeningIfActive();
+          }, 350);
+        };
+        utt.onerror = () => {
+          isSpeakingTTS = false;
+          if (onComplete) onComplete();
+          else resumeListeningIfActive();
+        };
+
+        window.speechSynthesis.speak(utt);
+      } catch(e) {
+        isSpeakingTTS = false;
+        if (onComplete) onComplete();
+        else resumeListeningIfActive();
+      }
+    }
+
+    function resumeListeningIfActive() {
+      if (wakeWordActive || isListening) {
+        setListeningVisuals(awaitingFollowupCommand || isListening);
+        updateWakeWordUI(wakeWordActive, awaitingFollowupCommand ? '✨ Listening for command...' : (wakeWordActive ? '👂 Listening for "Jarvis"...' : 'Ready'));
+        clearTimeout(autoRestartTimer);
+        autoRestartTimer = setTimeout(() => {
+          if ((wakeWordActive || isListening) && !isSpeechRunning && !isExecutingCommand && !isSpeakingTTS) {
+            startSpeechEngine();
+          }
+        }, 350);
+      }
+    }
+
+    // ==========================================
+    // MODE SWITCHING: SPEAK vs TEXT vs CONTROLS
+    // ==========================================
+    function switchMode(mode) {
+      currentMode = mode;
+      document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.mode-panel').forEach(p => p.classList.remove('active'));
+
+      const targetBtn = document.getElementById('btn-mode-' + mode);
+      const targetPanel = document.getElementById('panel-' + mode);
+      if (targetBtn) targetBtn.classList.add('active');
+      if (targetPanel) targetPanel.classList.add('active');
+
+      if (mode === 'text') {
+        setTimeout(() => cmdInput.focus(), 150);
+      }
+    }
+
+    function switchControlSubTab(tab) {
+      ['commands', 'agent', 'touchpad'].forEach(t => {
+        const btn = document.getElementById('sub-btn-' + t);
+        const p = document.getElementById('sub-panel-' + t);
+        if (btn && p) {
+          btn.classList.toggle('active', t === tab);
+          p.style.display = (t === tab) ? 'block' : 'none';
+        }
+      });
+      if (tab === 'agent') fetchLogs();
+    }
+
+    function selectMicSource(source) {
+      selectedMicSource = source;
+      document.getElementById('chip-phone').classList.toggle('active', source === 'phone');
+      document.getElementById('chip-pc').classList.toggle('active', source === 'pc');
+
+      if (source === 'pc') {
+        showToast('💻 Switched to PC Room Microphone');
+        speakBtnText.innerText = 'TRIGGER PC MIC';
+      } else {
+        showToast('📱 Switched to Mobile Device Microphone');
+        speakBtnText.innerText = (isListening || awaitingFollowupCommand) ? 'TAP TO STOP' : 'TAP TO SPEAK';
+      }
+    }
+
+    function showToast(msg, duration = 3000) {
+      toast.innerText = msg;
+      toast.classList.add('active');
+      setTimeout(() => toast.classList.remove('active'), duration);
+    }
+
+    function openHttpsModal() {
+      const modal = document.getElementById('https-modal');
+      const switchBtn = document.getElementById('btn-switch-https');
+      if (switchBtn) {
+        switchBtn.href = `https://${window.location.hostname}:8443/`;
+      }
+      if (modal) modal.classList.add('active');
+    }
+
+    function closeHttpsModal(e) {
+      if (e && e.target && e.target !== e.currentTarget && !e.target.classList.contains('modal-close-trigger')) {
+        return;
+      }
+      const modal = document.getElementById('https-modal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    function switchToHttps() {
+      const host = window.location.hostname;
+      window.location.href = `https://${host}:8443/`;
+    }
+
+    function switchToPcMic() {
+      const modal = document.getElementById('https-modal');
+      if (modal) modal.classList.remove('active');
+      selectMicSource('pc');
+      showToast('💻 Switched to PC Room Mic! Speak to your computer now.');
+    }
+
+    // Auto-detect insecure HTTP origin and show top lock badge
+    if (window.location.protocol === 'http:') {
+      const lockBtn = document.getElementById('https-unlock-btn');
+      if (lockBtn) lockBtn.style.display = 'flex';
+    }
+
+    // MediaRecorder fallback for browsers that block Web Speech on HTTP
+    async function fallbackMediaRecorder() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        openHttpsModal();
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) audioChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+          stream.getTracks().forEach(t => t.stop());
+          const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+          if (audioBlob.size > 1000) {
+            uploadAudioForTranscription(audioBlob);
+          } else {
+            showToast('No audio captured. Please try again.');
+          }
+        };
+
+        mediaRecorder.start();
+        setListeningVisuals(true);
+        showToast('🔴 Recording audio... Tap again to stop');
+      } catch (err) {
+        console.warn('getUserMedia error:', err);
+        setListeningVisuals(false);
+        openHttpsModal();
+      }
+    }
+
+    async function uploadAudioForTranscription(blob) {
+      orb.classList.add('processing');
+      speakJarvisText.innerText = 'Transcribing your audio on server...';
+      try {
+        const fd = new FormData();
+        fd.append('audio', blob, 'mobile_recording.webm');
+        const res = await fetch('/api/voice', { method: 'POST', body: fd });
+        const data = await res.json();
+        
+        if (data.transcription) {
+          speakUserText.innerText = `"${data.transcription}"`;
+          cmdInput.value = data.transcription;
+          appendChatMessage('user', data.transcription);
+        }
+        
+        handleCommandResponse(data);
+      } catch (err) {
+        speakJarvisText.innerText = 'Voice processing error: ' + err;
+      } finally {
+        orb.classList.remove('processing');
+      }
+    }
+
+    // Trigger PC Physical Microphone directly (Desktop App mode)
+    async function triggerPcMic() {
+      setListeningVisuals(true);
+      speakBtnText.innerText = 'PC IS LISTENING...';
+      speakUserText.innerText = '"Listening via PC room microphone..."';
+      showToast('💻 PC Microphone Active — Speak to your computer now');
+
+      try {
+        const res = await fetch('/api/voice/pc_listen', { method: 'POST' });
+        const data = await res.json();
+        setListeningVisuals(false);
+        if (data.transcription) {
+          speakUserText.innerText = `"${data.transcription}"`;
+          appendChatMessage('user', data.transcription);
+        }
+        handleCommandResponse(data);
+      } catch (e) {
+        setListeningVisuals(false);
+        speakJarvisText.innerText = 'PC Microphone error: ' + e;
+      }
+    }
+
+    // ==========================================
+    // COMMAND DISPATCH & EXECUTION
+    // ==========================================
     async function sendCommand(text) {
       if (!text || !text.trim()) return;
+      const cleanText = text.trim();
+
+      isExecutingCommand = true;
+      setListeningVisuals(false);
       orb.classList.add('processing');
-      orbHint.innerText = 'Executing on PC...';
+
+      speakUserText.innerText = `"${cleanText}"`;
+      cmdInput.value = cleanText;
+      appendChatMessage('user', cleanText);
+      speakJarvisText.innerText = 'Executing on PC...';
 
       try {
         const res = await fetch('/api/command', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: text })
+          body: JSON.stringify({ text: cleanText })
         });
         const data = await res.json();
-        
-        feedText.innerText = data.response || 'Command executed.';
-        feedTime.innerText = new Date().toLocaleTimeString();
-
-        // Speak reply on mobile if audio is supported
-        if ('speechSynthesis' in window && data.response) {
-          const utterance = new SpeechSynthesisUtterance(data.response);
-          window.speechSynthesis.speak(utterance);
-        }
-
-        // If screenshot or screen info was requested
-        if (data.action === 'screenshot' || data.screenshot_url || data.intent === 'screen_info') {
-          document.getElementById('shot-img').src = (data.screenshot_url || '/api/screenshot') + '?t=' + Date.now();
-          document.getElementById('shot-modal').classList.add('active');
-        }
-
-        // If camera stream was requested
-        if (data.intent === 'camera' || data.camera_url) {
-          openCameraModal();
-        }
+        handleCommandResponse(data);
       } catch (err) {
-        feedText.innerText = 'Failed to dispatch command to PC.';
+        speakJarvisText.innerText = 'Failed to dispatch command to PC.';
+        appendChatMessage('jarvis', 'Connection error: Could not reach JARVIS PC server.');
+        isExecutingCommand = false;
+        resumeListeningIfActive();
       } finally {
         orb.classList.remove('processing');
-        orbHint.innerText = 'Tap Orb to Speak';
         fetchTelemetry();
       }
     }
 
+    function handleCommandResponse(data) {
+      const resp = data.response || (data.success ? 'Command executed successfully.' : 'Action failed.');
+      speakJarvisText.innerText = resp;
+      appendChatMessage('jarvis', resp);
+
+      // If screenshot was requested
+      if (data.action === 'screenshot' || data.screenshot_url || data.intent === 'screen_info') {
+        document.getElementById('shot-img').src = (data.screenshot_url || '/api/screenshot') + '?t=' + Date.now();
+        document.getElementById('shot-modal').classList.add('active');
+      }
+
+      // If camera stream was requested
+      if (data.intent === 'camera' || data.camera_url) {
+        openCameraModal();
+      }
+
+      // Speak response aloud on mobile speaker if toggle enabled
+      if (voiceReplyToggle.checked && 'speechSynthesis' in window && resp) {
+        speakUtterance(resp, () => {
+          isExecutingCommand = false;
+          resumeListeningIfActive();
+        });
+      } else {
+        isExecutingCommand = false;
+        resumeListeningIfActive();
+      }
+    }
+
+    function appendChatMessage(role, text) {
+      const bubble = document.createElement('div');
+      bubble.className = `msg-bubble ${role}`;
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      bubble.innerHTML = `<div>${escapeHtml(text)}</div><div class="msg-time">${timeStr}</div>`;
+      chatHistory.appendChild(bubble);
+      chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.innerText = text;
+      return div.innerHTML;
+    }
+
+    function submitPrompt(promptText) {
+      cmdInput.value = promptText;
+      submitText();
+    }
+
+    function submitText() {
+      const val = cmdInput.value.trim();
+      if (val) {
+        cmdInput.value = '';
+        sendCommand(val);
+      }
+    }
+
+    function handleKey(e) {
+      if (e.key === 'Enter') submitText();
+    }
+
+    // ==========================================
+    // UTILITY DIALOGS & MODALS
+    // ==========================================
     function promptUnlock() {
       const pin = prompt('Enter your Windows PIN (leave empty if no PIN):', '');
       if (pin !== null) {
@@ -898,7 +2193,7 @@
 
     function closeCameraModal() {
       const img = document.getElementById('camera-stream-img');
-      img.src = ''; // Stop stream connection to release camera
+      img.src = '';
       document.getElementById('camera-modal').classList.remove('active');
     }
 
@@ -912,23 +2207,11 @@
           a.href = url;
           a.download = 'pc_camera_photo.jpg';
           a.click();
-          feedText.innerText = 'Photo saved to PC Desktop and downloaded to mobile.';
+          showToast('📸 Photo saved to PC Desktop and downloaded.');
         }
       } catch (e) {
-        feedText.innerText = 'Error capturing photo.';
+        showToast('Error capturing photo.');
       }
-    }
-
-    function submitText() {
-      const val = cmdInput.value.trim();
-      if (val) {
-        cmdInput.value = '';
-        sendCommand(val);
-      }
-    }
-
-    function handleKey(e) {
-      if (e.key === 'Enter') submitText();
     }
 
     function closeModal() {
@@ -965,14 +2248,14 @@
           body: JSON.stringify({ gemini_api_key: key })
         });
         const d = await res.json();
-        feedText.innerText = d.message || 'API key saved.';
+        showToast(d.message || 'API key saved.');
         closeSettingsModal();
       } catch (e) {
         alert('Failed to update settings: ' + e);
       }
     }
 
-    // Live Telemetry updates from PC
+    // Telemetry updates from PC
     async function fetchTelemetry() {
       try {
         const res = await fetch('/api/status');
@@ -980,32 +2263,17 @@
         document.getElementById('cpu-val').innerText = (data.cpu || '--') + '%';
         document.getElementById('ram-val').innerText = (data.ram || '--') + '%';
         document.getElementById('bat-val').innerText = (data.battery !== null ? data.battery + '%' : 'Plugged');
-      } catch(e) {}
+        document.getElementById('header-status').innerText = 'ONLINE';
+      } catch(e) {
+        document.getElementById('header-status').innerText = 'OFFLINE';
+      }
     }
 
     setInterval(fetchTelemetry, 5000);
     fetchTelemetry();
 
     // ==========================================
-    // TAB SWITCHING
-    // ==========================================
-    function switchTab(name) {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-
-      const btn = document.getElementById('tab-btn-' + name);
-      const panel = document.getElementById('panel-' + name);
-      if (btn && panel) {
-        btn.classList.add('active');
-        panel.classList.add('active');
-      }
-      if (name === 'agent') {
-        fetchLogs();
-      }
-    }
-
-    // ==========================================
-    // STONIC AI AGENT WORKFLOWS & TERMINAL
+    // STONIC AI WORKFLOWS & LOGS
     // ==========================================
     async function triggerWorkflow(action) {
       let param = "";
@@ -1023,8 +2291,7 @@
         if (param === null) return;
       }
 
-      feedText.innerText = `🤖 [AGENT TAKEOVER] Running ${action}...`;
-      feedTime.innerText = 'Autonomous Action';
+      speakJarvisText.innerText = `🤖 [AGENT TAKEOVER] Running ${action}...`;
       orb.classList.add('processing');
 
       try {
@@ -1035,13 +2302,13 @@
         });
         const d = await res.json();
         if (d.success) {
-          feedText.innerText = `✅ Agent completed action: ${action}`;
+          speakJarvisText.innerText = `✅ Agent completed action: ${action}`;
         } else {
-          feedText.innerText = `⚠️ Agent reported: ${d.error || 'Failed'}`;
+          speakJarvisText.innerText = `⚠️ Agent reported: ${d.error || 'Failed'}`;
         }
         fetchLogs();
       } catch (e) {
-        feedText.innerText = `Agent error: ${e}`;
+        speakJarvisText.innerText = `Agent error: ${e}`;
       } finally {
         orb.classList.remove('processing');
       }
@@ -1061,36 +2328,26 @@
       } catch (e) {}
     }
 
-    setInterval(() => {
-      const agentPanel = document.getElementById('panel-agent');
-      if (agentPanel && agentPanel.classList.contains('active')) {
-        fetchLogs();
-      }
-    }, 2500);
-
     // ==========================================
-    // VIRTUAL MOUSE TOUCHPAD & REMOTE TYPE
+    // TOUCHPAD & REMOTE TYPE
     // ==========================================
     const pad = document.getElementById('touchpad');
     let touchStartX = 0;
     let touchStartY = 0;
     let lastMoveTime = 0;
-    let isTouchDrag = false;
 
     if (pad) {
       pad.addEventListener('touchstart', (e) => {
         if (e.touches.length === 1) {
           touchStartX = e.touches[0].clientX;
           touchStartY = e.touches[0].clientY;
-          isTouchDrag = false;
         }
       }, { passive: true });
 
       pad.addEventListener('touchmove', (e) => {
         if (e.touches.length === 1) {
-          isTouchDrag = true;
           const now = Date.now();
-          if (now - lastMoveTime < 25) return; // 40 Hz throttle
+          if (now - lastMoveTime < 25) return;
           lastMoveTime = now;
 
           const curX = e.touches[0].clientX;
@@ -1112,15 +2369,13 @@
     }
 
     async function sendMouseClick(btn) {
-      // If was dragging, avoid accidental click
       try {
         await fetch('/api/computer/mouse/click', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ button: btn, clicks: (btn === 'double' ? 2 : 1) })
         });
-        feedText.innerText = `Mouse ${btn} click sent to PC.`;
-        feedTime.innerText = new Date().toLocaleTimeString();
+        showToast(`Mouse ${btn} click sent to PC.`);
       } catch (e) {}
     }
 
@@ -1131,21 +2386,21 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ amount: amt })
         });
-        feedText.innerText = amt > 0 ? "Scrolled page up." : "Scrolled page down.";
+        showToast(amt > 0 ? "Scrolled page up." : "Scrolled page down.");
       } catch (e) {}
     }
 
     async function promptRemoteType() {
       const text = prompt('Enter text to type into active PC window:', '');
       if (text !== null && text.length > 0) {
-        feedText.innerText = `Typing "${text}" into PC...`;
+        showToast(`Typing into PC...`);
         try {
           await fetch('/api/computer/keyboard/type', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: text })
           });
-          feedText.innerText = `✅ Typed "${text}" into PC active window.`;
+          showToast(`✅ Typed into active window.`);
           fetchLogs();
         } catch (e) {}
       }
