@@ -12,15 +12,19 @@ class WebSearch:
     def search(self, query: str) -> str:
         logger.info(f"Performing search query: '{query}'")
         try:
-            from duckduckgo_search import DDGS
+            try:
+                from ddgs import DDGS
+            except ImportError:
+                from duckduckgo_search import DDGS
             with DDGS() as ddgs:
                 results = list(ddgs.text(query, max_results=3))
                 if results:
                     snippets = [r.get("body", "") for r in results if r.get("body")]
                     summary = " ".join(snippets[:2])
-                    return summary[:350]
+                    summary = summary.encode("ascii", "ignore").decode("ascii")
+                    return summary[:400]
         except Exception as e:
-            logger.warning(f"DuckDuckGo search error: {e}")
+            logger.warning(f"Web search error: {e}")
 
         # Fallback to browser search
         url = f"https://www.google.com/search?q={urllib.parse.quote(query)}"

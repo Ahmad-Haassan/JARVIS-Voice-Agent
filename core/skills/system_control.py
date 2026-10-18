@@ -301,6 +301,187 @@ class SystemControl:
             return True
         return False
 
+    # ==========================================
+    # VOLUME & AUDIO CONTROL (pycaw)
+    # ==========================================
+    def get_volume(self) -> int:
+        try:
+            from pycaw.pycaw import AudioUtilities
+            speakers = AudioUtilities.GetSpeakers()
+            return int(round(speakers.volume_percent))
+        except Exception as e:
+            logger.warning(f"Error getting volume: {e}")
+            return 50
+
+    def set_volume(self, level: int) -> int:
+        try:
+            level = max(0, min(100, int(level)))
+            from pycaw.pycaw import AudioUtilities
+            speakers = AudioUtilities.GetSpeakers()
+            speakers.volume_percent = float(level)
+            logger.info(f"Master volume set to {level}%")
+            return level
+        except Exception as e:
+            logger.error(f"Error setting volume: {e}")
+            return self.get_volume()
+
+    def change_volume(self, delta: int) -> int:
+        cur = self.get_volume()
+        target = max(0, min(100, cur + delta))
+        return self.set_volume(target)
+
+    def set_mute(self, mute: bool = True) -> bool:
+        try:
+            from pycaw.pycaw import AudioUtilities
+            speakers = AudioUtilities.GetSpeakers()
+            speakers.EndpointVolume.SetMute(1 if mute else 0, None)
+            logger.info(f"Master mute set to {mute}")
+            return True
+        except Exception as e:
+            logger.error(f"Error toggling mute: {e}")
+            return False
+
+    def toggle_mute(self) -> bool:
+        try:
+            from pycaw.pycaw import AudioUtilities
+            speakers = AudioUtilities.GetSpeakers()
+            current = speakers.EndpointVolume.GetMute()
+            speakers.EndpointVolume.SetMute(0 if current else 1, None)
+            return not current
+        except Exception as e:
+            logger.error(f"Error toggling mute: {e}")
+            return False
+
+    # ==========================================
+    # MEDIA PLAYBACK CONTROLS
+    # ==========================================
+    def media_play_pause(self) -> bool:
+        try:
+            import ctypes
+            VK_MEDIA_PLAY_PAUSE = 0xB3
+            ctypes.windll.user32.keybd_event(VK_MEDIA_PLAY_PAUSE, 0, 0, 0)
+            ctypes.windll.user32.keybd_event(VK_MEDIA_PLAY_PAUSE, 0, 2, 0)
+            return True
+        except Exception as e:
+            logger.error(f"Media play/pause error: {e}")
+            return False
+
+    def media_next(self) -> bool:
+        try:
+            import ctypes
+            VK_MEDIA_NEXT_TRACK = 0xB0
+            ctypes.windll.user32.keybd_event(VK_MEDIA_NEXT_TRACK, 0, 0, 0)
+            ctypes.windll.user32.keybd_event(VK_MEDIA_NEXT_TRACK, 0, 2, 0)
+            return True
+        except Exception as e:
+            logger.error(f"Media next error: {e}")
+            return False
+
+    def media_prev(self) -> bool:
+        try:
+            import ctypes
+            VK_MEDIA_PREV_TRACK = 0xB1
+            ctypes.windll.user32.keybd_event(VK_MEDIA_PREV_TRACK, 0, 0, 0)
+            ctypes.windll.user32.keybd_event(VK_MEDIA_PREV_TRACK, 0, 2, 0)
+            return True
+        except Exception as e:
+            logger.error(f"Media prev error: {e}")
+            return False
+
+    # ==========================================
+    # WINDOWS & DESKTOP MANAGEMENT
+    # ==========================================
+    def get_open_windows(self) -> list:
+        """Returns list of all visible application window titles on user's interactive desktop."""
+        import ctypes
+        import threading
+        titles = []
+
+        def _worker():
+            user32 = ctypes.windll.user32
+            h_desk = user32.OpenDesktopW("default", 0, False, 0x1FF)
+            if not h_desk:
+                return
+            user32.SetThreadDesktop(h_desk)
+
+            def cb(hwnd, extra):
+                if user32.IsWindowVisible(hwnd):
+                    length = user32.GetWindowTextLengthW(hwnd)
+                    if length > 0:
+                        buff = ctypes.create_unicode_buffer(length + 1)
+                        user32.GetWindowTextW(hwnd, buff, length + 1)
+                        val = buff.value.replace("\u200b", "").strip()
+                        val = val.encode("ascii", "ignore").decode("ascii")
+                        if val and val not in ["Program Manager", "Windows Input Experience"]:
+                            titles.append(val)
+                return True
+
+            WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_int, ctypes.c_int)
+            user32.EnumWindows(WNDENUMPROC(cb), 0)
+            user32.CloseDesktop(h_desk)
+
+        t = threading.Thread(target=_worker)
+        t.start()
+        t.join(timeout=2.0)
+        return titles
+
+    def focus_window(self, app_name: str) -> bool:
+        """Brings the window matching app_name to the foreground."""
+        import ctypes
+        import threading
+        found = [False]
+
+        def _worker():
+            user32 = ctypes.windll.user32
+            h_desk = user32.OpenDesktopW("default", 0, False, 0x1FF)
+            if not h_desk:
+                return
+            user32.SetThreadDesktop(h_desk)
+
+            matched_hwnd = [None]
+            clean_name = app_name.lower().strip()
+
+            def cb(hwnd, extra):
+                if user32.IsWindowVisible(hwnd):
+                    length = user32.GetWindowTextLengthW(hwnd)
+                    if length > 0:
+                        buff = ctypes.create_unicode_buffer(length + 1)
+                        user32.GetWindowTextW(hwnd, buff, length + 1)
+                        if clean_name in buff.value.lower():
+                            matched_hwnd[0] = hwnd
+                            return False
+                return True
+
+            WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_int, ctypes.c_int)
+            user32.EnumWindows(WNDENUMPROC(cb), 0)
+
+            if matched_hwnd[0]:
+                user32.ShowWindow(matched_hwnd[0], 9)  # SW_RESTORE
+                user32.SetForegroundWindow(matched_hwnd[0])
+                found[0] = True
+            user32.CloseDesktop(h_desk)
+
+        t = threading.Thread(target=_worker)
+        t.start()
+        t.join(timeout=2.0)
+        return found[0]
+
+    def minimize_all(self) -> bool:
+        """Minimizes all windows to show the desktop (Win + D)."""
+        try:
+            import ctypes
+            VK_LWIN = 0x5B
+            VK_D = 0x44
+            user32 = ctypes.windll.user32
+            user32.keybd_event(VK_LWIN, 0, 0, 0)
+            user32.keybd_event(VK_D, 0, 0, 0)
+            user32.keybd_event(VK_D, 0, 2, 0)
+            user32.keybd_event(VK_LWIN, 0, 2, 0)
+            return True
+        except Exception as e:
+            logger.error(f"Minimize all error: {e}")
+            return False
+
 _sys_instance = None
 
 def get_system_control() -> SystemControl:

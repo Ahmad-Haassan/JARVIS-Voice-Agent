@@ -9,6 +9,7 @@ import psutil
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
+from typing import Optional
 from pydantic import BaseModel
 
 # Ensure project root in sys.path
@@ -96,11 +97,11 @@ async def execute_command(req: CommandRequest):
 
     final_resp = exec_result.response or spoken_resp or "Command executed."
     
-    # If screenshot or camera was requested
+    # If screenshot, screen_info, or camera was requested
     screenshot_url = None
     camera_url = None
     action_type = entities.get("action", "")
-    if intent == "system_control" and action_type == "screenshot":
+    if (intent == "system_control" and action_type == "screenshot") or intent == "screen_info":
         screenshot_url = "/api/screenshot"
     elif intent == "camera":
         camera_url = "/api/camera/stream"
@@ -113,6 +114,31 @@ async def execute_command(req: CommandRequest):
         "screenshot_url": screenshot_url,
         "camera_url": camera_url
     }
+
+class SettingsRequest(BaseModel):
+    gemini_api_key: Optional[str] = None
+    weather_city: Optional[str] = None
+
+@app.get("/api/settings")
+def get_settings():
+    from core.utils import config as cfg
+    key = cfg.get("ai", "gemini_api_key", "")
+    return {
+        "gemini_configured": bool(key and not key.startswith("AQ.")),
+        "weather_city": cfg.get("skills", "weather_city", "Karachi"),
+        "wake_word": cfg.get("app", "wake_word", "jarvis")
+    }
+
+@app.post("/api/settings")
+def update_settings(req: SettingsRequest):
+    from core.utils import config as cfg
+    if req.gemini_api_key is not None:
+        cfg.set("ai", "gemini_api_key", req.gemini_api_key.strip())
+        from core.ai.nlp_engine import get_nlp
+        get_nlp()._init_gemini()
+    if req.weather_city is not None:
+        cfg.set("skills", "weather_city", req.weather_city.strip())
+    return {"success": True, "message": "Settings updated successfully."}
 
 @app.get("/api/status")
 async def get_status():
