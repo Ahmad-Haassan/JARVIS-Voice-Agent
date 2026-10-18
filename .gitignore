@@ -18,3 +18,7 @@ model/*.tar.gz
 
 # Local application data and logs
 data/
+
+sample_video.mp4
+scratch_frames/
+

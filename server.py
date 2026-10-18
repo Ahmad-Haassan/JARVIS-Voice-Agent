@@ -23,6 +23,7 @@ from core.ai.nlp_engine import get_nlp
 from core.ai.command_router import get_router
 from core.skills.system_control import get_system_control
 from core.skills.camera import get_camera
+from core.skills.computer_agent import get_computer_agent
 
 logger = get_logger("server")
 app = FastAPI(title="JARVIS Mobile Remote")
@@ -37,6 +38,24 @@ app.add_middleware(
 
 class CommandRequest(BaseModel):
     text: str
+
+class MouseMoveRequest(BaseModel):
+    dx: int
+    dy: int
+
+class MouseClickRequest(BaseModel):
+    button: str = "left"
+    clicks: int = 1
+
+class MouseScrollRequest(BaseModel):
+    amount: int = -300
+
+class KeyboardTypeRequest(BaseModel):
+    text: str
+
+class WorkflowRequest(BaseModel):
+    action: str
+    param: str = ""
 
 def get_local_ip():
     """Detects the PC's Wi-Fi / Local Network IPv4 address."""
@@ -174,6 +193,68 @@ async def process_voice_audio(audio: UploadFile = File(...)):
     except Exception as e:
         logger.warning(f"Voice upload processing error: {e}")
         return {"success": False, "response": f"Voice transcription error: {e}"}
+
+# ==========================================
+# AUTONOMOUS COMPUTER CONTROL & TOUCHPAD
+# ==========================================
+@app.post("/api/computer/mouse/move")
+def mouse_move(req: MouseMoveRequest):
+    agent = get_computer_agent()
+    success = agent.move_rel(req.dx, req.dy)
+    return {"success": success}
+
+@app.post("/api/computer/mouse/click")
+def mouse_click(req: MouseClickRequest):
+    agent = get_computer_agent()
+    success = agent.click(button=req.button, clicks=req.clicks)
+    return {"success": success}
+
+@app.post("/api/computer/mouse/scroll")
+def mouse_scroll(req: MouseScrollRequest):
+    agent = get_computer_agent()
+    success = agent.scroll(req.amount)
+    return {"success": success}
+
+@app.post("/api/computer/keyboard/type")
+def keyboard_type(req: KeyboardTypeRequest):
+    agent = get_computer_agent()
+    success = agent.type_text(req.text)
+    return {"success": success}
+
+@app.post("/api/computer/workflow")
+def run_workflow(req: WorkflowRequest):
+    agent = get_computer_agent()
+    act = req.action.lower().strip()
+    param = req.param.strip()
+    logger.info(f"Triggering autonomous workflow: {act} ('{param}')")
+
+    if act == "search_google":
+        success = agent.workflow_search_google(param or "latest AI breakthroughs")
+    elif act == "search_youtube":
+        success = agent.workflow_search_youtube(param or "lofi beats")
+    elif act == "ask_ai":
+        success = agent.workflow_ask_ai(param or "Generate a python automation script")
+    elif act == "notepad":
+        success = agent.workflow_quick_notepad(param or "Meeting notes: sync on AI architecture at 4 PM.")
+    elif act == "start_menu":
+        success = agent.workflow_start_menu_launch(param or "calculator")
+    elif act == "snap_left":
+        success = agent.workflow_snap_window("left")
+    elif act == "snap_right":
+        success = agent.workflow_snap_window("right")
+    elif act == "maximize":
+        success = agent.workflow_snap_window("max")
+    elif act == "alt_tab":
+        success = agent.workflow_switch_window()
+    else:
+        return {"success": False, "error": f"Unknown workflow '{act}'"}
+
+    return {"success": success, "action": act, "logs": agent.get_logs(limit=5)}
+
+@app.get("/api/computer/logs")
+def get_computer_logs():
+    agent = get_computer_agent()
+    return {"logs": agent.get_logs(limit=25)}
 
 def print_banner(host_ip, port):
     url = f"http://{host_ip}:{port}"

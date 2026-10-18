@@ -76,7 +76,35 @@ class CommandRouter:
                 resp = "Computer camera feed online." if path else "Could not access computer camera."
                 return CommandResult(success=bool(path), response=resp, data=path)
 
-            # 5. WhatsApp
+            # 5.5 Autonomous Computer Control (Stonic AI Workflows)
+            elif intent == "computer_agent":
+                from core.skills.computer_agent import get_computer_agent
+                agent = get_computer_agent()
+                action_type = entities.get("action", "")
+
+                if action_type == "snap":
+                    direction = entities.get("direction", "max")
+                    success = agent.workflow_snap_window(direction)
+                    return CommandResult(success=success, response=f"Window snapped {direction}.")
+                elif action_type == "ask_ai":
+                    prompt_text = entities.get("prompt", "")
+                    success = agent.workflow_ask_ai(prompt_text)
+                    return CommandResult(success=success, response=f"AI Prompt '{prompt_text[:30]}...' dispatched.")
+                elif action_type == "notepad":
+                    content = entities.get("content", "")
+                    success = agent.workflow_quick_notepad(content)
+                    return CommandResult(success=success, response="Autonomous memo typed into Notepad.")
+                elif action_type == "switch_window":
+                    success = agent.workflow_switch_window()
+                    return CommandResult(success=success, response="Switched active window.")
+                elif action_type == "scroll":
+                    amount = entities.get("amount", -400)
+                    success = agent.scroll(amount)
+                    return CommandResult(success=success, response="Scrolled page.")
+                else:
+                    return CommandResult(success=True, response="Computer agent action executed.")
+
+            # 6. WhatsApp
             elif intent == "send_whatsapp":
                 contact = entities.get("contact", "")
                 message = entities.get("message", "")

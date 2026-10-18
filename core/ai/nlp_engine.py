@@ -131,6 +131,32 @@ class NLPEngine:
         if any(w in q for w in ["camera", "webcam", "take photo", "view camera", "access camera"]):
             return {"intent": "camera", "entities": {"action": "stream"}, "response": "Opening computer camera feed."}
 
+        # 6.5 Autonomous Computer Control & Stonic AI Workflows
+        if any(w in q for w in ["take over", "autonomous", "control mouse", "move mouse", "type note", "ask chatgpt", "snap window"]):
+            if "snap" in q:
+                dir_choice = "max"
+                if "left" in q: dir_choice = "left"
+                elif "right" in q: dir_choice = "right"
+                elif "min" in q: dir_choice = "min"
+                return {"intent": "computer_agent", "entities": {"action": "snap", "direction": dir_choice}, "response": f"Snapping active window {dir_choice}."}
+            elif "ask chatgpt" in q or "ask ai" in q:
+                m = re.search(r"(?:ask chatgpt|ask ai)\s+(?:about|to|that)?\s*(.+)", q)
+                prompt = m.group(1).strip() if m else "Explain quantum computing in simple terms"
+                return {"intent": "computer_agent", "entities": {"action": "ask_ai", "prompt": prompt}, "response": f"Autonomous agent opening ChatGPT and entering prompt."}
+            elif "type note" in q or "write note" in q:
+                m = re.search(r"(?:type note|write note)\s+(?:about|saying|that)?\s*(.+)", q)
+                note_text = m.group(1).strip() if m else "Follow up on project tasks"
+                return {"intent": "computer_agent", "entities": {"action": "notepad", "content": note_text}, "response": "Opening Notepad and typing memo."}
+
+        if "alt tab" in q or "switch window" in q:
+            return {"intent": "computer_agent", "entities": {"action": "switch_window"}, "response": "Switching active window."}
+        if "scroll down" in q:
+            return {"intent": "computer_agent", "entities": {"action": "scroll", "amount": -400}, "response": "Scrolling page down."}
+        if "scroll up" in q:
+            return {"intent": "computer_agent", "entities": {"action": "scroll", "amount": 400}, "response": "Scrolling page up."}
+        if "maximize" in q and ("window" in q or "screen" in q):
+            return {"intent": "computer_agent", "entities": {"action": "snap", "direction": "max"}, "response": "Maximizing window."}
+
         # 7. System Power & Unlock
         if "unlock" in q and ("pc" in q or "computer" in q or "screen" in q or q.strip() == "unlock"):
             m = re.search(r"pin\s*([0-9]{4,8})", q)

@@ -376,6 +376,122 @@
     .modal.active { display: flex; }
     .modal img { max-width: 100%; max-height: 75vh; border-radius: 12px; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 10px 30px rgba(0,0,0,0.8); object-fit: contain; }
     .modal-close { margin-top: 14px; width: 100%; max-width: 280px; padding: 12px 24px; border-radius: 12px; background: linear-gradient(135deg, #ef4444, #dc2626); color: white; border: none; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
+
+    /* Segmented Tab Bar */
+    .tab-nav {
+      display: flex;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      padding: 4px;
+      margin-bottom: 14px;
+      gap: 4px;
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px 6px;
+      border: none;
+      background: transparent;
+      color: var(--text-dim);
+      font-size: 0.72rem;
+      font-weight: 700;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .tab-btn.active {
+      background: linear-gradient(135deg, var(--accent), #4f46e5);
+      color: #fff;
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+    .tab-panel {
+      display: none;
+      margin-bottom: 16px;
+    }
+    .tab-panel.active {
+      display: block;
+    }
+
+    /* Stonic AI Agent Terminal */
+    .agent-terminal {
+      background: #020617;
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      border-radius: 14px;
+      padding: 12px;
+      font-family: 'Space Grotesk', monospace;
+      font-size: 0.75rem;
+      color: #00f2fe;
+      min-height: 90px;
+      max-height: 130px;
+      overflow-y: auto;
+      margin-bottom: 12px;
+      box-shadow: inset 0 0 15px rgba(0, 242, 254, 0.05);
+    }
+    .term-line {
+      margin-bottom: 4px;
+      line-height: 1.35;
+      display: flex;
+      gap: 6px;
+    }
+    .term-time { color: #64748b; font-size: 0.7rem; }
+    .term-cat { color: #10b981; font-weight: bold; }
+    .term-msg { color: #e2e8f0; }
+
+    /* Touchpad Area */
+    .touchpad-box {
+      width: 100%;
+      height: 175px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 2px dashed rgba(99, 102, 241, 0.45);
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      margin-bottom: 12px;
+      position: relative;
+      cursor: crosshair;
+    }
+    .touchpad-box:active {
+      border-color: var(--cyan);
+      box-shadow: 0 0 15px var(--cyan-glow);
+    }
+    .touchpad-hint {
+      color: var(--text-dim);
+      font-size: 0.8rem;
+      pointer-events: none;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .mouse-btn-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .mouse-btn {
+      padding: 12px;
+      background: var(--card-bg);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.8rem;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+    .mouse-btn:active {
+      background: var(--accent);
+      transform: scale(0.95);
+    }
   </style>
 </head>
 <body>
@@ -430,50 +546,117 @@
     <div class="feed-time" id="feed-time">Ready</div>
   </div>
 
-  <!-- Quick Command Buttons -->
-  <div class="section-title">Quick Commands</div>
-  <div class="quick-grid">
-    <button class="quick-btn" onclick="sendCommand('start work mode')">
-      <span class="btn-icon">⚡</span>
-      <span>Work Mode</span>
-    </button>
-    <button class="quick-btn" onclick="sendCommand('open antigravity')">
-      <span class="btn-icon">🚀</span>
-      <span>Antigravity</span>
-    </button>
-    <button class="quick-btn" onclick="openCameraModal()">
-      <span class="btn-icon">📷</span>
-      <span>PC Camera</span>
-    </button>
-    <button class="quick-btn" onclick="sendCommand('take screenshot')">
-      <span class="btn-icon">📸</span>
-      <span>Screenshot</span>
-    </button>
-    <button class="quick-btn" onclick="sendCommand('open chrome')">
-      <span class="btn-icon">🌐</span>
-      <span>Chrome</span>
-    </button>
-    <button class="quick-btn" onclick="sendCommand('play lofi on youtube')">
-      <span class="btn-icon">🎵</span>
-      <span>YouTube</span>
-    </button>
-    <button class="quick-btn" onclick="sendCommand('open whatsapp')">
-      <span class="btn-icon">💬</span>
-      <span>WhatsApp</span>
-    </button>
-    <button class="quick-btn" onclick="promptUnlock()">
-      <span class="btn-icon">🔓</span>
-      <span>Unlock PC</span>
-    </button>
-    <button class="quick-btn" onclick="sendCommand('lock pc')">
-      <span class="btn-icon">🔒</span>
-      <span>Lock PC</span>
-    </button>
-    <button class="quick-btn" onclick="sendCommand('system diagnostics')">
-      <span class="btn-icon">📊</span>
-      <span>Diagnostics</span>
-    </button>
+  <!-- Segmented Navigation Tabs -->
+  <div class="tab-nav">
+    <button class="tab-btn active" id="tab-btn-commands" onclick="switchTab('commands')">⚡ Commands</button>
+    <button class="tab-btn" id="tab-btn-agent" onclick="switchTab('agent')">🤖 Stonic AI</button>
+    <button class="tab-btn" id="tab-btn-touchpad" onclick="switchTab('touchpad')">🖱️ Touchpad</button>
   </div>
+
+  <!-- Tab 1: Quick Command Buttons -->
+  <div class="tab-panel active" id="panel-commands">
+    <div class="quick-grid">
+      <button class="quick-btn" onclick="sendCommand('start work mode')">
+        <span class="btn-icon">⚡</span>
+        <span>Work Mode</span>
+      </button>
+      <button class="quick-btn" onclick="sendCommand('open antigravity')">
+        <span class="btn-icon">🚀</span>
+        <span>Antigravity</span>
+      </button>
+      <button class="quick-btn" onclick="openCameraModal()">
+        <span class="btn-icon">📷</span>
+        <span>PC Camera</span>
+      </button>
+      <button class="quick-btn" onclick="sendCommand('take screenshot')">
+        <span class="btn-icon">📸</span>
+        <span>Screenshot</span>
+      </button>
+      <button class="quick-btn" onclick="sendCommand('open chrome')">
+        <span class="btn-icon">🌐</span>
+        <span>Chrome</span>
+      </button>
+      <button class="quick-btn" onclick="sendCommand('play lofi on youtube')">
+        <span class="btn-icon">🎵</span>
+        <span>YouTube</span>
+      </button>
+      <button class="quick-btn" onclick="sendCommand('open whatsapp')">
+        <span class="btn-icon">💬</span>
+        <span>WhatsApp</span>
+      </button>
+      <button class="quick-btn" onclick="promptUnlock()">
+        <span class="btn-icon">🔓</span>
+        <span>Unlock PC</span>
+      </button>
+      <button class="quick-btn" onclick="sendCommand('lock pc')">
+        <span class="btn-icon">🔒</span>
+        <span>Lock PC</span>
+      </button>
+      <button class="quick-btn" onclick="sendCommand('system diagnostics')">
+        <span class="btn-icon">📊</span>
+        <span>Diagnostics</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Tab 2: Autonomous Agent (Stonic AI Workflows) -->
+  <div class="tab-panel" id="panel-agent">
+    <div class="agent-terminal" id="agent-terminal">
+      <div class="term-line"><span class="term-time">[SYS]</span> <span class="term-cat">READY:</span> <span class="term-msg">Autonomous Computer Control online</span></div>
+    </div>
+    <div class="quick-grid">
+      <button class="quick-btn" onclick="triggerWorkflow('ask_ai')">
+        <span class="btn-icon">🤖</span>
+        <span>Ask AI / GPT</span>
+      </button>
+      <button class="quick-btn" onclick="triggerWorkflow('search_youtube')">
+        <span class="btn-icon">▶️</span>
+        <span>Auto-YouTube</span>
+      </button>
+      <button class="quick-btn" onclick="triggerWorkflow('notepad')">
+        <span class="btn-icon">📝</span>
+        <span>Auto-Memo</span>
+      </button>
+      <button class="quick-btn" onclick="triggerWorkflow('start_menu')">
+        <span class="btn-icon">🪟</span>
+        <span>Start Hijack</span>
+      </button>
+      <button class="quick-btn" onclick="triggerWorkflow('snap_left')">
+        <span class="btn-icon">⬅️</span>
+        <span>Snap Left</span>
+      </button>
+      <button class="quick-btn" onclick="triggerWorkflow('snap_right')">
+        <span class="btn-icon">➡️</span>
+        <span>Snap Right</span>
+      </button>
+      <button class="quick-btn" onclick="triggerWorkflow('maximize')">
+        <span class="btn-icon">⛶</span>
+        <span>Maximize</span>
+      </button>
+      <button class="quick-btn" onclick="triggerWorkflow('alt_tab')">
+        <span class="btn-icon">🔄</span>
+        <span>Alt+Tab</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Tab 3: Virtual Mouse Touchpad -->
+  <div class="tab-panel" id="panel-touchpad">
+    <div class="touchpad-box" id="touchpad" onclick="sendMouseClick('left')">
+      <span class="touchpad-hint">📱 Slide Finger to Move PC Cursor<br>Tap to Left-Click</span>
+    </div>
+    <div class="mouse-btn-row">
+      <button class="mouse-btn" onclick="sendMouseClick('left')">🖱️ Left Click</button>
+      <button class="mouse-btn" onclick="sendMouseClick('double')">⚡ Double</button>
+      <button class="mouse-btn" onclick="sendMouseClick('right')">📋 Right Click</button>
+    </div>
+    <div class="mouse-btn-row">
+      <button class="mouse-btn" onclick="sendMouseScroll(400)">▲ Scroll Up</button>
+      <button class="mouse-btn" onclick="sendMouseScroll(-400)">▼ Scroll Down</button>
+      <button class="mouse-btn" onclick="promptRemoteType()">⌨️ Type Text</button>
+    </div>
+  </div>
+
 
   <!-- Bottom Input Bar -->
   <div class="input-row">
@@ -690,6 +873,171 @@
 
     setInterval(fetchTelemetry, 5000);
     fetchTelemetry();
+
+    // ==========================================
+    // TAB SWITCHING
+    // ==========================================
+    function switchTab(name) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+
+      const btn = document.getElementById('tab-btn-' + name);
+      const panel = document.getElementById('panel-' + name);
+      if (btn && panel) {
+        btn.classList.add('active');
+        panel.classList.add('active');
+      }
+      if (name === 'agent') {
+        fetchLogs();
+      }
+    }
+
+    // ==========================================
+    // STONIC AI AGENT WORKFLOWS & TERMINAL
+    // ==========================================
+    async function triggerWorkflow(action) {
+      let param = "";
+      if (action === 'ask_ai') {
+        param = prompt('Enter prompt for ChatGPT/AI:', 'Explain quantum computing in simple terms');
+        if (param === null) return;
+      } else if (action === 'search_youtube') {
+        param = prompt('Enter song or video topic for YouTube:', 'interstellar theme');
+        if (param === null) return;
+      } else if (action === 'notepad') {
+        param = prompt('Enter memo to type into Notepad:', 'Review AI architecture and verify computer takeover.');
+        if (param === null) return;
+      } else if (action === 'start_menu') {
+        param = prompt('Enter app name to launch via Start Menu takeover:', 'calculator');
+        if (param === null) return;
+      }
+
+      feedText.innerText = `🤖 [AGENT TAKEOVER] Running ${action}...`;
+      feedTime.innerText = 'Autonomous Action';
+      orb.classList.add('processing');
+
+      try {
+        const res = await fetch('/api/computer/workflow', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: action, param: param })
+        });
+        const d = await res.json();
+        if (d.success) {
+          feedText.innerText = `✅ Agent completed action: ${action}`;
+        } else {
+          feedText.innerText = `⚠️ Agent reported: ${d.error || 'Failed'}`;
+        }
+        fetchLogs();
+      } catch (e) {
+        feedText.innerText = `Agent error: ${e}`;
+      } finally {
+        orb.classList.remove('processing');
+      }
+    }
+
+    async function fetchLogs() {
+      try {
+        const res = await fetch('/api/computer/logs');
+        const data = await res.json();
+        const term = document.getElementById('agent-terminal');
+        if (data.logs && data.logs.length > 0) {
+          term.innerHTML = data.logs.map(l => 
+            `<div class="term-line"><span class="term-time">[${l.time}]</span> <span class="term-cat">${l.category}:</span> <span class="term-msg">${l.message}</span></div>`
+          ).join('');
+          term.scrollTop = term.scrollHeight;
+        }
+      } catch (e) {}
+    }
+
+    setInterval(() => {
+      const agentPanel = document.getElementById('panel-agent');
+      if (agentPanel && agentPanel.classList.contains('active')) {
+        fetchLogs();
+      }
+    }, 2500);
+
+    // ==========================================
+    // VIRTUAL MOUSE TOUCHPAD & REMOTE TYPE
+    // ==========================================
+    const pad = document.getElementById('touchpad');
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let lastMoveTime = 0;
+    let isTouchDrag = false;
+
+    if (pad) {
+      pad.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+          isTouchDrag = false;
+        }
+      }, { passive: true });
+
+      pad.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 1) {
+          isTouchDrag = true;
+          const now = Date.now();
+          if (now - lastMoveTime < 25) return; // 40 Hz throttle
+          lastMoveTime = now;
+
+          const curX = e.touches[0].clientX;
+          const curY = e.touches[0].clientY;
+          const dx = Math.round((curX - touchStartX) * 1.7);
+          const dy = Math.round((curY - touchStartY) * 1.7);
+          touchStartX = curX;
+          touchStartY = curY;
+
+          if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
+            fetch('/api/computer/mouse/move', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ dx: dx, dy: dy })
+            }).catch(() => {});
+          }
+        }
+      }, { passive: false });
+    }
+
+    async function sendMouseClick(btn) {
+      // If was dragging, avoid accidental click
+      try {
+        await fetch('/api/computer/mouse/click', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ button: btn, clicks: (btn === 'double' ? 2 : 1) })
+        });
+        feedText.innerText = `Mouse ${btn} click sent to PC.`;
+        feedTime.innerText = new Date().toLocaleTimeString();
+      } catch (e) {}
+    }
+
+    async function sendMouseScroll(amt) {
+      try {
+        await fetch('/api/computer/mouse/scroll', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: amt })
+        });
+        feedText.innerText = amt > 0 ? "Scrolled page up." : "Scrolled page down.";
+      } catch (e) {}
+    }
+
+    async function promptRemoteType() {
+      const text = prompt('Enter text to type into active PC window:', '');
+      if (text !== null && text.length > 0) {
+        feedText.innerText = `Typing "${text}" into PC...`;
+        try {
+          await fetch('/api/computer/keyboard/type', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text })
+          });
+          feedText.innerText = `✅ Typed "${text}" into PC active window.`;
+          fetchLogs();
+        } catch (e) {}
+      }
+    }
   </script>
 </body>
 </html>
