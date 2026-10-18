@@ -142,44 +142,51 @@ class SystemControl:
             return False
 
     def take_screenshot(self) -> str:
-        """Captures the real active user desktop screenshot by attaching to WinSta0\\default."""
+        """Captures the real active user desktop screenshot by attaching a dedicated thread to WinSta0\\default."""
+        import threading
         data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data")
         os.makedirs(data_dir, exist_ok=True)
         path = os.path.join(data_dir, "screenshot.png")
 
-        # Ensure thread is attached to the user's interactive desktop WinSta0\default
-        h_desk = None
-        try:
-            import ctypes
-            user32 = ctypes.windll.user32
-            h_desk = user32.OpenDesktopW("default", 0, False, 0x1FF)
-            if h_desk:
-                user32.SetThreadDesktop(h_desk)
-        except Exception as de:
-            logger.warning(f"Could not attach to desktop default: {de}")
+        captured = [False]
 
-        # Method 1: PIL ImageGrab (high-res capture on active desktop)
-        try:
-            from PIL import ImageGrab
-            img = ImageGrab.grab()
-            if img and img.size[0] > 100:
-                img.save(path)
-                try:
-                    desktop_path = os.path.join(os.path.expanduser("~"), "Desktop", "JARVIS_screenshot.png")
-                    img.save(desktop_path)
-                except Exception:
-                    pass
-                logger.info(f"Screenshot successfully saved to: {path} ({img.size})")
+        def _worker():
+            h_desk = None
+            try:
+                import ctypes
+                user32 = ctypes.windll.user32
+                h_desk = user32.OpenDesktopW("default", 0, False, 0x1FF)
+                if h_desk:
+                    user32.SetThreadDesktop(h_desk)
+
+                from PIL import ImageGrab
+                img = ImageGrab.grab()
+                if img and img.size[0] > 100:
+                    img.save(path)
+                    try:
+                        desktop_path = os.path.join(os.path.expanduser("~"), "Desktop", "JARVIS_screenshot.png")
+                        img.save(desktop_path)
+                    except Exception:
+                        pass
+                    captured[0] = True
+            except Exception as e:
+                logger.warning(f"PIL thread grab error: {e}")
+            finally:
                 if h_desk:
                     try:
                         ctypes.windll.user32.CloseDesktop(h_desk)
                     except Exception:
                         pass
-                return path
-        except Exception as e:
-            logger.warning(f"PIL ImageGrab error ({e}), trying PowerShell capture...")
 
-        # Method 2: PowerShell Drawing Capture
+        t = threading.Thread(target=_worker)
+        t.start()
+        t.join(timeout=3.0)
+
+        if captured[0] and os.path.exists(path):
+            logger.info(f"Screenshot successfully saved to: {path}")
+            return path
+
+        # Fallback: PowerShell Drawing Capture
         try:
             ps_script = f"""
             Add-Type -AssemblyName System.Windows.Forms
@@ -194,27 +201,11 @@ class SystemControl:
             """
             subprocess.run(["powershell", "-NoProfile", "-Command", ps_script], capture_output=True, timeout=5)
             if os.path.exists(path) and os.path.getsize(path) > 1000:
-                try:
-                    import shutil
-                    desktop_path = os.path.join(os.path.expanduser("~"), "Desktop", "JARVIS_screenshot.png")
-                    shutil.copyfile(path, desktop_path)
-                except Exception:
-                    pass
                 logger.info(f"PowerShell screenshot saved to: {path}")
-                if h_desk:
-                    try:
-                        ctypes.windll.user32.CloseDesktop(h_desk)
-                    except Exception:
-                        pass
                 return path
         except Exception as pe:
             logger.warning(f"PowerShell capture error: {pe}")
 
-        if h_desk:
-            try:
-                ctypes.windll.user32.CloseDesktop(h_desk)
-            except Exception:
-                pass
         return ""
 
     def work_mode(self) -> bool:
