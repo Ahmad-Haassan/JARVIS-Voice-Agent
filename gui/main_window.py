@@ -376,8 +376,10 @@ class MainWindow(QMainWindow):
         self.qa_grid.setSpacing(10)
         
         qa_btns = [
-            ("WhatsApp", "open whatsapp"), ("YouTube", "open youtube"), ("Chrome", "open chrome"),
-            ("Desktop Folder", "create desktop folder"), ("Settings", "open settings"), ("Screenshot", "take screenshot")
+            ("⚡ Work Mode", "start work mode"), ("🚀 Antigravity", "open antigravity"),
+            ("🌐 Chrome", "open chrome"), ("🎵 YouTube", "play lofi on youtube"),
+            ("📸 Screenshot", "take screenshot"), ("💬 WhatsApp", "open whatsapp"),
+            ("📁 Folder", "create desktop folder"), ("⚙️ Settings", "open settings")
         ]
         
         for i, (label, cmd) in enumerate(qa_btns):
@@ -398,7 +400,7 @@ class MainWindow(QMainWindow):
                 }
             """)
             btn.clicked.connect(lambda checked, c=cmd: self._on_quick_action(c))
-            self.qa_grid.addWidget(btn, i // 3, i % 3)
+            self.qa_grid.addWidget(btn, i // 4, i % 4)
         
         rp_layout.addLayout(self.qa_grid)
 

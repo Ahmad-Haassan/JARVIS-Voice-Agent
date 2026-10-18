@@ -52,7 +52,8 @@ def get_local_ip():
 async def serve_home():
     html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "index.html")
     with open(html_path, "r", encoding="utf-8") as f:
-        return f.read()
+        content = f.read()
+    return HTMLResponse(content=content, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 @app.post("/api/command")
 async def execute_command(req: CommandRequest):
@@ -112,14 +113,14 @@ async def get_screenshot():
     
     # If fresh screenshot exists (taken within last 5 seconds), serve it immediately
     if os.path.exists(path) and (time.time() - os.path.getmtime(path) < 5.0):
-        return FileResponse(path, media_type="image/png")
+        return FileResponse(path, media_type="image/png", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
     sys_ctrl = get_system_control()
     fresh_path = sys_ctrl.take_screenshot()
     if fresh_path and os.path.exists(fresh_path):
-        return FileResponse(fresh_path, media_type="image/png")
+        return FileResponse(fresh_path, media_type="image/png", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     elif os.path.exists(path):
-        return FileResponse(path, media_type="image/png")
+        return FileResponse(path, media_type="image/png", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     return {"error": "Failed to capture screenshot"}
 
 def print_banner(host_ip, port):

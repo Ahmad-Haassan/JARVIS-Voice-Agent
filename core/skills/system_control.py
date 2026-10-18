@@ -33,22 +33,42 @@ def get_antigravity_path():
             return p
     return None
 
+def shell_execute(target: str, args: str = "") -> bool:
+    """Launches an application or URL directly on the user's interactive Windows desktop using Windows Shell."""
+    try:
+        import win32com.client
+        shell = win32com.client.Dispatch("Shell.Application")
+        shell.ShellExecute(target, args, "", "open", 1)
+        logger.info(f"ShellExecute invoked: target='{target}', args='{args}'")
+        return True
+    except Exception as e:
+        logger.warning(f"Shell.Application error ({e}), falling back to cmd start...")
+        try:
+            if args:
+                os.system(f'start "" "{target}" "{args}"')
+            else:
+                os.system(f'start "" "{target}"')
+            return True
+        except Exception as se:
+            logger.error(f"Fallback start error: {se}")
+            return False
+
 APP_MAP = {
-    "whatsapp": "start whatsapp:",
-    "edge": "start msedge",
+    "whatsapp": "whatsapp:",
+    "edge": "msedge",
     "vs code": "code",
     "vscode": "code",
     "code": "code",
-    "terminal": "powershell",
-    "cmd": "cmd",
-    "notepad": "notepad",
-    "calculator": "calc",
-    "calc": "calc",
+    "terminal": "powershell.exe",
+    "cmd": "cmd.exe",
+    "notepad": "notepad.exe",
+    "calculator": "calc.exe",
+    "calc": "calc.exe",
     "spotify": "spotify",
-    "file explorer": "explorer",
-    "explorer": "explorer",
-    "task manager": "taskmgr",
-    "settings": "start ms-settings:",
+    "file explorer": "explorer.exe",
+    "explorer": "explorer.exe",
+    "task manager": "taskmgr.exe",
+    "settings": "ms-settings:",
 }
 
 class SystemControl:
@@ -63,54 +83,34 @@ class SystemControl:
         if "antigravity" in app_clean:
             ag = get_antigravity_path()
             if ag:
-                subprocess.Popen([ag])
-                return True
-            os.system("start antigravity")
-            return True
+                return shell_execute(ag)
+            return shell_execute("antigravity")
 
         # 2. Chrome
         if "chrome" in app_clean or "google chrome" in app_clean:
             cp = get_chrome_path()
             if cp:
-                subprocess.Popen([cp])
-                return True
-            os.system("start chrome")
-            return True
+                return shell_execute(cp, "https://www.google.com")
+            return shell_execute("chrome.exe", "https://www.google.com")
 
-        # 3. YouTube (opens directly in Chrome or browser)
+        # 3. YouTube (opens directly in Chrome or default browser)
         if "youtube" in app_clean:
             cp = get_chrome_path()
-            url = "https://www.youtube.com"
             if cp:
-                subprocess.Popen([cp, url])
-                return True
-            webbrowser.open(url)
-            return True
+                return shell_execute(cp, "https://www.youtube.com")
+            return shell_execute("https://www.youtube.com")
 
         # 4. WhatsApp
         if "whatsapp" in app_clean:
-            os.system("start whatsapp:")
-            return True
+            return shell_execute("whatsapp:")
 
         # 5. Check known map
         for name, cmd in APP_MAP.items():
             if name in app_clean or app_clean in name:
-                try:
-                    if cmd.startswith("start "):
-                        os.system(cmd)
-                    else:
-                        subprocess.Popen(cmd, shell=True)
-                    return True
-                except Exception as e:
-                    logger.warning(f"Error launching {name} with command {cmd}: {e}")
+                return shell_execute(cmd)
 
         # Fallback
-        try:
-            os.system(f'start "" "{app_clean}"')
-            return True
-        except Exception as e:
-            logger.error(f"Failed to open '{app_clean}': {e}")
-            return False
+        return shell_execute(app_clean)
 
     def close_app(self, app_name: str) -> bool:
         app_clean = (app_name or "").lower().strip()
@@ -134,23 +134,40 @@ class SystemControl:
             return False
 
     def take_screenshot(self) -> str:
-        """Captures Windows desktop screenshot and saves to data/screenshot.png."""
+        """Captures the real active user desktop screenshot by attaching to WinSta0\\default."""
         data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data")
         os.makedirs(data_dir, exist_ok=True)
         path = os.path.join(data_dir, "screenshot.png")
 
-        # Method 1: PIL ImageGrab
+        # Ensure thread is attached to the user's interactive desktop WinSta0\default
+        h_desk = None
+        try:
+            import ctypes
+            user32 = ctypes.windll.user32
+            h_desk = user32.OpenDesktopW("default", 0, False, 0x1FF)
+            if h_desk:
+                user32.SetThreadDesktop(h_desk)
+        except Exception as de:
+            logger.warning(f"Could not attach to desktop default: {de}")
+
+        # Method 1: PIL ImageGrab (high-res capture on active desktop)
         try:
             from PIL import ImageGrab
             img = ImageGrab.grab()
-            img.save(path)
-            try:
-                desktop_path = os.path.join(os.path.expanduser("~"), "Desktop", "JARVIS_screenshot.png")
-                img.save(desktop_path)
-            except Exception:
-                pass
-            logger.info(f"Screenshot successfully saved to: {path}")
-            return path
+            if img and img.size[0] > 100:
+                img.save(path)
+                try:
+                    desktop_path = os.path.join(os.path.expanduser("~"), "Desktop", "JARVIS_screenshot.png")
+                    img.save(desktop_path)
+                except Exception:
+                    pass
+                logger.info(f"Screenshot successfully saved to: {path} ({img.size})")
+                if h_desk:
+                    try:
+                        ctypes.windll.user32.CloseDesktop(h_desk)
+                    except Exception:
+                        pass
+                return path
         except Exception as e:
             logger.warning(f"PIL ImageGrab error ({e}), trying PowerShell capture...")
 
@@ -176,44 +193,45 @@ class SystemControl:
                 except Exception:
                     pass
                 logger.info(f"PowerShell screenshot saved to: {path}")
+                if h_desk:
+                    try:
+                        ctypes.windll.user32.CloseDesktop(h_desk)
+                    except Exception:
+                        pass
                 return path
         except Exception as pe:
             logger.warning(f"PowerShell capture error: {pe}")
 
+        if h_desk:
+            try:
+                ctypes.windll.user32.CloseDesktop(h_desk)
+            except Exception:
+                pass
         return ""
 
     def work_mode(self) -> bool:
-        """Launches work setup: Antigravity IDE, Google Chrome, Terminal, and VS Code."""
-        logger.info("Initiating Work Mode routine...")
-        success = False
+        """Launches work setup: Antigravity IDE, Google Chrome, Terminal, and VS Code on user desktop."""
+        logger.info("Initiating Work Mode routine via Shell.Application...")
+        ag = get_antigravity_path()
+        cp = get_chrome_path()
 
         # 1. Launch Antigravity IDE
-        ag = get_antigravity_path()
         if ag:
-            subprocess.Popen([ag])
-            success = True
+            shell_execute(ag)
         else:
-            os.system("start antigravity")
-            success = True
+            shell_execute("antigravity")
 
         # 2. Launch Google Chrome with developer resources
-        cp = get_chrome_path()
         if cp:
-            subprocess.Popen([cp, "https://github.com"])
-            success = True
+            shell_execute(cp, "https://github.com")
         else:
-            webbrowser.open("https://github.com")
-            success = True
+            shell_execute("https://github.com")
 
         # 3. Launch Terminal & VS Code
-        try:
-            subprocess.Popen("cmd.exe /c start powershell", shell=True)
-            subprocess.Popen("cmd.exe /c code", shell=True)
-            success = True
-        except Exception:
-            pass
+        shell_execute("powershell.exe")
+        shell_execute("code")
 
-        return success
+        return True
 
     def get_system_diagnostics(self) -> str:
         try:
