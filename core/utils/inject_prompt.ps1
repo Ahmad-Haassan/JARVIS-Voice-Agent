@@ -1,42 +1,21 @@
 param(
     [string]$WindowTitle = "Antigravity",
-    [int]$WaitSec = 6
+    [int]$WaitSec = 3
 )
 
 $ws = New-Object -ComObject WScript.Shell
 
-# 1. Loop and wait for the specific target window to appear and bring it to the foreground
-$found = $false
-for ($i = 0; $i -lt ($WaitSec * 3); $i++) {
-    if ($WindowTitle -and $ws.AppActivate($WindowTitle)) {
-        $found = $true
-        break
-    }
-    if (-not $WindowTitle -and $ws.AppActivate("Antigravity")) {
-        $found = $true
-        break
-    }
-    Start-Sleep -Milliseconds 350
-}
-
-if (-not $found) {
-    exit 1
+# 1. Bring window to front
+if ($WindowTitle) {
+    $ws.AppActivate($WindowTitle)
+} else {
+    $ws.AppActivate("Antigravity")
 }
 
 # 2. Allow focus to settle
-Start-Sleep -Milliseconds 800
+Start-Sleep -Seconds $WaitSec
 
-# 3. Open/Focus AI Agent Chat (Skip for Antigravity as chat is already open)
-if (-not ($WindowTitle -like "*Antigravity*" -or -not $WindowTitle)) {
-    $ws.SendKeys("^l")
-    Start-Sleep -Milliseconds 600
-} else {
-    Start-Sleep -Milliseconds 400
-}
-
-# 4. Paste Prompt from Clipboard (Ctrl + V)
+# 3. Direct Ctrl + V and Enter
 $ws.SendKeys("^v")
-Start-Sleep -Milliseconds 400
-
-# 5. Submit Prompt to AI (Enter)
+Start-Sleep -Milliseconds 300
 $ws.SendKeys("~")

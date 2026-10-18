@@ -48,6 +48,16 @@ class WakeDetector:
         logger.info("Wake word detector paused.")
 
     def resume(self):
+        while not self._audio_queue.empty():
+            try:
+                self._audio_queue.get_nowait()
+            except Exception:
+                break
+        if getattr(self, "_recognizer", None):
+            try:
+                self._recognizer.Reset()
+            except Exception:
+                pass
         self._paused = False
         logger.info("Wake word detector resumed.")
 
@@ -70,6 +80,7 @@ class WakeDetector:
             logger.info(f"Loading Vosk model from: {model_path}")
             model = Model(model_path)
             recognizer = KaldiRecognizer(model, 16000)
+            self._recognizer = recognizer
 
             def audio_callback(indata, frames, time_info, status):
                 if status:
@@ -77,12 +88,24 @@ class WakeDetector:
                 if self._running and not self._paused:
                     self._audio_queue.put(bytes(indata))
 
+            WAKE_VARIANTS = [
+                self.wake_word, "jarvis", "javis", "travis", "service", 
+                "harvest", "starvis", "charvis", "darvis", "davis", "yarvis",
+                "jarves", "jarvice", "jervis", "jar vis", "jarvees", "jarv",
+                "hey jarvis", "hi jarvis", "hello jarvis", "ok jarvis"
+            ]
+
             with sd.RawInputStream(samplerate=16000, blocksize=4000, dtype='int16',
                                    channels=1, callback=audio_callback):
                 logger.info("Microphone stream opened for wake word detection.")
                 while self._running:
                     if self._paused:
-                        time.sleep(0.3)
+                        while not self._audio_queue.empty():
+                            try:
+                                self._audio_queue.get_nowait()
+                            except Exception:
+                                break
+                        time.sleep(0.1)
                         continue
                     try:
                         data = self._audio_queue.get(timeout=0.5)
@@ -92,7 +115,8 @@ class WakeDetector:
                     if recognizer.AcceptWaveform(data):
                         res = json.loads(recognizer.Result())
                         text = res.get("text", "").lower()
-                        if self.wake_word in text or "jarvis" in text:
+                        clean_merged = text.replace(" ", "")
+                        if any(v in text for v in WAKE_VARIANTS) or "jarvis" in clean_merged or "javis" in clean_merged:
                             logger.info(f"Wake word detected in: '{text}'!")
                             self.pause()
                             if self.on_detected:
@@ -100,7 +124,8 @@ class WakeDetector:
                     else:
                         partial = json.loads(recognizer.PartialResult())
                         part_text = partial.get("partial", "").lower()
-                        if self.wake_word in part_text or "jarvis" in part_text:
+                        clean_part = part_text.replace(" ", "")
+                        if any(v in part_text for v in WAKE_VARIANTS) or "jarvis" in clean_part or "javis" in clean_part:
                             logger.info(f"Wake word detected in partial: '{part_text}'!")
                             recognizer.Reset()
                             self.pause()
@@ -114,7 +139,8 @@ class WakeDetector:
     def _speech_recognition_wake_loop(self):
         WAKE_VARIANTS = [
             self.wake_word, "jarvis", "javis", "travis",
-            "service", "darvis", "charvis", "harvest", "starvis"
+            "service", "darvis", "charvis", "harvest", "starvis",
+            "jarves", "jarvice", "jervis", "jar vis", "hey jarvis", "hi jarvis"
         ]
 
         while self._running:
@@ -141,7 +167,8 @@ class WakeDetector:
                             try:
                                 text = recognizer.recognize_google(audio).lower()
                                 logger.info(f"Microphone heard: '{text}'")
-                                if any(v in text for v in WAKE_VARIANTS):
+                                clean_merged = text.replace(" ", "")
+                                if any(v in text for v in WAKE_VARIANTS) or "jarvis" in clean_merged or "javis" in clean_merged:
                                     logger.info(f"Wake word detected via speech recognition: '{text}'!")
                                     self.pause()
                                     if self.on_detected:

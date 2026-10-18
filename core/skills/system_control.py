@@ -431,10 +431,12 @@ class SystemControl:
         except Exception as e:
             logger.warning(f"pyperclip error: {e}")
 
-        # 3. Direct Win32 Injector in background thread
+        # 3. Direct Injector in background thread
         def _dispatch_prompt():
             user32 = ctypes.windll.user32
             kernel32 = ctypes.windll.kernel32
+
+            # Switch thread to active interactive desktop WinSta0\Default
             try:
                 h_desk = user32.OpenDesktopW("default", 0, False, 0x1FF)
                 if h_desk:
@@ -442,13 +444,13 @@ class SystemControl:
             except Exception:
                 pass
 
-            logger.info(f"Waiting for new window matching keyword: '{window_keyword}'...")
+            logger.info(f"Waiting for target window matching '{window_keyword}' to open...")
             target_hwnd = None
             target_title = ""
 
             WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
 
-            # Poll for up to 14 seconds for the target window to be created and visible
+            # Poll for up to 14 seconds for the software window to finish spawning and rendering
             for attempt in range(28):
                 time.sleep(0.5)
                 found = []
@@ -460,113 +462,74 @@ class SystemControl:
                             buf = ctypes.create_unicode_buffer(l + 1)
                             user32.GetWindowTextW(hwnd, buf, l + 1)
                             title = buf.value
-                            # If app is antigravity, avoid mistakenly capturing File Explorer windows
-                            if "antigravity" in app_clean and "explorer" in title.lower():
-                                return True
+                            # Match target folder keyword in window title (ignoring File Explorer)
                             if window_keyword and window_keyword.lower() in title.lower():
-                                if "antigravity" in app_clean and "antigravity" in title.lower():
-                                    found.insert(0, (hwnd, title))
-                                else:
+                                if "explorer" not in title.lower():
                                     found.append((hwnd, title))
-                            elif not window_keyword and "antigravity" in app_clean and "antigravity" in title.lower():
-                                found.append((hwnd, title))
-                            elif attempt >= 22 and "antigravity" in app_clean and "antigravity" in title.lower():
-                                # Last-resort fallback after 11 seconds if folder title was not detected
-                                found.append((hwnd, title))
                     return True
 
                 try:
                     user32.EnumWindows(WNDENUMPROC(cb), 0)
-                except Exception as e:
-                    logger.debug(f"EnumWindows error: {e}")
+                except Exception:
+                    pass
 
                 if found:
                     target_hwnd, target_title = found[0]
                     logger.info(f"Found target window [{target_hwnd}]: '{target_title}' after {attempt * 0.5:.1f}s")
                     break
 
-            # Secondary fallback: use native WScript.Shell AppActivate if EnumWindows missed it
-            if not target_hwnd:
+            # Bring target window to front and bypass Windows 11 foreground lock
+            if target_hwnd:
+                try:
+                    fg_hwnd = user32.GetForegroundWindow()
+                    fg_tid = user32.GetWindowThreadProcessId(fg_hwnd, None)
+                    cur_tid = kernel32.GetCurrentThreadId()
+
+                    if fg_tid != cur_tid:
+                        user32.AttachThreadInput(cur_tid, fg_tid, True)
+
+                    # Tap Alt key to allow foreground switch
+                    user32.keybd_event(0x12, 0, 0, 0)
+                    user32.keybd_event(0x12, 0, 2, 0)
+
+                    user32.ShowWindow(target_hwnd, 9)  # SW_RESTORE
+                    user32.BringWindowToTop(target_hwnd)
+                    user32.SetForegroundWindow(target_hwnd)
+
+                    if fg_tid != cur_tid:
+                        user32.AttachThreadInput(cur_tid, fg_tid, False)
+                except Exception as e:
+                    logger.warning(f"Foreground attach error: {e}")
+            else:
+                # Fallback: activate by title via WScript.Shell
                 try:
                     import win32com.client
                     ws = win32com.client.Dispatch("WScript.Shell")
-                    if window_keyword and ws.AppActivate(window_keyword):
-                        time.sleep(0.3)
-                        target_hwnd = user32.GetForegroundWindow()
-                        target_title = window_keyword
-                        logger.info(f"Found and activated window via AppActivate('{window_keyword}') [HWND: {target_hwnd}]")
-                    elif "antigravity" in app_clean and ws.AppActivate("Antigravity"):
-                        time.sleep(0.3)
-                        target_hwnd = user32.GetForegroundWindow()
-                        target_title = "Antigravity"
-                        logger.info(f"Found and activated window via AppActivate('Antigravity') [HWND: {target_hwnd}]")
-                except Exception as e:
-                    logger.debug(f"AppActivate fallback error: {e}")
+                    if window_keyword:
+                        ws.AppActivate(window_keyword)
+                    elif app_clean:
+                        ws.AppActivate(app_clean)
+                except Exception:
+                    pass
 
-            if not target_hwnd:
-                logger.warning(f"Target window for '{window_keyword}' not found within timeout.")
-                return
+            # Wait for the window to settle in the foreground
+            time.sleep(1.0)
 
-            # Bring target window to front and bypass Windows 11 foreground lock
-            try:
-                fg_hwnd = user32.GetForegroundWindow()
-                fg_tid = user32.GetWindowThreadProcessId(fg_hwnd, None)
-                cur_tid = kernel32.GetCurrentThreadId()
-
-                if fg_tid != cur_tid:
-                    user32.AttachThreadInput(cur_tid, fg_tid, True)
-
-                # Tap Alt key to allow foreground switch
-                user32.keybd_event(0x12, 0, 0, 0)
-                user32.keybd_event(0x12, 0, 2, 0)
-
-                user32.ShowWindow(target_hwnd, 9)  # SW_RESTORE
-                user32.BringWindowToTop(target_hwnd)
-                user32.SetForegroundWindow(target_hwnd)
-
-                if fg_tid != cur_tid:
-                    user32.AttachThreadInput(cur_tid, fg_tid, False)
-            except Exception as e:
-                logger.warning(f"Foreground attach error: {e}")
-
-            time.sleep(0.6)
-
-            is_antigravity = "antigravity" in app_clean or (target_title and "antigravity" in target_title.lower())
-            if not is_antigravity:
-                # For non-Antigravity apps (e.g. VS Code), click to activate and focus chat with Ctrl + L
-                try:
-                    rect = ctypes.wintypes.RECT()
-                    user32.GetWindowRect(target_hwnd, ctypes.byref(rect))
-                    cx = (rect.left + rect.right) // 2
-                    cy = (rect.top + rect.bottom) // 2
-                    pyautogui.click(cx, cy + 20)
-                    logger.info(f"Activated target window at ({cx}, {cy+20})")
-                except Exception as e:
-                    logger.warning(f"Click window error: {e}")
-
-                time.sleep(0.6)
-                pyautogui.hotkey('ctrl', 'l')
-                time.sleep(0.6)
-            else:
-                # For Antigravity, the chat is already open & focused. Skip Ctrl + L completely
-                # to prevent disabling/toggling the chat panel or stealing focus.
-                time.sleep(0.6)
-
-            # Ensure clipboard holds the user's prompt
+            # Ensure clipboard holds the prompt
             try:
                 pyperclip.copy(prompt)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Clipboard copy error: {e}")
 
-            time.sleep(0.3)
+            time.sleep(0.2)
 
-            # Paste prompt directly from clipboard (Ctrl + V)
+            # Directly paste prompt (Ctrl + V) without any extra steps
             pyautogui.hotkey('ctrl', 'v')
             time.sleep(0.4)
 
-            # Submit prompt to Agent (Enter)
+            # Submit prompt (Enter)
             pyautogui.press('enter')
-            logger.info(f"Successfully injected prompt into '{target_title}': '{prompt}'")
+            logger.info(f"Direct prompt pasted and submitted to '{target_title or app_clean}': '{prompt}'")
 
         threading.Thread(target=_dispatch_prompt, daemon=True).start()
         return True

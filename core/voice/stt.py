@@ -20,7 +20,18 @@ class STTEngine:
         except ImportError:
             logger.warning("speech_recognition library not available.")
 
-    def listen(self, timeout: float = 7.0) -> str:
+    def transcribe(self, audio_data=None) -> str:
+        """Transcribe an audio buffer or return string if already transcribed."""
+        if isinstance(audio_data, str):
+            return audio_data
+        if not audio_data or not self._recognizer:
+            return ""
+        try:
+            return self._recognizer.recognize_google(audio_data).strip()
+        except Exception:
+            return ""
+
+    def listen(self, timeout: float = 7.0, phrase_time_limit: float = 10.0) -> str:
         """Listens from the microphone and returns the transcribed text."""
         if not self._recognizer:
             self._init_engine()
@@ -31,9 +42,9 @@ class STTEngine:
         try:
             import speech_recognition as sr
             with sr.Microphone() as source:
-                logger.info(f"Listening for command (timeout={timeout}s)...")
-                self._recognizer.adjust_for_ambient_noise(source, duration=0.4)
-                audio = self._recognizer.listen(source, timeout=timeout, phrase_time_limit=10.0)
+                logger.info(f"Listening for command (timeout={timeout}s, phrase_limit={phrase_time_limit}s)...")
+                self._recognizer.adjust_for_ambient_noise(source, duration=0.3)
+                audio = self._recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit)
                 logger.info("Audio captured, transcribing...")
 
                 # First try faster-whisper if configured

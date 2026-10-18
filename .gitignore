@@ -13,6 +13,7 @@ config.json
 .env
 
 # Large model downloads (keep directory structure)
+model/
 model/*.zip
 model/*.tar.gz
 
@@ -21,6 +22,8 @@ data/
 
 sample_video.mp4
 scratch_frames/
+frame_*.png
+recent_recording.mp4
 
 # Auto-generated SSL certificates and private keys
 *.pem

@@ -636,22 +636,19 @@ class VoiceWorker(QThread):
             wake.pause()
             self.listening_signal.emit(True)
             self.status_signal.emit("LISTENING...")
-            self.tts.speak("How can I help you?", block=False)
+            # User requirement: Speak "Yes boss?" immediately on hearing wake word
+            self.tts.speak("Yes boss?", block=True)
+            time.sleep(0.12)
 
-            audio_data = self.stt.listen(timeout=6.0, phrase_time_limit=10.0)
-            if not audio_data:
+            text = self.stt.listen(timeout=7.0, phrase_time_limit=10.0)
+            if not text:
                 self.listening_signal.emit(False)
                 self.status_signal.emit("STANDBY [ACTIVE]")
                 return
 
             self.status_signal.emit("PROCESSING...")
-            text = self.stt.transcribe(audio_data)
-
-            if text:
-                self.update_signal.emit(text, True)
-                self._execute_pipeline(text)
-            else:
-                self.status_signal.emit("STANDBY [ACTIVE]")
+            self.update_signal.emit(text, True)
+            self._execute_pipeline(text)
         finally:
             self._is_processing = False
             self.listening_signal.emit(False)
@@ -671,19 +668,29 @@ class VoiceWorker(QThread):
 
         final_resp = exec_result.response or nlp_resp
         if exec_result.response and exec_result.response != nlp_resp:
-            self.tts.speak(exec_result.response)
+            self.tts.speak(exec_result.response, block=True)
         elif not nlp_resp and final_resp:
-            self.tts.speak(final_resp)
+            self.tts.speak(final_resp, block=True)
 
         TASK_INTENTS = [
             "open_app", "close_app", "open_folder", "open_file",
             "open_in", "system_control", "file_action", "write_content",
-            "send_whatsapp", "youtube_play", "work_mode"
+            "send_whatsapp", "youtube_play", "work_mode", "volume_control",
+            "clean_temp", "camera", "computer_agent", "custom"
         ]
-        if exec_result.success and result.get("intent") in TASK_INTENTS:
-            self.tts.speak("Command completed.")
+        intent = result.get("intent", "")
+        # User requirement: Say "Done boss." upon completing instructions
+        if exec_result.success or intent in TASK_INTENTS or intent != "chat":
+            self.tts.speak("Done boss.", block=True)
+            if not final_resp:
+                final_resp = "Done boss."
+            elif "done boss" not in final_resp.lower():
+                final_resp = f"{final_resp} Done boss."
+        elif not final_resp:
+            final_resp = "Done boss."
+            self.tts.speak(final_resp, block=True)
 
-        self.update_signal.emit(final_resp or "Command completed.", False)
+        self.update_signal.emit(final_resp, False)
         self.status_signal.emit("STANDBY [ACTIVE]")
 
     def trigger(self):
@@ -703,7 +710,8 @@ class VoiceWorker(QThread):
             self.tts = get_tts()
             self.wake = get_wake_detector(on_detected=self._on_wake)
 
-            self.tts.speak("Jarvis online. What do you need?", block=False)
+            self.tts.speak("Jarvis online. All systems nominal.", block=True)
+            time.sleep(0.15)
             self.wake.start()
 
             while self._running:
@@ -1863,7 +1871,8 @@ class MainWindow(QMainWindow):
         })
 
         resp = exec_result.response or f"{title} completed."
-        tts.speak(resp, block=True)
+        full_speech = f"{resp} Done boss." if "done boss" not in resp.lower() else resp
+        tts.speak(full_speech, block=True)
 
         # Update feedback and history
         cur_time = datetime.now().strftime("%H:%M:%S")
@@ -1873,7 +1882,7 @@ class MainWindow(QMainWindow):
             "entities": entities,
             "source": source,
             "timestamp": cur_time,
-            "response": resp
+            "response": full_speech
         }
 
         # Safely update GUI elements on Qt thread
@@ -2038,11 +2047,16 @@ class MainWindow(QMainWindow):
             "response": nlp_resp
         })
 
-        final_resp = exec_result.response or nlp_resp or "Command completed."
+        final_resp = exec_result.response or nlp_resp or "Instruction completed."
         if exec_result.response and exec_result.response != nlp_resp:
-            tts.speak(exec_result.response)
+            tts.speak(exec_result.response, block=True)
         elif not nlp_resp and final_resp:
-            tts.speak(final_resp)
+            tts.speak(final_resp, block=True)
+
+        if exec_result.success or result.get("intent") != "chat":
+            tts.speak("Done boss.", block=True)
+            if "done boss" not in final_resp.lower():
+                final_resp = f"{final_resp} Done boss."
 
         record = {
             "title": text,
