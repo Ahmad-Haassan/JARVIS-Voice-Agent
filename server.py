@@ -480,6 +480,24 @@ def print_banner(host_ip, http_port, https_port=None):
     except Exception:
         pass
 
+def free_ports(*ports):
+    """Automatically free ports if occupied by another instance or stale process."""
+    import subprocess
+    my_pid = str(os.getpid())
+    for port in ports:
+        try:
+            cmd = f'netstat -ano | findstr :{port}'
+            output = subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL)
+            for line in output.strip().splitlines():
+                parts = line.split()
+                if len(parts) >= 5 and "LISTENING" in line.upper():
+                    pid = parts[-1]
+                    if pid != my_pid and pid != "0":
+                        subprocess.run(f'taskkill /F /PID {pid}', shell=True, capture_output=True)
+                        time.sleep(0.2)
+        except Exception:
+            pass
+
 if __name__ == "__main__":
     try:
         import uvicorn
@@ -487,6 +505,9 @@ if __name__ == "__main__":
         local_ip = get_local_ip()
         http_port = 8000
         https_port = 8443
+
+        # Prevent [Errno 10048] by releasing any stale listeners
+        free_ports(http_port, https_port)
 
         key_path, cert_path = ensure_ssl_certificates(local_ip)
 

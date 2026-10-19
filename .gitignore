@@ -24,6 +24,7 @@ sample_video.mp4
 scratch_frames/
 frame_*.png
 recent_recording.mp4
+input_box_crop.png
 
 # Auto-generated SSL certificates and private keys
 *.pem
