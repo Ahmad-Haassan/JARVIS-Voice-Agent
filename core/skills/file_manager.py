@@ -242,6 +242,71 @@ class FileManager:
                 logger.error(f"Failed to open folder {resolved}: {fe}")
                 return False, f"Failed to open folder '{name}': {fe}", None
 
+    def read_document_text(self, file_path: str, max_chars: int = 4000) -> str:
+        """Reads text from Word documents (.docx), text files, code, etc."""
+        if not file_path or not os.path.exists(file_path):
+            return ""
+        
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext == ".docx":
+            try:
+                import zipfile, xml.etree.ElementTree as ET
+                with zipfile.ZipFile(file_path) as z:
+                    xml_content = z.read("word/document.xml")
+                    tree = ET.fromstring(xml_content)
+                    ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+                    paragraphs = []
+                    for p in tree.iterfind(".//w:p", ns):
+                        text = "".join(node.text for node in p.iterfind(".//w:t", ns) if node.text)
+                        if text:
+                            paragraphs.append(text)
+                    return "\n".join(paragraphs)[:max_chars]
+            except Exception as e:
+                logger.warning(f"Failed to parse docx '{file_path}': {e}")
+                return ""
+
+        try:
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                return f.read(max_chars)
+        except Exception:
+            try:
+                with open(file_path, "r", encoding="latin-1", errors="ignore") as f:
+                    return f.read(max_chars)
+            except Exception as e:
+                logger.warning(f"Failed to read file '{file_path}': {e}")
+                return ""
+
+    def find_document_in_folder(self, folder_query: str, doc_query: str) -> Tuple[Optional[str], str]:
+        """Locates a document inside a specified folder."""
+        folder_path, folder_name = self.resolve_folder(folder_query)
+        if not folder_path or not os.path.exists(folder_path):
+            return None, f"Could not find folder '{folder_query}'"
+
+        q_clean = doc_query.lower().strip()
+        q_tokens = [tok for tok in q_clean.replace("_", " ").replace("-", " ").split() if len(tok) > 1]
+
+        # Scan folder up to depth 3
+        for root, dirs, files in os.walk(folder_path):
+            rel_depth = root[len(folder_path):].count(os.sep)
+            if rel_depth > 3:
+                continue
+            for f in files:
+                f_lower = f.lower()
+                if q_clean in f_lower or (q_tokens and all(tok in f_lower for tok in q_tokens)):
+                    return os.path.join(root, f), f
+        
+        # Broader search: any token
+        for root, dirs, files in os.walk(folder_path):
+            rel_depth = root[len(folder_path):].count(os.sep)
+            if rel_depth > 3:
+                continue
+            for f in files:
+                f_lower = f.lower()
+                if q_tokens and any(tok in f_lower for tok in q_tokens):
+                    return os.path.join(root, f), f
+
+        return None, f"Could not find document '{doc_query}' in '{folder_name}'"
+
 _file_instance = None
 
 def get_file_manager() -> FileManager:

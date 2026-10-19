@@ -25,6 +25,8 @@ scratch_frames/
 frame_*.png
 recent_recording.mp4
 input_box_crop.png
+ask_tpl.png
+prompt_box_clean.png
 
 # Auto-generated SSL certificates and private keys
 *.pem

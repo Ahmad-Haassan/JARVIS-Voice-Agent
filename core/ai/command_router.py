@@ -293,7 +293,43 @@ class CommandRouter:
                     return CommandResult(success=True, response=summary, data=summary)
                 return CommandResult(success=True, response=f"I checked online for '{query}'.", data=summary)
 
-            # 16. General Chat
+            # 16. Document to ChatGPT Dispatch
+            elif intent == "doc_to_chatgpt":
+                folder = entities.get("folder", "Desktop")
+                document = entities.get("document") or entities.get("file", "")
+                prompt = entities.get("prompt", "")
+                from core.skills.computer_agent import get_computer_agent
+                success, resp = get_computer_agent().workflow_send_document_to_chatgpt(folder, document, prompt)
+                return CommandResult(success=success, response=resp)
+
+            # 17. Real-Time Live News
+            elif intent == "live_news":
+                topic = entities.get("topic") or entities.get("country") or "Pakistan"
+                from core.skills.news import get_news_skill
+                resp = get_news_skill().get_top_news(topic=topic, count=5)
+                return CommandResult(success=True, response=resp)
+
+            # 18. ChatGPT Direct AI Prompt
+            elif intent == "chatgpt_prompt":
+                prompt = entities.get("prompt") or entities.get("query", "")
+                from core.skills.computer_agent import get_computer_agent
+                success = get_computer_agent().workflow_ask_ai(prompt)
+                resp = f"Opened ChatGPT and submitted: '{prompt}'." if success else "Failed to submit prompt to ChatGPT."
+                return CommandResult(success=success, response=resp)
+
+            # 19. Universal PowerShell Execution
+            elif intent == "powershell_exec":
+                script = entities.get("command") or entities.get("script", "")
+                success, output = sys_ctrl.execute_powershell(script)
+                resp = f"Command output: {output[:250]}" if success else f"Execution error: {output[:250]}"
+                return CommandResult(success=success, response=resp)
+
+            # 20. Continuous Hands-Free Mode Toggle
+            elif intent == "continuous_mode":
+                action_mode = entities.get("action", "toggle")
+                return CommandResult(success=True, response=spoken_resp or f"Continuous mode {action_mode}.", data={"continuous": action_mode})
+
+            # 21. General Chat
             else:
                 return CommandResult(success=True, response=spoken_resp or "Ready for your next instruction, sir.")
 

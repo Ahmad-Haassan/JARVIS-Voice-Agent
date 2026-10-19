@@ -173,9 +173,9 @@ class NLPEngine:
         if any(w in q for w in ["camera", "webcam", "take photo", "view camera", "access camera", "pc camera"]):
             return {"intent": "camera", "entities": {"action": "stream"}, "response": "Opening computer camera feed."}
 
-        # 7a. Open Target in App WITH Prompt (e.g. "open dsa folder in antigravity and solve assignment 3", "open testing forlder in antigravity , 5 lines on elon musk")
+        # 7a. Open Target in App WITH Prompt (e.g. "open dsa folder in antigravity and solve assignment 3", "testing folder in antigravity and solve assignment")
         open_in_prompt_match = re.search(
-            r"^(?:open|launch)\s+(?:the\s+|my\s+)?(.+?)\s+(?:in|with|using)\s+([a-zA-Z0-9_\-\s]+?)(?:[\,\;\:\-]\s*|\s+(?:and\s+give\s+(?:the\s+|a\s+)?(?:same\s+)?(?:prompt|promt)\s*(?:as\s+i\s+give\s+from\s+mobile\s*)?|and\s+(?:prompt|promt)\s+|with\s+(?:prompt|promt)\s+|and\s+ask\s+(?:it\s+|him\s+)?(?:to\s+)?|and\s+tell\s+(?:it\s+|him\s+)?(?:to\s+)?|then\s+(?:prompt|promt)\s+|dispatch\s+(?:prompt|promt)\s*|and\s+|then\s+)|\s*[\"\'\“\”])\s*(.+)$",
+            r"^(?:open\s+|launch\s+)?(?:the\s+|my\s+)?(.+?)\s+(?:in|with|using)\s+([a-zA-Z0-9_\-\s]+?)(?:[\,\;\:\-]\s*|\s+(?:and\s+give\s+(?:the\s+|a\s+)?(?:same\s+)?(?:prompt|promt)\s*(?:as\s+i\s+give\s+from\s+mobile\s*)?|and\s+(?:prompt|promt)\s+|with\s+(?:prompt|promt)\s+|and\s+ask\s+(?:it\s+|him\s+)?(?:to\s+)?|and\s+tell\s+(?:it\s+|him\s+)?(?:to\s+)?|then\s+(?:prompt|promt)\s+|dispatch\s+(?:prompt|promt)\s*|and\s+|then\s+)|\s*[\"\'\“\”])\s*(.+)$",
             q,
             re.IGNORECASE
         )
@@ -308,8 +308,81 @@ class NLPEngine:
                     "response": f"Opening {f_name}."
                 }
 
-        # Folder Creation Patterns
+        # Continuous Hands-Free Conversation Mode Toggles
+        if any(w in q for w in ["continuous mode on", "enable continuous", "continuous on", "hands free on", "hands-free on", "lagatar suno", "always listen", "conversational mode"]):
+            return {
+                "intent": "continuous_mode",
+                "entities": {"action": "on"},
+                "response": "Continuous hands-free conversation mode activated. Main all time sun raha hoon Ahmad."
+            }
+        if any(w in q for w in ["continuous mode off", "disable continuous", "continuous off", "stop continuous", "hands free off", "chup ho jao", "standby", "pause listening", "ruk jao"]):
+            return {
+                "intent": "continuous_mode",
+                "entities": {"action": "off"},
+                "response": "Continuous mode deactivated. Standing by boss."
+            }
+
+        # Document to ChatGPT Dispatch Workflow (Roman Urdu & English)
+        # e.g., "ye mera dsa folder hai usme week 3 document hai wo chatgpt ko bhejo aur usay kaho detail bataye"
+        doc_cg1 = re.search(
+            r"(?:(?:ye|mera|the|my)\s+)*([a-zA-Z0-9_\-\s]+?)\s+(?:folder|directory).*?(?:usme|mein|me|in)\s+([a-zA-Z0-9_\-\.\s]+?)\s+(?:document|doc|file)?\s*(?:hai)?\s*(?:wo\s+|woh\s+)?(?:chatgpt|browser|ai)\s+(?:ko\s+bhejo|ko\s+send\s+karo|ko\s+do|pe\s+bhejo|ko\s+dikhao)(?:\s+(?:aur|and|or)\s+(?:usay\s+|use\s+)?(?:kaho|bolo|ask|tell)\s+(.+))?",
+            q,
+            re.IGNORECASE
+        )
+        doc_cg2 = re.search(
+            r"^(?:send|pass|give)\s+(?:document\s+|file\s+)?([a-zA-Z0-9_\-\.\s]+?)\s+(?:from|in)\s+([a-zA-Z0-9_\-\s]+?)\s+(?:folder|directory)?\s+(?:to|into)\s+chatgpt(?:\s+(?:and|with|to)\s+(?:ask|tell|instruct)?\s*(.+))?$",
+            q,
+            re.IGNORECASE
+        )
+        if doc_cg1:
+            raw_fld = doc_cg1.group(1).strip()
+            fld = re.sub(r"^(?:ye|mera|the|my)\s+", "", raw_fld, flags=re.IGNORECASE).strip()
+            raw_doc = doc_cg1.group(2).strip()
+            doc = re.sub(r"\s+(?:document|doc|file|hai)$", "", raw_doc, flags=re.IGNORECASE).strip()
+            pmt = doc_cg1.group(3).strip() if doc_cg1.group(3) else "Please analyze this document and explain all details."
+            return {
+                "intent": "doc_to_chatgpt",
+                "entities": {"folder": fld or raw_fld, "document": doc or raw_doc, "prompt": pmt},
+                "response": f"Finding '{doc or raw_doc}' in '{fld or raw_fld}' folder and dispatching to ChatGPT."
+            }
+        elif doc_cg2:
+            doc = doc_cg2.group(1).strip()
+            fld = doc_cg2.group(2).strip()
+            pmt = doc_cg2.group(3).strip() if doc_cg2.group(3) else "Please analyze this document and explain all details."
+            return {
+                "intent": "doc_to_chatgpt",
+                "entities": {"folder": fld, "document": doc, "prompt": pmt},
+                "response": f"Finding '{doc}' in '{fld}' folder and dispatching to ChatGPT."
+            }
+
+        # Live Real-Time News (Pakistan / Tech / World)
+        if any(w in q for w in ["top news", "top 5 news", "news btao", "aj ki news", "khabrein", "pakistan news", "headlines", "latest news"]):
+            topic = "Pakistan"
+            if "tech" in q: topic = "Technology"
+            elif "world" in q or "dunya" in q: topic = "World"
+            elif "cricket" in q: topic = "Pakistan Cricket"
+            return {"intent": "live_news", "entities": {"topic": topic, "count": 5}, "response": f"Fetching live news for {topic}."}
+
+        # Direct ChatGPT Prompts (e.g. "chatgpt pe search karo 5 lines on AI", "ask chatgpt write python script")
+        cg_match = re.search(r"(?:chatgpt|chat\s*gpt)\s+(?:pe|par|me|mein)\s+(?:search\s+karo|poocho|likho|bhejo|prompt\s+do)\s+(.+)", q)
+        cg_match2 = re.search(r"^(?:ask|tell)\s+chatgpt\s+(?:to\s+)?(.+)", q)
+        if cg_match:
+            user_p = cg_match.group(1).strip()
+            return {"intent": "chatgpt_prompt", "entities": {"prompt": user_p}, "response": f"Asking ChatGPT: '{user_p}'."}
+        if cg_match2:
+            user_p = cg_match2.group(1).strip()
+            return {"intent": "chatgpt_prompt", "entities": {"prompt": user_p}, "response": f"Asking ChatGPT: '{user_p}'."}
+
+        # Desktop Folder Creation (Roman Urdu & English)
+        ru_folder1 = re.search(r"desktop\s+(?:pe|par|me|mein)\s+(?:folder\s+bana\s+(?:do|de|o)|naya\s+folder\s+banao)\s+(?:called\s+|named\s+)?([a-zA-Z0-9_\-\s]+)$", q)
+        ru_folder2 = re.search(r"desktop\s+(?:pe|par|me|mein)\s+([a-zA-Z0-9_\-\s]+?)\s+(?:ka\s+)?folder\s+bana\s*(?:do|de|o)?$", q)
         create_folder_match = re.search(r"^(?:create|make|new)\s+(?:a\s+)?folder\s+(?:named\s+|called\s+)?([a-zA-Z0-9_\-\s]+)$", q)
+        if ru_folder1:
+            name = ru_folder1.group(1).strip()
+            return {"intent": "file_action", "entities": {"action": "create", "name": name}, "response": f"Creating desktop folder '{name}'."}
+        if ru_folder2:
+            name = ru_folder2.group(1).strip()
+            return {"intent": "file_action", "entities": {"action": "create", "name": name}, "response": f"Creating desktop folder '{name}'."}
         if create_folder_match:
             f_name = create_folder_match.group(1).strip()
             return {
@@ -328,6 +401,11 @@ class NLPEngine:
             clean_f = re.sub(r"^(?:open|show)\s+", "", q).strip()
             return {"intent": "open_file", "entities": {"file": clean_f}, "response": f"Opening {clean_f}."}
 
+        # Universal PowerShell Command Execution
+        if q.startswith("powershell ") or q.startswith("run command ") or q.startswith("cmd "):
+            cmd = re.sub(r"^(?:powershell|run command|cmd)\s+", "", q).strip()
+            return {"intent": "powershell_exec", "entities": {"command": cmd}, "response": f"Executing command: {cmd}"}
+
         # 10. App Open / Close
         if q.startswith("close ") or q.startswith("kill ") or q.startswith("exit "):
             app_to_close = q.split(" ", 1)[1].strip()
@@ -335,16 +413,13 @@ class NLPEngine:
 
         if q.startswith("open ") or q.startswith("launch ") or q.startswith("start ") or q.startswith("bring up "):
             app_to_open = q.split(" ", 1)[1].strip()
-            # Clean filler phrases
             for prefix in ["app ", "program ", "the ", "my "]:
                 if app_to_open.startswith(prefix):
                     app_to_open = app_to_open[len(prefix):].strip()
-            # Check if user said e.g. "open folder ..." or "open ... folder"
             if "folder" in app_to_open or "directory" in app_to_open:
                 clean_target = re.sub(r"\b(?:folder|directory|my|the)\b", "", app_to_open).strip()
                 return {"intent": "open_folder", "entities": {"folder": clean_target or app_to_open}, "response": f"Opening {clean_target or app_to_open} folder."}
             return {"intent": "open_app", "entities": {"app": app_to_open}, "response": f"Opening {app_to_open}."}
-
 
         # 10. YouTube Media Playback
         if "youtube" in q or q.startswith("play ") or q.startswith("listen to "):
@@ -407,16 +482,29 @@ class NLPEngine:
         if any(q.startswith(s) for s in qa_starters):
             return {"intent": "search_web", "entities": {"query": query}, "response": f"Looking into that for you, sir."}
 
+        # Roman Urdu conversational chitchat personalized for Ahmad
+        if any(w in q for w in ["awaz aa rahi hai", "awaz aa rhy hai", "meri awaz", "can you hear me", "sun rahe ho", "sun rhy ho"]):
+            return {"intent": "chat", "entities": {}, "response": "Haan Ahmad, aapki awaz bilkul saaf aa rahi hai. Farmaiye main aapki kya madad kar sakta hoon?"}
+
+        if any(w in q for w in ["kaise ho", "kya hal hai", "kese ho", "kaisay ho"]):
+            return {"intent": "chat", "entities": {}, "response": "Main bilkul theek hoon Ahmad! Aapka loyal AI assistant all systems ready ke sath hazir hai."}
+
+        if any(w in q for w in ["kya kar rahe ho", "kya kr rhy ho", "what are you doing"]):
+            return {"intent": "chat", "entities": {}, "response": "Ahmad, main aapke commands ka intezar kar raha hoon. Bas aapka hukum chahiye."}
+
+        if any(w in q for w in ["shukriya", "bohot shukriya", "dhanwad"]):
+            return {"intent": "chat", "entities": {}, "response": "Hamesha aapke liye hazir hoon Ahmad!"}
+
         # Conversational greetings & personality
         greetings = {
-            "hello": "Hello, sir. How may I assist you today?",
-            "hi": "Greetings. Systems are running smoothly.",
-            "how are you": "I am fully operational and ready at your command.",
+            "hello": "Hello Ahmad. How may I assist you today?",
+            "hi": "Greetings Ahmad. Systems are running smoothly.",
+            "how are you": "I am fully operational and ready at your command, Ahmad.",
             "who are you": "I am JARVIS, your personal intelligent desktop assistant.",
-            "thank you": "Always a pleasure to serve, sir.",
-            "thanks": "You're welcome, sir.",
-            "good morning": "Good morning, sir. All core diagnostics are green.",
-            "good night": "Good night, sir. Powering down non-essential loops."
+            "thank you": "Always a pleasure to serve, Ahmad.",
+            "thanks": "You're welcome, Ahmad.",
+            "good morning": "Good morning Ahmad. All core diagnostics are green.",
+            "good night": "Good night Ahmad. Powering down non-essential loops."
         }
         for key, reply in greetings.items():
             if key in q:

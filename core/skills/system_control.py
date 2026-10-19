@@ -488,10 +488,6 @@ class SystemControl:
                     if fg_tid != cur_tid:
                         user32.AttachThreadInput(cur_tid, fg_tid, True)
 
-                    # Tap Alt key to allow foreground switch
-                    user32.keybd_event(0x12, 0, 0, 0)
-                    user32.keybd_event(0x12, 0, 2, 0)
-
                     user32.ShowWindow(target_hwnd, 9)  # SW_RESTORE
                     user32.BringWindowToTop(target_hwnd)
                     user32.SetForegroundWindow(target_hwnd)
@@ -512,8 +508,43 @@ class SystemControl:
                 except Exception:
                     pass
 
+            # Dismiss any active menu bar or overlay (e.g. if Alt or menu was pressed)
+            try:
+                user32.keybd_event(0x1B, 0, 0, 0)  # VK_ESCAPE down
+                user32.keybd_event(0x1B, 0, 2, 0)  # VK_ESCAPE up
+            except Exception:
+                pass
+
             # Wait for the window to settle in the foreground
-            time.sleep(1.0)
+            time.sleep(0.8)
+
+            # Focus the input area (prompt box)
+            if target_hwnd:
+                try:
+                    rect = ctypes.wintypes.RECT()
+                    user32.GetWindowRect(target_hwnd, ctypes.byref(rect))
+                    w = rect.right - rect.left
+                    h = rect.bottom - rect.top
+                    is_antigravity = "antigravity" in (target_title or app_clean).lower()
+                    if is_antigravity:
+                        # In Antigravity IDE, click the prompt box in the right pane (center: 60% x, 46% y)
+                        cx = rect.left + int(w * 0.60)
+                        cy = rect.top + int(h * 0.46)
+                    else:
+                        cx = rect.left + int(w * 0.50)
+                        cy = rect.top + int(h * 0.50)
+
+                    user32.SetCursorPos(cx, cy)
+                    time.sleep(0.05)
+                    user32.mouse_event(2, 0, 0, 0, 0)  # MOUSEEVENTF_LEFTDOWN
+                    time.sleep(0.05)
+                    user32.mouse_event(4, 0, 0, 0, 0)  # MOUSEEVENTF_LEFTUP
+                    time.sleep(0.05)
+                    pyautogui.click(cx, cy)
+                except Exception as ex:
+                    logger.warning(f"Focus click error: {ex}")
+
+            time.sleep(0.3)
 
             # Ensure clipboard holds the prompt
             try:
@@ -935,6 +966,19 @@ class SystemControl:
         except Exception as e:
             logger.error(f"Minimize all error: {e}")
             return False
+
+    def execute_powershell(self, script: str) -> tuple:
+        """Executes an arbitrary PowerShell script safely and returns (success, output)."""
+        try:
+            cmd = ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=12.0)
+            out = res.stdout.strip()
+            err = res.stderr.strip()
+            if res.returncode == 0:
+                return True, out or "Command executed successfully."
+            return False, err or out or f"Command failed with exit code {res.returncode}"
+        except Exception as e:
+            return False, str(e)
 
 _sys_instance = None
 

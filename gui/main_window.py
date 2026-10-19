@@ -608,17 +608,25 @@ class VoiceWorker(QThread):
     update_signal = pyqtSignal(str, bool)
     listening_signal = pyqtSignal(bool)
     status_signal = pyqtSignal(str)
+    continuous_signal = pyqtSignal(bool)
 
     def __init__(self, auth_manager):
         super().__init__()
         self.auth_manager = auth_manager
         self._running = True
         self._is_processing = False
+        self.continuous_mode = False
         self.stt = None
         self.nlp = None
         self.router = None
         self.tts = None
         self.wake = None
+
+    def set_continuous_mode(self, enabled: bool):
+        self.continuous_mode = enabled
+        self.continuous_signal.emit(enabled)
+        if enabled and not self._is_processing:
+            self.trigger()
 
     def _on_wake(self):
         from core.voice.wake_word import get_wake_detector
@@ -641,18 +649,38 @@ class VoiceWorker(QThread):
             time.sleep(0.12)
 
             text = self.stt.listen(timeout=7.0, phrase_time_limit=10.0)
-            if not text:
-                self.listening_signal.emit(False)
-                self.status_signal.emit("STANDBY [ACTIVE]")
-                return
+            if text:
+                self.status_signal.emit("PROCESSING...")
+                self.update_signal.emit(text, True)
+                self._execute_pipeline(text)
 
-            self.status_signal.emit("PROCESSING...")
-            self.update_signal.emit(text, True)
-            self._execute_pipeline(text)
+            # Continuous Conversation Loop (Hands-Free All-Time Listening)
+            while self.continuous_mode and self._running:
+                time.sleep(0.15)
+                self.listening_signal.emit(True)
+                self.status_signal.emit("CONTINUOUS [LISTENING]")
+                cont_text = self.stt.listen(timeout=8.0, phrase_time_limit=12.0)
+                if not cont_text:
+                    if not self.continuous_mode:
+                        break
+                    continue
+
+                lower_c = cont_text.lower().strip()
+                if any(w in lower_c for w in ["continuous mode off", "disable continuous", "stop continuous", "standby", "chup ho jao", "ruk jao", "pause listening"]):
+                    self.continuous_mode = False
+                    self.continuous_signal.emit(False)
+                    self.tts.speak("Continuous mode deactivated. Standing by boss.", block=True)
+                    break
+
+                self.status_signal.emit("PROCESSING...")
+                self.update_signal.emit(cont_text, True)
+                self._execute_pipeline(cont_text)
+
         finally:
             self._is_processing = False
             self.listening_signal.emit(False)
-            wake.resume()
+            if not self.continuous_mode:
+                wake.resume()
 
     def _execute_pipeline(self, text: str):
         result = self.nlp.process(text)
@@ -666,6 +694,16 @@ class VoiceWorker(QThread):
             "response": nlp_resp
         })
 
+        intent = result.get("intent", "")
+        if intent == "continuous_mode":
+            action_mode = result.get("entities", {}).get("action", "toggle")
+            if action_mode == "on":
+                self.continuous_mode = True
+                self.continuous_signal.emit(True)
+            elif action_mode == "off":
+                self.continuous_mode = False
+                self.continuous_signal.emit(False)
+
         final_resp = exec_result.response or nlp_resp
         if exec_result.response and exec_result.response != nlp_resp:
             self.tts.speak(exec_result.response, block=True)
@@ -676,11 +714,11 @@ class VoiceWorker(QThread):
             "open_app", "close_app", "open_folder", "open_file",
             "open_in", "system_control", "file_action", "write_content",
             "send_whatsapp", "youtube_play", "work_mode", "volume_control",
-            "clean_temp", "camera", "computer_agent", "custom"
+            "clean_temp", "camera", "computer_agent", "doc_to_chatgpt",
+            "live_news", "chatgpt_prompt", "powershell_exec", "custom"
         ]
-        intent = result.get("intent", "")
         # User requirement: Say "Done boss." upon completing instructions
-        if exec_result.success or intent in TASK_INTENTS or intent != "chat":
+        if exec_result.success or intent in TASK_INTENTS or intent not in ["chat", "continuous_mode"]:
             self.tts.speak("Done boss.", block=True)
             if not final_resp:
                 final_resp = "Done boss."
@@ -691,7 +729,10 @@ class VoiceWorker(QThread):
             self.tts.speak(final_resp, block=True)
 
         self.update_signal.emit(final_resp, False)
-        self.status_signal.emit("STANDBY [ACTIVE]")
+        if self.continuous_mode:
+            self.status_signal.emit("CONTINUOUS [ACTIVE]")
+        else:
+            self.status_signal.emit("STANDBY [ACTIVE]")
 
     def trigger(self):
         threading.Thread(target=self._on_wake, daemon=True).start()
@@ -770,6 +811,7 @@ class MainWindow(QMainWindow):
         self.worker.update_signal.connect(self._on_command_update)
         self.worker.listening_signal.connect(self._on_listening_state)
         self.worker.status_signal.connect(self._on_status_change)
+        self.worker.continuous_signal.connect(self._update_continuous_button)
         self.worker.start()
 
     def resizeEvent(self, event):
@@ -1058,6 +1100,27 @@ class MainWindow(QMainWindow):
         """)
         btn_trigger.clicked.connect(lambda: self.worker.trigger())
         bottom_bar.addWidget(btn_trigger)
+
+        self.btn_continuous = QPushButton("⚡ CONTINUOUS: OFF")
+        self.btn_continuous.setStyleSheet("""
+            QPushButton {
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 10px;
+                padding: 6px 14px;
+                color: #94a3b8;
+                font-size: 10px;
+                font-weight: 700;
+                letter-spacing: 1px;
+            }
+            QPushButton:hover {
+                background: rgba(16, 185, 129, 0.2);
+                border-color: #10b981;
+                color: #10b981;
+            }
+        """)
+        self.btn_continuous.clicked.connect(self._toggle_continuous_mode)
+        bottom_bar.addWidget(self.btn_continuous)
 
         main_layout.addLayout(bottom_bar)
 
@@ -1917,6 +1980,55 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(0, lambda: self._on_action_finished(record))
 
         threading.Thread(target=_voice_run, daemon=True).start()
+
+    def _toggle_continuous_mode(self):
+        new_state = not self.worker.continuous_mode
+        self.worker.set_continuous_mode(new_state)
+        self._update_continuous_button(new_state)
+
+    def _update_continuous_button(self, active: bool):
+        if active:
+            self.btn_continuous.setText("🔥 CONTINUOUS: ACTIVE")
+            self.btn_continuous.setStyleSheet("""
+                QPushButton {
+                    background: rgba(16, 185, 129, 0.25);
+                    border: 1px solid #10b981;
+                    border-radius: 10px;
+                    padding: 6px 14px;
+                    color: #10b981;
+                    font-size: 10px;
+                    font-weight: 800;
+                    letter-spacing: 1px;
+                }
+                QPushButton:hover {
+                    background: rgba(16, 185, 129, 0.4);
+                    color: white;
+                }
+            """)
+            self.state_lbl.setText("CONTINUOUS [ACTIVE]")
+            self.state_lbl.setStyleSheet("color: #10b981; font-size: 12px; font-weight: 800; letter-spacing: 2px;")
+            self.global_feedback_lbl.setText("CONTINUOUS MODE ACTIVE // ALL-TIME MIC LISTENING FOR AHMAD")
+        else:
+            self.btn_continuous.setText("⚡ CONTINUOUS: OFF")
+            self.btn_continuous.setStyleSheet("""
+                QPushButton {
+                    background: rgba(255, 255, 255, 0.05);
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    border-radius: 10px;
+                    padding: 6px 14px;
+                    color: #94a3b8;
+                    font-size: 10px;
+                    font-weight: 700;
+                    letter-spacing: 1px;
+                }
+                QPushButton:hover {
+                    background: rgba(0, 242, 254, 0.2);
+                    border-color: #00f2fe;
+                    color: #00f2fe;
+                }
+            """)
+            self.state_lbl.setText("STANDBY [ACTIVE]")
+            self.state_lbl.setStyleSheet("color: #00f2fe; font-size: 12px; font-weight: 800; letter-spacing: 2px;")
 
     def _copy_remote_link(self):
         QApplication.clipboard().setText(self.remote_url_val)

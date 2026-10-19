@@ -222,21 +222,53 @@ class ComputerAgent:
                 shell_execute(chatgpt_url)
             time.sleep(2.0)
 
-            # Move cursor to center-bottom of screen (typical chat prompt input area)
+            # Focus input area (center bottom of viewport)
             prompt_x = int(self.screen_width * 0.5)
             prompt_y = int(self.screen_height * 0.88)
-            self.move_to(prompt_x, prompt_y, duration=0.6)
+            self.move_to(prompt_x, prompt_y, duration=0.4)
             self.click()
             time.sleep(0.3)
 
-            # Type prompt smoothly
-            self.type_text(prompt, interval=0.03)
+            # Instant, reliable clipboard paste for full prompt and multi-line content
+            try:
+                import pyperclip
+                pyperclip.copy(prompt)
+                time.sleep(0.1)
+                self.hotkey("ctrl", "v")
+            except Exception:
+                self.type_text(prompt, interval=0.01)
+
             time.sleep(0.4)
             self.press_key("enter")
             self._log_action("AGENT", "AI Prompt submitted successfully!")
             return True
         finally:
             self._is_busy = False
+
+    def workflow_send_document_to_chatgpt(self, folder_query: str, doc_query: str, user_prompt: str = "") -> tuple:
+        """
+        Locates a document in the given folder, extracts its content/summary,
+        opens ChatGPT in Google Chrome, pastes the prompt and document content,
+        and submits the query autonomously.
+        """
+        from core.skills.file_manager import get_file_manager
+        fm = get_file_manager()
+        doc_path, doc_name = fm.find_document_in_folder(folder_query, doc_query)
+        if not doc_path:
+            return False, f"Could not find document '{doc_query}' inside '{folder_query}' folder."
+
+        content = fm.read_document_text(doc_path, max_chars=2800)
+        instruction = user_prompt.strip() or "Please analyze this document and explain all details."
+
+        full_prompt = (
+            f"{instruction}\n\n"
+            f"[Attached Document: {doc_name}]\n{content}"
+        ) if content else f"{instruction}\n[Document: {doc_name} at {doc_path}]"
+
+        success = self.workflow_ask_ai(full_prompt)
+        if success:
+            return True, f"Found '{doc_name}' in '{folder_query}', opened ChatGPT, and dispatched your request."
+        return False, f"Located '{doc_name}', but encountered an issue submitting to ChatGPT."
 
     def workflow_quick_notepad(self, content: str, title: str = "JARVIS Autonomous Memo") -> bool:
         """Opens Notepad and autonomously writes a memo/note with typewriter animation."""
