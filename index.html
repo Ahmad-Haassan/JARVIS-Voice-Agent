@@ -1502,9 +1502,11 @@
           <div class="stream-viewport" id="stream-viewport-box" style="position: relative; overflow: hidden; border-radius: 18px; touch-action: none;">
             <div class="stream-overlay-badge">
               <span class="status-dot"></span>
-              <span id="stream-status-badge">1080P FULL HD STREAM</span>
+              <span id="stream-status-badge">HD LOW-LATENCY STREAM</span>
             </div>
-            <img id="screen-stream-img" src="/api/screen/stream" alt="Live PC Screen 1080p" style="transform-origin: center center; transition: transform 0.12s ease; will-change: transform;" onerror="this.src='/api/screenshot'">
+            <!-- Zero-Latency Real-Time Virtual Cursor Overlay -->
+            <div id="virtual-cursor" style="position: absolute; top: 50%; left: 50%; width: 14px; height: 14px; border-radius: 50%; background: #00f5d4; border: 2px solid #ffffff; box-shadow: 0 0 12px #00f5d4, 0 0 4px #000; pointer-events: none; transform: translate(-50%, -50%); z-index: 10; transition: transform 0.04s ease-out; will-change: left, top; display: block;"></div>
+            <img id="screen-stream-img" src="/api/screen/stream" alt="Live PC Screen" style="transform-origin: center center; transition: transform 0.12s ease; will-change: transform;" onerror="this.src='/api/screenshot'">
           </div>
 
           <!-- Speed Controls between screen and trackpad -->
@@ -2168,6 +2170,27 @@
     // Connect WebSocket on load
     connectMouseWs();
 
+    // Zero-Latency Client-Side Instant Virtual Cursor
+    let curXPercent = 50.0;
+    let curYPercent = 50.0;
+    function updateVirtualCursor(dx, dy) {
+      const vCursor = document.getElementById('virtual-cursor');
+      if (!vCursor) return;
+      curXPercent = Math.max(1, Math.min(99, curXPercent + (dx * 0.07)));
+      curYPercent = Math.max(1, Math.min(99, curYPercent + (dy * 0.12)));
+      vCursor.style.left = curXPercent + '%';
+      vCursor.style.top = curYPercent + '%';
+    }
+
+    function pulseVirtualCursor() {
+      const vCursor = document.getElementById('virtual-cursor');
+      if (!vCursor) return;
+      vCursor.style.transform = 'translate(-50%, -50%) scale(1.6)';
+      setTimeout(() => {
+        if (vCursor) vCursor.style.transform = 'translate(-50%, -50%) scale(1.0)';
+      }, 120);
+    }
+
     const surface = document.getElementById('touch-surface');
     let lastX = 0, lastY = 0;
     let startX = 0, startY = 0;
@@ -2214,6 +2237,7 @@
         const dy = Math.round(rawDy * cursorSensitivity * accel);
 
         if (dx !== 0 || dy !== 0) {
+          updateVirtualCursor(dx, dy);
           sendMouseMove(dx, dy);
         }
       });
@@ -2270,6 +2294,7 @@
 
     function sendMouseClick(btn) {
       soundBeep();
+      pulseVirtualCursor();
       showToast(`🖱️ ${btn.toUpperCase()} Click`);
       if (mouseWs && mouseWs.readyState === WebSocket.OPEN) {
         mouseWs.send(`c:${btn}`);

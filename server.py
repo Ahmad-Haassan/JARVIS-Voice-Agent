@@ -264,7 +264,7 @@ def generate_screen_mjpeg_stream():
 
     sw = user32.GetSystemMetrics(0) or 1920
     sh = user32.GetSystemMetrics(1) or 1080
-    target_w = min(sw, 1920)
+    target_w = 960  # Ultra-fast 40+ FPS stream for mobile
     target_h = int(sh * target_w / sw)
 
     src_dc = None
@@ -302,16 +302,16 @@ def generate_screen_mjpeg_stream():
             if 0 <= cx < sw and 0 <= cy < sh:
                 sc_x = int(cx * target_w / sw)
                 sc_y = int(cy * target_h / sh)
-                cv2.circle(frame, (sc_x, sc_y), 8, (0, 242, 254), -1)
-                cv2.circle(frame, (sc_x, sc_y), 11, (255, 255, 255), 2)
+                cv2.circle(frame, (sc_x, sc_y), 7, (0, 245, 212), -1)
+                cv2.circle(frame, (sc_x, sc_y), 10, (255, 255, 255), 2)
 
-            ret, buffer = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
+            ret, buffer = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 62])
             if ret:
                 frame_bytes = buffer.tobytes()
                 yield (b"--frame\r\n"
                        b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n")
 
-            time.sleep(0.06)  # High-speed responsive capture
+            time.sleep(0.02)  # ~45 FPS ultra-fluid real-time capture
     except Exception as e:
         logger.debug(f"Screen stream client disconnected: {e}")
     finally:
