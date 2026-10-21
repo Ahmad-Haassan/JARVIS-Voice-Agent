@@ -7,7 +7,10 @@ import time
 import socket
 import asyncio
 import psutil
-from fastapi import FastAPI, Request, UploadFile, File, WebSocket, WebSocketDisconnect
+import json
+import re
+from datetime import datetime
+from fastapi import FastAPI, Request, UploadFile, File, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
@@ -61,24 +64,201 @@ app.add_middleware(
 
 class CommandRequest(BaseModel):
     text: str
+    device_id: Optional[str] = None
 
 class MouseMoveRequest(BaseModel):
     dx: int
     dy: int
+    device_id: Optional[str] = None
 
 class MouseClickRequest(BaseModel):
     button: str = "left"
     clicks: int = 1
+    device_id: Optional[str] = None
 
 class MouseScrollRequest(BaseModel):
     amount: int = -300
+    device_id: Optional[str] = None
 
 class KeyboardTypeRequest(BaseModel):
     text: str
+    device_id: Optional[str] = None
 
 class WorkflowRequest(BaseModel):
     action: str
     param: str = ""
+    device_id: Optional[str] = None
+
+class DevicePingRequest(BaseModel):
+    device_id: str
+    device_name: Optional[str] = "Mobile Device"
+    user_agent: Optional[str] = ""
+
+class DeviceActionRequest(BaseModel):
+    device_id: str
+
+# ==========================================
+# CONNECTED DEVICES & ACCESS CONTROL SYSTEM
+# ==========================================
+DEVICES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "devices.json")
+
+def load_devices() -> dict:
+    if os.path.exists(DEVICES_FILE):
+        try:
+            with open(DEVICES_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def save_devices(data: dict):
+    try:
+        os.makedirs(os.path.dirname(DEVICES_FILE), exist_ok=True)
+        with open(DEVICES_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        logger.error(f"Failed to save devices: {e}")
+
+def get_client_ip(request: Request) -> str:
+    cf_ip = request.headers.get("cf-connecting-ip")
+    if cf_ip:
+        return cf_ip.strip()
+    x_forwarded = request.headers.get("x-forwarded-for")
+    if x_forwarded:
+        return x_forwarded.split(",")[0].strip()
+    if request.client:
+        return request.client.host
+    return "Unknown"
+
+def check_device_allowed(device_id: Optional[str] = None) -> bool:
+    if not device_id:
+        return True
+    devices = load_devices()
+    dev = devices.get(device_id)
+    if dev and dev.get("is_blocked"):
+        return False
+    return True
+
+@app.post("/api/devices/ping")
+async def ping_device(req: DevicePingRequest, request: Request):
+    dev_id = req.device_id.strip()
+    if not dev_id:
+        return {"allowed": True, "status": "ok"}
+    
+    devices = load_devices()
+    now_ts = time.time()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    client_ip = get_client_ip(request)
+    ua = req.user_agent or request.headers.get("user-agent", "")
+
+    if dev_id in devices and devices[dev_id].get("is_blocked"):
+        return {
+            "allowed": False,
+            "status": "blocked",
+            "message": "Access revoked by PC administrator."
+        }
+    
+    if dev_id not in devices:
+        devices[dev_id] = {
+            "device_id": dev_id,
+            "device_name": req.device_name or "Mobile Device",
+            "ip": client_ip,
+            "user_agent": ua,
+            "first_seen": now_str,
+            "last_seen": now_ts,
+            "is_blocked": False
+        }
+    else:
+        devices[dev_id]["last_seen"] = now_ts
+        devices[dev_id]["ip"] = client_ip
+        if req.device_name:
+            devices[dev_id]["device_name"] = req.device_name
+        if ua:
+            devices[dev_id]["user_agent"] = ua
+
+    save_devices(devices)
+    return {"allowed": True, "status": "online", "device_id": dev_id}
+
+@app.get("/api/devices")
+async def get_devices():
+    devices = load_devices()
+    now_ts = time.time()
+    device_list = []
+    online_count = 0
+    blocked_count = 0
+
+    for dev_id, info in devices.items():
+        last_seen = info.get("last_seen", 0)
+        is_blocked = info.get("is_blocked", False)
+        # Device is considered currently online if pinged within last 35 seconds
+        is_online = (now_ts - last_seen < 35) and not is_blocked
+        if is_online:
+            online_count += 1
+        if is_blocked:
+            blocked_count += 1
+            
+        device_list.append({
+            "device_id": dev_id,
+            "device_name": info.get("device_name", "Remote Device"),
+            "ip": info.get("ip", "Unknown"),
+            "user_agent": info.get("user_agent", ""),
+            "first_seen": info.get("first_seen", "Unknown"),
+            "last_seen_seconds_ago": int(now_ts - last_seen),
+            "is_online": is_online,
+            "is_blocked": is_blocked
+        })
+
+    # Sort: online first, then by last seen
+    device_list.sort(key=lambda x: (x["is_blocked"], not x["is_online"], x["last_seen_seconds_ago"]))
+
+    return {
+        "success": True,
+        "total_connected": online_count,
+        "total_registered": len(device_list),
+        "total_blocked": blocked_count,
+        "devices": device_list
+    }
+
+@app.post("/api/devices/delete")
+async def delete_device(req: DeviceActionRequest):
+    dev_id = req.device_id.strip()
+    devices = load_devices()
+    if dev_id in devices:
+        devices[dev_id]["is_blocked"] = True
+        devices[dev_id]["blocked_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        save_devices(devices)
+        logger.warning(f"Device revoked & blocked: {dev_id} ({devices[dev_id].get('device_name')})")
+        return {"success": True, "message": f"Device access revoked and disconnected."}
+    return {"success": False, "message": "Device not found."}
+
+@app.post("/api/devices/unblock")
+async def unblock_device(req: DeviceActionRequest):
+    dev_id = req.device_id.strip()
+    devices = load_devices()
+    if dev_id in devices:
+        devices[dev_id]["is_blocked"] = False
+        save_devices(devices)
+        logger.info(f"Device unblocked: {dev_id}")
+        return {"success": True, "message": f"Device unblocked successfully."}
+    return {"success": False, "message": "Device not found."}
+
+@app.get("/api/tunnel_info")
+def get_tunnel_info():
+    cf_log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cf.log")
+    tunnel_url = None
+    if os.path.exists(cf_log_path):
+        try:
+            with open(cf_log_path, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read()
+                matches = re.findall(r"https://[a-zA-Z0-9-]+\.trycloudflare\.com", content)
+                if matches:
+                    tunnel_url = matches[-1]
+        except Exception:
+            pass
+    return {
+        "tunnel_url": tunnel_url,
+        "local_ip": get_local_ip()
+    }
 
 def get_local_ip():
     """Detects the PC's Wi-Fi / Local Network IPv4 address."""
@@ -104,6 +284,8 @@ COMMAND_TIMEOUT_SECONDS = 30
 async def execute_command(req: CommandRequest):
     """Runs the (blocking) command pipeline in a worker thread so a slow or hung
     PC action can never freeze the server's event loop."""
+    if req.device_id and not check_device_allowed(req.device_id):
+        raise HTTPException(status_code=403, detail="Device access has been revoked.")
     text = req.text.strip()
     try:
         return await asyncio.wait_for(
@@ -417,27 +599,51 @@ async def trigger_pc_listen():
 @app.websocket("/ws/mouse")
 async def websocket_mouse_endpoint(websocket: WebSocket):
     """Ultra-low-latency bidirectional WebSocket for mobile touchpad.
-    Zero HTTP overhead, sub-millisecond execution for fluid cursor movement.
+    Zero HTTP overhead, sub-millisecond execution for fluid cursor movement and real-time cursor alignment.
     """
+    dev_id = websocket.query_params.get("device_id")
+    if dev_id and not check_device_allowed(dev_id):
+        await websocket.close(code=1008)
+        return
+
     await websocket.accept()
     agent = get_computer_agent()
+
+    # Instantly align pulse cursor upon connection
+    try:
+        _, _, init_x, init_y = agent.get_cursor_pos()
+        await websocket.send_text(f"p:{init_x},{init_y}")
+    except Exception:
+        pass
+
     try:
         while True:
             msg = await websocket.receive_text()
             if not msg:
                 continue
+            if dev_id and not check_device_allowed(dev_id):
+                await websocket.send_text("error:access_revoked")
+                await websocket.close(code=1008)
+                break
             if msg.startswith("m:"):
                 # "m:dx,dy" format for relative movement
                 parts = msg[2:].split(",")
                 if len(parts) == 2:
                     try:
-                        agent.move_rel(int(parts[0]), int(parts[1]))
+                        coords = agent.move_rel(int(parts[0]), int(parts[1]))
+                        if coords:
+                            await websocket.send_text(f"p:{coords[0]},{coords[1]}")
                     except ValueError:
                         pass
             elif msg.startswith("c:"):
                 # "c:btn" format for clicks (left, right, double)
                 btn = msg[2:].strip()
                 agent.click(button=btn)
+                try:
+                    _, _, cx, cy = agent.get_cursor_pos()
+                    await websocket.send_text(f"p:{cx},{cy}")
+                except Exception:
+                    pass
             elif msg.startswith("s:"):
                 # "s:amount" format for wheel scroll
                 try:
@@ -452,6 +658,8 @@ async def websocket_mouse_endpoint(websocket: WebSocket):
 @app.post("/api/computer/mouse/move")
 @app.post("/api/mouse/move")
 async def mouse_move(req: MouseMoveRequest):
+    if req.device_id and not check_device_allowed(req.device_id):
+        raise HTTPException(status_code=403, detail="Device access revoked.")
     agent = get_computer_agent()
     success = agent.move_rel(req.dx, req.dy)
     return {"success": success}
@@ -459,6 +667,8 @@ async def mouse_move(req: MouseMoveRequest):
 @app.post("/api/computer/mouse/click")
 @app.post("/api/mouse/click")
 async def mouse_click(req: MouseClickRequest):
+    if req.device_id and not check_device_allowed(req.device_id):
+        raise HTTPException(status_code=403, detail="Device access revoked.")
     agent = get_computer_agent()
     success = agent.click(button=req.button, clicks=req.clicks)
     return {"success": success}
@@ -466,6 +676,8 @@ async def mouse_click(req: MouseClickRequest):
 @app.post("/api/computer/mouse/scroll")
 @app.post("/api/mouse/scroll")
 async def mouse_scroll(req: MouseScrollRequest):
+    if req.device_id and not check_device_allowed(req.device_id):
+        raise HTTPException(status_code=403, detail="Device access revoked.")
     agent = get_computer_agent()
     success = agent.scroll(req.amount)
     return {"success": success}
@@ -473,6 +685,8 @@ async def mouse_scroll(req: MouseScrollRequest):
 @app.post("/api/computer/keyboard/type")
 @app.post("/api/keyboard/type")
 def keyboard_type(req: KeyboardTypeRequest):
+    if req.device_id and not check_device_allowed(req.device_id):
+        raise HTTPException(status_code=403, detail="Device access revoked.")
     agent = get_computer_agent()
     success = agent.type_text(req.text)
     return {"success": success}

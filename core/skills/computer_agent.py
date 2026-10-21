@@ -69,7 +69,22 @@ class ComputerAgent:
             logger.error(f"move_to failed: {e}")
             return False
 
-    def move_rel(self, dx: int, dy: int) -> bool:
+    def get_cursor_pos(self):
+        """Returns (x, y, pct_x, pct_y) coordinates of current mouse cursor."""
+        try:
+            self._attach_desktop()
+            user32 = ctypes.windll.user32
+            class POINT(ctypes.Structure):
+                _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+            pt = POINT()
+            user32.GetCursorPos(ctypes.byref(pt))
+            pct_x = round((pt.x / max(1, self.screen_width)) * 100.0, 2)
+            pct_y = round((pt.y / max(1, self.screen_height)) * 100.0, 2)
+            return pt.x, pt.y, pct_x, pct_y
+        except Exception:
+            return 0, 0, 50.0, 50.0
+
+    def move_rel(self, dx: int, dy: int):
         """Zero-latency hardware cursor movement via Win32 SetCursorPos."""
         try:
             self._attach_desktop()
@@ -83,10 +98,12 @@ class ComputerAgent:
             nx = max(0, min(self.screen_width - 1, pt.x + int(dx)))
             ny = max(0, min(self.screen_height - 1, pt.y + int(dy)))
             user32.SetCursorPos(nx, ny)
-            return True
+            pct_x = round((nx / max(1, self.screen_width)) * 100.0, 2)
+            pct_y = round((ny / max(1, self.screen_height)) * 100.0, 2)
+            return pct_x, pct_y
         except Exception as e:
             logger.error(f"move_rel failed: {e}")
-            return False
+            return None
 
     def click(self, x: Optional[int] = None, y: Optional[int] = None, button: str = "left", clicks: int = 1) -> bool:
         """High-speed native mouse clicks with desktop session attachment."""

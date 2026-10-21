@@ -2209,6 +2209,17 @@
           clearTimeout(wsConnectTimer);
         };
 
+        mouseWs.onmessage = (event) => {
+          if (typeof event.data === 'string' && event.data.startsWith('p:')) {
+            const parts = event.data.substring(2).split(',');
+            if (parts.length === 2) {
+              const targetX = parseFloat(parts[0]);
+              const targetY = parseFloat(parts[1]);
+              setVirtualCursorDirect(targetX, targetY);
+            }
+          }
+        };
+
         mouseWs.onclose = () => {
           mouseWs = null;
           const badge = document.getElementById('ws-status-badge');
@@ -2231,16 +2242,41 @@
     // Connect WebSocket on load
     connectMouseWs();
 
-    // Zero-Latency Client-Side Instant Virtual Cursor
+    // Mathematically Perfect Real-Time Pulse Cursor Alignment
     let curXPercent = 50.0;
     let curYPercent = 50.0;
-    function updateVirtualCursor(dx, dy) {
+
+    function setVirtualCursorDirect(pctX, pctY) {
       const vCursor = document.getElementById('virtual-cursor');
+      const streamImg = document.getElementById('screen-stream-img');
+      const viewportBox = document.getElementById('stream-viewport-box');
       if (!vCursor) return;
-      curXPercent = Math.max(1, Math.min(99, curXPercent + (dx * 0.07)));
-      curYPercent = Math.max(1, Math.min(99, curYPercent + (dy * 0.12)));
+
+      curXPercent = Math.max(0, Math.min(100, pctX));
+      curYPercent = Math.max(0, Math.min(100, pctY));
+
+      if (streamImg && viewportBox) {
+        const imgRect = streamImg.getBoundingClientRect();
+        const boxRect = viewportBox.getBoundingClientRect();
+        if (imgRect.width > 20 && imgRect.height > 20) {
+          const posX = (imgRect.left - boxRect.left) + ((curXPercent / 100.0) * imgRect.width);
+          const posY = (imgRect.top - boxRect.top) + ((curYPercent / 100.0) * imgRect.height);
+          vCursor.style.left = posX + 'px';
+          vCursor.style.top = posY + 'px';
+          return;
+        }
+      }
       vCursor.style.left = curXPercent + '%';
       vCursor.style.top = curYPercent + '%';
+    }
+
+    function updateVirtualCursor(dx, dy) {
+      const streamImg = document.getElementById('screen-stream-img');
+      const imgW = streamImg ? (streamImg.clientWidth || 320) : 320;
+      const imgH = streamImg ? (streamImg.clientHeight || 180) : 180;
+      const stepX = (dx / imgW) * 100.0;
+      const stepY = (dy / imgH) * 100.0;
+      setVirtualCursorDirect(curXPercent + stepX, curYPercent + stepY);
     }
 
     function pulseVirtualCursor() {
