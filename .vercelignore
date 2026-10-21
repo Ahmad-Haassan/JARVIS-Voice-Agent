@@ -9,7 +9,6 @@ docs/
 model/
 venv/
 data/
-*.bat
 *.ps1
 *.ico
 *.pem

@@ -1211,7 +1211,7 @@
         </div>
       </div>
 
-        <a href="/GHOST-Connect.bat" download="GHOST-Connect.bat" class="primary-btn" style="padding: 6px 12px; font-size: 0.72rem; text-decoration: none; display: flex; align-items: center; gap: 5px;" title="Download 1-Click Client to control this PC">
+        <a href="/GHOST-Connect.bat" download="GHOST-Connect.bat" onclick="downloadClientFile(event)" class="primary-btn" style="padding: 6px 12px; font-size: 0.72rem; text-decoration: none; display: flex; align-items: center; gap: 5px; cursor: pointer;" title="Download 1-Click Client to control this PC">
           <svg style="width: 14px; height: 14px; fill: currentColor;" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
           Download PC Client
         </a>
@@ -1424,7 +1424,7 @@
             💻 Want to Control YOUR OWN PC from Mobile?
           </div>
           <ol style="font-size: 0.82rem; color: #cbd5e1; line-height: 1.6; padding-left: 20px;">
-            <li>Click <strong><a href="/GHOST-Connect.bat" download style="color: var(--cyan); text-decoration: underline;">Download PC Client</a></strong> and save the file on your PC.</li>
+            <li>Click <strong><a href="/GHOST-Connect.bat" download="GHOST-Connect.bat" onclick="downloadClientFile(event)" style="color: var(--cyan); text-decoration: underline; cursor: pointer;">Download PC Client</a></strong> and save the file on your PC.</li>
             <li>Double-click the downloaded <code>GHOST-Connect.bat</code> file on your computer.</li>
             <li>Scan the QR code below (or open the link) on your phone. <strong>Connected!</strong></li>
           </ol>
@@ -1830,6 +1830,43 @@
       }).catch(() => {
         prompt('Copy your remote connection link:', link);
       });
+    }
+
+    async function downloadClientFile(e) {
+      if (e) e.preventDefault();
+      soundConfirm();
+      showToast('📥 Starting GHOST Client download...');
+      try {
+        const res = await fetch('/GHOST-Connect.bat');
+        if (!res.ok) throw new Error('Root file not found');
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'GHOST-Connect.bat';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        showToast('✅ Downloaded GHOST-Connect.bat');
+      } catch (_) {
+        try {
+          const res2 = await fetch('https://raw.githubusercontent.com/Ahmad-Haassan/ghost/main/GHOST-Connect.bat');
+          if (!res2.ok) throw new Error('Raw fallback error');
+          const blob2 = await res2.blob();
+          const url2 = window.URL.createObjectURL(blob2);
+          const a2 = document.createElement('a');
+          a2.href = url2;
+          a2.download = 'GHOST-Connect.bat';
+          document.body.appendChild(a2);
+          a2.click();
+          a2.remove();
+          window.URL.revokeObjectURL(url2);
+          showToast('✅ Downloaded GHOST-Connect.bat');
+        } catch (err) {
+          window.open('https://github.com/Ahmad-Haassan/ghost/raw/main/GHOST-Connect.bat', '_blank');
+        }
+      }
     }
 
     function simulateFriendConnect() {
