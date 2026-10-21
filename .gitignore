@@ -33,3 +33,7 @@ prompt_box_clean.png
 key.pem
 cert.pem
 
+# Binary executables and tunnel logs
+cloudflared.exe
+*.log
+cf.log

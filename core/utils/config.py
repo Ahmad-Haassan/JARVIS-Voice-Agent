@@ -9,9 +9,9 @@ _config = None
 
 DEFAULT_CONFIG = {
     "app": {
-        "name": "Jarvis",
+        "name": "Ghost",
         "version": "1.0.0",
-        "wake_word": "jarvis",
+        "wake_word": "ghost",
         "language": "en",
         "theme": "dark"
     },

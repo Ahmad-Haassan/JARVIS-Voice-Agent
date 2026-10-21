@@ -1,0 +1,8 @@
+{
+  "version": 2,
+  "cleanUrls": true,
+  "routes": [
+    { "src": "/api/(.*)", "dest": "https://api.ghost.local/$1" },
+    { "src": "/(.*)", "dest": "/web/$1" }
+  ]
+}

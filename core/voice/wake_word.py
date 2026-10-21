@@ -89,7 +89,9 @@ class WakeDetector:
                     self._audio_queue.put(bytes(indata))
 
             WAKE_VARIANTS = [
-                self.wake_word, "jarvis", "javis", "travis", "service", 
+                self.wake_word, "ghost", "post", "host", "toast", "most", "coast", "goast",
+                "hey ghost", "hi ghost", "hello ghost", "ok ghost",
+                "jarvis", "javis", "travis", "service", 
                 "harvest", "starvis", "charvis", "darvis", "davis", "yarvis",
                 "jarves", "jarvice", "jervis", "jar vis", "jarvees", "jarv",
                 "hey jarvis", "hi jarvis", "hello jarvis", "ok jarvis"
@@ -116,7 +118,7 @@ class WakeDetector:
                         res = json.loads(recognizer.Result())
                         text = res.get("text", "").lower()
                         clean_merged = text.replace(" ", "")
-                        if any(v in text for v in WAKE_VARIANTS) or "jarvis" in clean_merged or "javis" in clean_merged:
+                        if any(v in text for v in WAKE_VARIANTS) or "ghost" in clean_merged or "jarvis" in clean_merged or "javis" in clean_merged:
                             logger.info(f"Wake word detected in: '{text}'!")
                             self.pause()
                             if self.on_detected:
@@ -125,7 +127,7 @@ class WakeDetector:
                         partial = json.loads(recognizer.PartialResult())
                         part_text = partial.get("partial", "").lower()
                         clean_part = part_text.replace(" ", "")
-                        if any(v in part_text for v in WAKE_VARIANTS) or "jarvis" in clean_part or "javis" in clean_part:
+                        if any(v in part_text for v in WAKE_VARIANTS) or "ghost" in clean_part or "jarvis" in clean_part or "javis" in clean_part:
                             logger.info(f"Wake word detected in partial: '{part_text}'!")
                             recognizer.Reset()
                             self.pause()
@@ -138,7 +140,9 @@ class WakeDetector:
 
     def _speech_recognition_wake_loop(self):
         WAKE_VARIANTS = [
-            self.wake_word, "jarvis", "javis", "travis",
+            self.wake_word, "ghost", "post", "host", "toast", "most", "coast", "goast",
+            "hey ghost", "hi ghost", "hello ghost", "ok ghost",
+            "jarvis", "javis", "travis",
             "service", "darvis", "charvis", "harvest", "starvis",
             "jarves", "jarvice", "jervis", "jar vis", "hey jarvis", "hi jarvis"
         ]

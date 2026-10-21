@@ -1,18 +1,18 @@
 <div align="center">
 
-# 🎙️ JARVIS AI — Supercharged Desktop Voice Assistant
-### *Offline Wake-Word Detection, Local Whisper Transcription & Deep Windows OS Automation*
+# 👻 GHOST — Autonomous Neural Desktop OS & Remote Commander
+### *One-Time QR Mobile Pairing, Encrypted Tunnel Control & Deep Windows OS Automation*
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org/)
 [![Vosk](https://img.shields.io/badge/Vosk-Offline_Wake_Word-FF6F00?style=for-the-badge)](https://alphacephei.com/vosk/)
-[![Faster-Whisper](https://img.shields.io/badge/Faster_Whisper-Local_STT-blue?style=for-the-badge)](https://github.com/SYSTRAN/faster-whisper)
-[![PyQt6](https://img.shields.io/badge/GUI-PyQt6_Cyber_HUD-41CD52?style=for-the-badge&logo=qt&logoColor=white)](https://riverbankcomputing.com/software/pyqt/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Remote_Bridge-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Web App](https://img.shields.io/badge/Web_HUD-Cyber_Obsidian-00f5d4?style=for-the-badge)](./web/index.html)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](./LICENSE)
 
 <br />
 
 <p align="center">
-  JARVIS is an always-listening, privacy-first personal desktop AI assistant built in Python. Designed with a dual-stage speech pipeline (lightweight offline wake-word + local quantized Whisper STT), JARVIS provides hands-free OS control, instant app launching, YouTube media automation, and system diagnostics through a glowing cyberpunk PyQt6 interface.
+  <b>GHOST</b> is a next-generation cybernetic desktop operating system and remote control platform. Equipped with real-time Win32 automation, dual-stage speech recognition, and an encrypted wireless mobile bridge with instant One-Time QR pairing, GHOST enables complete hands-free control of your PC from anywhere in the world over 4G/5G.
 </p>
 
 [**Explore Capabilities**](#-core-capabilities) • [**Architecture**](#-speech--automation-pipeline) • [**Command Glossary**](#-supported-voice-commands) • [**Setup Guide**](#-setup--installation)

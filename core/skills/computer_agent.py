@@ -7,15 +7,16 @@ import threading
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
+import ctypes
 import pyautogui
 from core.utils.logger import get_logger
 from core.skills.system_control import shell_execute, get_chrome_path
 
 logger = get_logger("skills.computer_agent")
 
-# Configure PyAutoGUI safely
+# Configure PyAutoGUI with minimal pause for fluid remote response
 pyautogui.FAILSAFE = False
-pyautogui.PAUSE = 0.05
+pyautogui.PAUSE = 0.001
 
 class ComputerAgent:
     def __init__(self):
@@ -45,40 +46,77 @@ class ComputerAgent:
         return self._is_busy
 
     # ==========================================
-    # MOUSE CONTROL
+    # MOUSE CONTROL (HIGH-PERFORMANCE WIN32 API)
     # ==========================================
-    def move_to(self, x: int, y: int, duration: float = 0.35) -> bool:
+    def _attach_desktop(self):
+        """Attaches current thread to interactive desktop session WinSta0\\Default."""
         try:
-            # Bound coordinates within screen
+            user32 = ctypes.windll.user32
+            h_desk = user32.OpenDesktopW("default", 0, False, 0x1FF)
+            if h_desk:
+                user32.SetThreadDesktop(h_desk)
+        except Exception:
+            pass
+
+    def move_to(self, x: int, y: int, duration: float = 0.0) -> bool:
+        try:
+            self._attach_desktop()
             tx = max(0, min(self.screen_width - 1, int(x)))
             ty = max(0, min(self.screen_height - 1, int(y)))
-            pyautogui.moveTo(tx, ty, duration=duration, tween=pyautogui.easeInOutQuad)
-            self._log_action("MOUSE", f"Moved cursor to ({tx}, {ty})")
+            ctypes.windll.user32.SetCursorPos(tx, ty)
             return True
         except Exception as e:
             logger.error(f"move_to failed: {e}")
             return False
 
     def move_rel(self, dx: int, dy: int) -> bool:
+        """Zero-latency hardware cursor movement via Win32 SetCursorPos."""
         try:
-            cur_x, cur_y = pyautogui.position()
-            return self.move_to(cur_x + dx, cur_y + dy, duration=0.05)
+            self._attach_desktop()
+            user32 = ctypes.windll.user32
+
+            class POINT(ctypes.Structure):
+                _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+
+            pt = POINT()
+            user32.GetCursorPos(ctypes.byref(pt))
+            nx = max(0, min(self.screen_width - 1, pt.x + int(dx)))
+            ny = max(0, min(self.screen_height - 1, pt.y + int(dy)))
+            user32.SetCursorPos(nx, ny)
+            return True
         except Exception as e:
             logger.error(f"move_rel failed: {e}")
             return False
 
     def click(self, x: Optional[int] = None, y: Optional[int] = None, button: str = "left", clicks: int = 1) -> bool:
+        """High-speed native mouse clicks with desktop session attachment."""
         try:
-            btn = "left"
-            if button in ("right", "middle", "left", "primary", "secondary"):
-                btn = button
-            elif button == "double":
-                btn = "left"
-                clicks = 2
+            self._attach_desktop()
+            user32 = ctypes.windll.user32
+
             if x is not None and y is not None:
-                self.move_to(x, y, duration=0.2)
-            pyautogui.click(button=btn, clicks=clicks)
-            self._log_action("MOUSE", f"Clicked {btn} button ({clicks}x) at {pyautogui.position()}")
+                user32.SetCursorPos(int(x), int(y))
+
+            btn = (button or "left").lower().strip()
+            if btn in ("right", "secondary"):
+                for i in range(clicks):
+                    user32.mouse_event(0x0008, 0, 0, 0, 0)  # RIGHTDOWN
+                    user32.mouse_event(0x0010, 0, 0, 0, 0)  # RIGHTUP
+                    if clicks > 1 and i < clicks - 1:
+                        time.sleep(0.04)
+            elif btn == "middle":
+                for i in range(clicks):
+                    user32.mouse_event(0x0020, 0, 0, 0, 0)  # MIDDLEDOWN
+                    user32.mouse_event(0x0040, 0, 0, 0, 0)  # MIDDLEUP
+                    if clicks > 1 and i < clicks - 1:
+                        time.sleep(0.04)
+            else:  # left or double
+                total = 2 if btn == "double" else clicks
+                for i in range(total):
+                    user32.mouse_event(0x0002, 0, 0, 0, 0)  # LEFTDOWN
+                    user32.mouse_event(0x0004, 0, 0, 0, 0)  # LEFTUP
+                    if total > 1 and i < total - 1:
+                        time.sleep(0.04)
             return True
         except Exception as e:
             logger.error(f"click failed: {e}")
@@ -91,9 +129,11 @@ class ComputerAgent:
         return self.click(x=x, y=y, button="left", clicks=2)
 
     def scroll(self, amount: int) -> bool:
+        """Native Win32 mouse wheel scroll."""
         try:
-            pyautogui.scroll(amount)
-            self._log_action("MOUSE", f"Scrolled mouse wheel ({amount})")
+            self._attach_desktop()
+            # 0x0800 = MOUSEEVENTF_WHEEL
+            ctypes.windll.user32.mouse_event(0x0800, 0, 0, int(amount), 0)
             return True
         except Exception as e:
             logger.error(f"scroll failed: {e}")
@@ -103,11 +143,24 @@ class ComputerAgent:
     # KEYBOARD CONTROL
     # ==========================================
     def type_text(self, text: str, interval: float = 0.025) -> bool:
-        """Types text with natural human-like keystroke intervals."""
+        """Types text into active window."""
         try:
+            self._attach_desktop()
             self._log_action("KEYBOARD", f"Typing text: '{text[:35]}...'")
-            pyautogui.write(text, interval=interval)
+            import pyperclip
+            pyperclip.copy(text)
+            ctypes.windll.user32.keybd_event(0x11, 0, 0, 0)  # Ctrl down
+            ctypes.windll.user32.keybd_event(0x56, 0, 0, 0)  # V down
+            ctypes.windll.user32.keybd_event(0x56, 0, 2, 0)  # V up
+            ctypes.windll.user32.keybd_event(0x11, 0, 2, 0)  # Ctrl up
             return True
+        except Exception:
+            try:
+                pyautogui.write(text, interval=interval)
+                return True
+            except Exception as e:
+                logger.error(f"type_text failed: {e}")
+                return False
         except Exception as e:
             logger.error(f"type_text failed: {e}")
             return False

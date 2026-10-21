@@ -78,13 +78,21 @@ def shell_execute(target: str, args: str = "") -> bool:
 
 import threading
 import json
-import difflib
+import re
+import glob
+
+try:
+    from rapidfuzz import fuzz
+    HAS_RAPIDFUZZ = True
+except ImportError:
+    import difflib
+    HAS_RAPIDFUZZ = False
 
 class AppCatalog:
     _instance = None
 
     def __init__(self):
-        self._apps = []
+        self._apps = []  # List of dicts: {"name": str, "clean": str, "type": str, "target": str}
         self._loaded = False
         self._load_lock = threading.Lock()
         self._start_async_load()
@@ -101,98 +109,91 @@ class AppCatalog:
 
     def _load_installed_apps(self):
         with self._load_lock:
+            collected = []
+            seen_names = set()
+
+            # 1. Standard Built-in Windows Utilities & Aliases
+            BUILTINS = [
+                ("Snipping Tool", ["snipping tool", "snip tool", "snip", "screenshot tool"], "exe", "snippingtool.exe"),
+                ("Calculator", ["calculator", "calc"], "exe", "calc.exe"),
+                ("Notepad", ["notepad", "notes", "text editor"], "exe", "notepad.exe"),
+                ("Paint", ["paint", "mspaint"], "exe", "mspaint.exe"),
+                ("Task Manager", ["task manager", "taskmgr", "task"], "exe", "taskmgr.exe"),
+                ("Command Prompt", ["cmd", "command prompt"], "exe", "cmd.exe"),
+                ("PowerShell", ["powershell", "terminal"], "exe", "powershell.exe"),
+                ("Control Panel", ["control panel", "control"], "exe", "control.exe"),
+                ("File Explorer", ["file explorer", "explorer", "files"], "exe", "explorer.exe"),
+                ("Device Manager", ["device manager"], "exe", "devmgmt.msc"),
+                ("WordPad", ["wordpad"], "exe", "write.exe"),
+                ("Registry Editor", ["regedit", "registry editor"], "exe", "regedit.exe"),
+                ("Windows Settings", ["settings", "system settings", "pc settings"], "protocol", "ms-settings:"),
+                ("Camera", ["camera", "webcam"], "protocol", "microsoft.windows.camera:"),
+                ("Microsoft Store", ["store", "microsoft store", "app store"], "protocol", "ms-windows-store:"),
+                ("Clock", ["clock", "alarm", "alarms", "timer", "stopwatch"], "protocol", "ms-clock:"),
+            ]
+            for disp_name, aliases, kind, tgt in BUILTINS:
+                item = {"name": disp_name, "aliases": aliases, "type": kind, "target": tgt}
+                collected.append(item)
+
+            # 2. Modern Apps & UWP via PowerShell Get-StartApps
             try:
-                cmd = ["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", "Get-StartApps | ConvertTo-Json"]
-                proc = subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=12)
+                cmd = ["powershell.exe", "-NoProfile", "-WindowStyle", "Hidden", "-Command", "Get-StartApps | ConvertTo-Json"]
+                proc = subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=8)
                 if proc.returncode == 0 and proc.stdout.strip():
-                    data = json.loads(proc.stdout)
-                    if isinstance(data, list):
-                        self._apps = data
-                    elif isinstance(data, dict):
-                        self._apps = [data]
-                    logger.info(f"Loaded {len(self._apps)} Windows StartApps into catalog.")
+                    raw = json.loads(proc.stdout)
+                    items = raw if isinstance(raw, list) else [raw]
+                    for it in items:
+                        name = it.get("Name", "").strip()
+                        appid = it.get("AppID", "").strip()
+                        if name and appid:
+                            clean_n = name.lower()
+                            if clean_n not in seen_names:
+                                seen_names.add(clean_n)
+                                if appid.endswith(".exe") and os.path.exists(appid):
+                                    collected.append({"name": name, "aliases": [clean_n], "type": "exe", "target": appid})
+                                else:
+                                    collected.append({"name": name, "aliases": [clean_n], "type": "appid", "target": appid})
             except Exception as e:
-                logger.warning(f"Failed to load StartApps: {e}")
+                logger.warning(f"Get-StartApps load warning: {e}")
+
+            # 3. Recursive Start Menu Shortcuts (.lnk files across all users)
+            start_dirs = [
+                r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs",
+                os.path.expandvars(r"%APPDATA%\Microsoft\Windows\Start Menu\Programs")
+            ]
+            for sdir in start_dirs:
+                if os.path.exists(sdir):
+                    for root, _, files in os.walk(sdir):
+                        for f in files:
+                            if f.lower().endswith(".lnk"):
+                                name = f[:-4].strip()
+                                clean_n = name.lower()
+                                if clean_n not in seen_names:
+                                    seen_names.add(clean_n)
+                                    collected.append({
+                                        "name": name,
+                                        "aliases": [clean_n],
+                                        "type": "lnk",
+                                        "target": os.path.join(root, f)
+                                    })
+
+            self._apps = collected
+            logger.info(f"AppCatalog dynamically indexed {len(self._apps)} applications across Windows.")
             self._loaded = True
 
     def find_and_launch(self, app_name: str) -> bool:
-        if not self._loaded:
+        if not self._loaded or not self._apps:
             self._load_installed_apps()
 
         clean = (app_name or "").lower().strip()
-        for prefix in ["app ", "the ", "program ", "application ", "software ", "my "]:
+        for prefix in ["open ", "launch ", "start ", "run ", "the ", "app ", "application ", "program ", "software ", "my "]:
             if clean.startswith(prefix):
                 clean = clean[len(prefix):].strip()
 
-        # 1. Direct protocol URI mappings (UWP & Built-in Windows features)
-        PROTOCOL_MAP = {
-            "clock": "ms-clock:",
-            "alarm": "ms-clock:",
-            "alarms": "ms-clock:",
-            "timer": "ms-clock:",
-            "stopwatch": "ms-clock:",
-            "microsoft store": "ms-windows-store:",
-            "store": "ms-windows-store:",
-            "app store": "ms-windows-store:",
-            "settings": "ms-settings:",
-            "system settings": "ms-settings:",
-            "pc settings": "ms-settings:",
-            "camera": "microsoft.windows.camera:",
-            "webcam": "microsoft.windows.camera:",
-            "calculator": "calc.exe",
-            "calc": "calc.exe",
-            "notepad": "notepad.exe",
-            "paint": "mspaint.exe",
-            "photos": "ms-photos:",
-            "photo viewer": "ms-photos:",
-            "weather": "bingweather:",
-            "maps": "bingmaps:",
-            "feedback": "feedback-hub:",
-            "snipping tool": "snippingtool.exe",
-            "snip": "snippingtool.exe",
-            "task manager": "taskmgr.exe",
-            "taskmgr": "taskmgr.exe",
-            "control panel": "control.exe",
-            "cmd": "cmd.exe",
-            "command prompt": "cmd.exe",
-            "terminal": "powershell.exe",
-            "powershell": "powershell.exe",
-            "explorer": "explorer.exe",
-            "file explorer": "explorer.exe",
-            "whatsapp": "shell:AppsFolder\\5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App",
-            "spotify": "spotify:"
-        }
-        if clean in PROTOCOL_MAP:
-            target = PROTOCOL_MAP[clean]
-            if target.startswith("shell:") or target.startswith("ms-") or target.startswith("microsoft.") or target.startswith("bing"):
-                try:
-                    subprocess.Popen(["explorer.exe", target])
-                    return True
-                except Exception:
-                    pass
-            return shell_execute(target)
+        if not clean:
+            return False
 
-        # 2. Check installed desktop & UWP apps via Get-StartApps catalog
-        match = self._match_start_app(clean)
-        if match:
-            appid = match.get("AppID", "")
-            if appid:
-                logger.info(f"AppCatalog launching match: '{match.get('Name')}' ({appid})")
-                if appid.endswith(".exe") and os.path.exists(appid):
-                    try:
-                        os.startfile(appid)
-                        return True
-                    except Exception:
-                        subprocess.Popen([appid])
-                        return True
-                else:
-                    try:
-                        subprocess.Popen(["explorer.exe", f"shell:AppsFolder\\{appid}"])
-                        return True
-                    except Exception as e:
-                        logger.error(f"Failed to launch shell:AppsFolder\\{appid}: {e}")
-
-        # 3. Web Services & AI assistants
+        # 1. Check Web Services & Sites
         WEB_APPS = {
             "gemini": "https://gemini.google.com",
             "chatgpt": "https://chatgpt.com",
@@ -209,55 +210,127 @@ class AppCatalog:
             "canva": "https://canva.com",
             "instagram": "https://instagram.com",
             "facebook": "https://facebook.com",
-            "deepseek": "https://chat.deepseek.com"
+            "deepseek": "https://chat.deepseek.com",
         }
         if clean in WEB_APPS:
-            url = WEB_APPS[clean]
-            cp = get_chrome_path()
-            if cp:
-                return shell_execute(cp, url)
-            return shell_execute(url)
+            import webbrowser
+            try:
+                os.startfile(WEB_APPS[clean])
+            except Exception:
+                webbrowser.open(WEB_APPS[clean])
+            return True
 
-        return False
+        # 2. Smart Fuzzy Match in AppCatalog
+        match = self._fuzzy_search(clean)
+        if match:
+            return self._launch_app_entry(match)
 
-    def _match_start_app(self, clean: str):
-        for a in self._apps:
-            if a.get("Name", "").lower() == clean:
-                return a
-        for a in self._apps:
-            name = a.get("Name", "").lower()
-            if clean in name or name in clean:
-                return a
-        names = [a.get("Name", "") for a in self._apps]
-        matches = difflib.get_close_matches(clean, names, n=1, cutoff=0.7)
-        if matches:
-            for a in self._apps:
-                if a.get("Name") == matches[0]:
-                    return a
+        # 3. Universal Fallback: Let Windows Shell find and run it
+        try:
+            logger.info(f"Fallback launch for '{clean}' via Windows cmd start...")
+            subprocess.Popen(["cmd.exe", "/c", "start", "", clean],
+                             creationflags=0x08000000,
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+            return True
+        except Exception as fe:
+            logger.error(f"Fallback launch failed: {fe}")
+            return False
+
+    def _fuzzy_search(self, query: str):
+        if not self._loaded or not self._apps:
+            self._load_installed_apps()
+        q = query.lower().strip()
+        q_words = [w for w in re.findall(r'\w+', q) if w not in ["tool", "app", "the", "program"]]
+        if not q_words:
+            q_words = re.findall(r'\w+', q)
+
+        # Exact match
+        for app in self._apps:
+            if app["name"].lower() == q or any(a == q for a in app.get("aliases", [])):
+                return app
+
+        # Word tokens subset match (e.g. 'snip tool' -> matches 'Snipping Tool')
+        best_token_matches = []
+        for app in self._apps:
+            n_lower = app["name"].lower()
+            all_aliases = " ".join([n_lower] + app.get("aliases", []))
+            if all(w in all_aliases for w in q_words):
+                best_token_matches.append(app)
+
+        if best_token_matches:
+            best_token_matches.sort(key=lambda a: len(a["name"]))
+            return best_token_matches[0]
+
+        # Fuzzy Scoring via RapidFuzz / Difflib
+        scored = []
+        for app in self._apps:
+            n_lower = app["name"].lower()
+            if HAS_RAPIDFUZZ:
+                s1 = fuzz.token_set_ratio(q, n_lower)
+                s2 = fuzz.partial_ratio(q, n_lower)
+                score = max(s1, s2)
+            else:
+                score = difflib.SequenceMatcher(None, q, n_lower).ratio() * 100
+            scored.append((score, app))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        if scored and scored[0][0] >= 55:
+            logger.info(f"Fuzzy match resolved: '{query}' -> '{scored[0][1]['name']}' (score: {scored[0][0]:.1f})")
+            return scored[0][1]
+
         return None
 
-APP_MAP = {
-    "whatsapp": "whatsapp:",
-    "edge": "msedge",
-    "vs code": "code",
-    "vscode": "code",
-    "code": "code",
-    "terminal": "powershell.exe",
-    "cmd": "cmd.exe",
-    "notepad": "notepad.exe",
-    "calculator": "calc.exe",
-    "calc": "calc.exe",
-    "spotify": "spotify",
-    "file explorer": "explorer.exe",
-    "explorer": "explorer.exe",
-    "task manager": "taskmgr.exe",
-    "settings": "ms-settings:",
-}
+    def _launch_app_entry(self, entry: dict) -> bool:
+        kind = entry.get("type")
+        target = entry.get("target")
+        name = entry.get("name")
+        logger.info(f"Launching app '{name}' (type={kind}, target={target})")
+
+        try:
+            if kind == "lnk":
+                os.startfile(target)
+                return True
+            elif kind == "appid":
+                subprocess.Popen(["explorer.exe", f"shell:AppsFolder\\{target}"],
+                                 creationflags=0x08000000,
+                                 stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL)
+                return True
+            elif kind == "exe":
+                if os.path.isabs(target) and os.path.exists(target):
+                    try:
+                        os.startfile(target)
+                        return True
+                    except Exception:
+                        pass
+                subprocess.Popen(["cmd.exe", "/c", "start", "", target],
+                                 creationflags=0x08000000,
+                                 stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL)
+                return True
+            elif kind == "protocol":
+                try:
+                    os.startfile(target)
+                    return True
+                except Exception:
+                    subprocess.Popen(["explorer.exe", target],
+                                     creationflags=0x08000000,
+                                     stdout=subprocess.DEVNULL,
+                                     stderr=subprocess.DEVNULL)
+                    return True
+        except Exception as e:
+            logger.error(f"Error launching {name}: {e}")
+            try:
+                subprocess.Popen(["cmd.exe", "/c", "start", "", target], creationflags=0x08000000)
+                return True
+            except Exception:
+                return False
 
 class SystemControl:
     def open_app(self, app_name: str) -> bool:
         app_clean = (app_name or "").lower().strip()
-        logger.info(f"Opening app: '{app_clean}'")
+        logger.info(f"Opening app request: '{app_clean}'")
 
         if not app_clean:
             return False
@@ -266,26 +339,52 @@ class SystemControl:
         if "antigravity" in app_clean:
             ag = get_antigravity_path()
             if ag:
-                return shell_execute(ag)
-            return shell_execute("antigravity")
+                try:
+                    os.startfile(ag)
+                    return True
+                except Exception:
+                    pass
+            try:
+                subprocess.Popen(["cmd.exe", "/c", "start", "", "antigravity"], creationflags=0x08000000)
+                return True
+            except Exception:
+                pass
 
-        # 2. Chrome
+        # 2. Chrome & Browsers (Works on ANY machine)
         if app_clean in ["chrome", "google chrome", "browser"]:
-            cp = get_chrome_path()
-            if cp:
-                return shell_execute(cp, "https://www.google.com")
-            return shell_execute("chrome.exe", "https://www.google.com")
+            # If Chrome is already open, immediately restore and focus it
+            if self.focus_window("Google Chrome") or self.focus_window("Chrome"):
+                logger.info("Focused existing Google Chrome window.")
+                return True
+            chrome_candidates = [
+                r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+                os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe")
+            ]
+            for cp in chrome_candidates:
+                if os.path.exists(cp):
+                    try:
+                        os.startfile(cp)
+                        return True
+                    except Exception:
+                        pass
+            try:
+                subprocess.Popen(["cmd.exe", "/c", "start", "chrome", "https://www.google.com"],
+                                 creationflags=0x08000000,
+                                 stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL)
+                return True
+            except Exception:
+                pass
+            import webbrowser
+            webbrowser.open("https://www.google.com")
+            return True
 
-        # 3. Universal AppCatalog (matches any installed PC app, UWP app, or web service)
+        # 3. Universal AppCatalog (100% of installed Windows apps, UWP, and shortcuts)
         if AppCatalog.get_instance().find_and_launch(app_clean):
             return True
 
-        # 4. Check known map
-        for name, cmd in APP_MAP.items():
-            if name in app_clean or app_clean in name:
-                return shell_execute(cmd)
-
-        # 5. Check if target is a folder or directory
+        # 4. Check if target is a folder or directory
         try:
             from core.skills.file_manager import get_file_manager
             fm = get_file_manager()
@@ -295,7 +394,7 @@ class SystemControl:
         except Exception as fe:
             logger.debug(f"Folder check skipped: {fe}")
 
-        # 6. Fallback shell execute or URL
+        # 5. Fallback shell execute or URL
         res = shell_execute(app_clean)
         if not res:
             if "." in app_clean and " " not in app_clean:
@@ -952,20 +1051,28 @@ class SystemControl:
         return found[0]
 
     def minimize_all(self) -> bool:
-        """Minimizes all windows to show the desktop (Win + D)."""
+        """Minimizes all windows to show/toggle the desktop."""
         try:
-            import ctypes
-            VK_LWIN = 0x5B
-            VK_D = 0x44
-            user32 = ctypes.windll.user32
-            user32.keybd_event(VK_LWIN, 0, 0, 0)
-            user32.keybd_event(VK_D, 0, 0, 0)
-            user32.keybd_event(VK_D, 0, 2, 0)
-            user32.keybd_event(VK_LWIN, 0, 2, 0)
+            import win32com.client
+            shell = win32com.client.Dispatch("Shell.Application")
+            shell.ToggleDesktop()
+            logger.info("Desktop toggled via Shell.Application COM.")
             return True
         except Exception as e:
-            logger.error(f"Minimize all error: {e}")
-            return False
+            logger.warning(f"COM ToggleDesktop warning: {e}, falling back to keybd_event")
+            try:
+                import ctypes
+                VK_LWIN = 0x5B
+                VK_D = 0x44
+                user32 = ctypes.windll.user32
+                user32.keybd_event(VK_LWIN, 0, 0, 0)
+                user32.keybd_event(VK_D, 0, 0, 0)
+                user32.keybd_event(VK_D, 0, 2, 0)
+                user32.keybd_event(VK_LWIN, 0, 2, 0)
+                return True
+            except Exception as e2:
+                logger.error(f"Minimize all error: {e2}")
+                return False
 
     def execute_powershell(self, script: str) -> tuple:
         """Executes an arbitrary PowerShell script safely and returns (success, output)."""

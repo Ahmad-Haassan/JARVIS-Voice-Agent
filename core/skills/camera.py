@@ -41,7 +41,7 @@ class CameraSkill:
 
                 # Also save copy to Desktop
                 try:
-                    desktop_path = os.path.join(os.path.expanduser("~"), "Desktop", "JARVIS_camera.jpg")
+                    desktop_path = os.path.join(os.path.expanduser("~"), "Desktop", "Ghost_camera.jpg")
                     cv2.imwrite(desktop_path, frame)
                 except Exception:
                     pass

@@ -58,10 +58,13 @@ class WebSearch:
             except Exception as fe:
                 logger.warning(f"Direct video extraction fallback: {fe}")
 
-            cp = get_chrome_path()
-            if cp:
-                return shell_execute(cp, play_url)
-            return shell_execute(play_url)
+            try:
+                import os
+                os.startfile(play_url)
+                return True
+            except Exception:
+                webbrowser.open(play_url)
+                return True
         except Exception as e:
             logger.error(f"YouTube play error: {e}")
             return False

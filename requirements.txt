@@ -51,3 +51,9 @@ Pillow>=10.0.0
 rapidfuzz>=3.6.0
 phonetics>=1.0.5
 yt-dlp>=2024.1.1
+
+# ── Mobile Server ───────────────────────────────────
+fastapi>=0.109.0
+uvicorn>=0.27.0
+python-multipart>=0.0.9
+

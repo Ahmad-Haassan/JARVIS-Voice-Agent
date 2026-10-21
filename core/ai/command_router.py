@@ -1,6 +1,9 @@
 """
 Command Router — maps parsed intents to corresponding skill executors.
 """
+import os
+import subprocess
+import webbrowser
 from dataclasses import dataclass
 from typing import Any, Optional
 from core.utils.logger import get_logger
@@ -235,12 +238,39 @@ class CommandRouter:
                     resp = f"Opened {file_target}." if success else f"Could not find file '{file_target}'."
                 return CommandResult(success=success, response=resp, data=path)
 
-            # 15. Open Target in Specific App (e.g. "open dsa folder in antigravity and solve assignment 3")
+            # 15. Open Target in Specific App (e.g. "open chatgpt in chrome", "open dsa folder in antigravity")
             elif intent == "open_in":
-                target_name = entities.get("target", "")
-                app_name = entities.get("app", "")
-                prompt = entities.get("prompt", "")
-                
+                target_name = (entities.get("target") or "").strip()
+                app_name = (entities.get("app") or "").strip()
+                prompt = (entities.get("prompt") or "").strip()
+
+                WEB_SITES = {
+                    "chatgpt": "https://chatgpt.com",
+                    "gemini": "https://gemini.google.com",
+                    "youtube": "https://www.youtube.com",
+                    "github": "https://github.com",
+                    "google": "https://www.google.com",
+                    "gmail": "https://mail.google.com",
+                    "claude": "https://claude.ai",
+                    "deepseek": "https://chat.deepseek.com",
+                    "netflix": "https://netflix.com",
+                    "reddit": "https://reddit.com"
+                }
+
+                target_lower = target_name.lower()
+                is_web = target_lower in WEB_SITES or target_lower.startswith("http") or "." in target_lower or app_name.lower() in ["chrome", "google chrome", "browser", "edge"]
+
+                if is_web:
+                    url = WEB_SITES.get(target_lower, target_name if target_name.startswith("http") else f"https://{target_name}")
+                    if "chrome" in app_name.lower():
+                        try:
+                            subprocess.Popen(["cmd.exe", "/c", "start", "chrome", url])
+                        except Exception:
+                            webbrowser.open(url)
+                    else:
+                        webbrowser.open(url)
+                    return CommandResult(success=True, response=f"Opened {target_name} in {app_name or 'browser'}.")
+
                 resolved_path = None
                 display_name = target_name
                 if target_name:

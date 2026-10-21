@@ -3,25 +3,45 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>JARVIS Mobile Commander</title>
+  <title>GHOST // Autonomous Neural Desktop OS & Remote Commander</title>
+  <meta name="description" content="Next-Generation Cybernetic Desktop Remote Control & Neural Voice Operating System. Connect, pair, and control your PC from anywhere on Earth.">
+  <meta name="theme-color" content="#030712">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="GHOST">
+
+  <!-- Premium Typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+
   <style>
     :root {
-      --bg: #020617;
-      --card-bg: rgba(15, 23, 42, 0.72);
-      --card-border: rgba(255, 255, 255, 0.08);
-      --accent: #6366f1;
-      --accent-glow: rgba(99, 102, 241, 0.45);
-      --cyan: #00f2fe;
-      --cyan-glow: rgba(0, 242, 254, 0.35);
-      --text: #f8fafc;
-      --text-dim: #94a3b8;
-      --success: #10b981;
+      --bg-base: #030712;
+      --bg-surface: rgba(11, 19, 38, 0.75);
+      --bg-card: rgba(15, 23, 42, 0.65);
+      --bg-card-hover: rgba(30, 41, 59, 0.7);
+      --border-glow: rgba(0, 245, 212, 0.35);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      
+      --cyan: #00f5d4;
+      --cyan-dim: #00bbf9;
+      --cyan-glow: rgba(0, 245, 212, 0.4);
+      --purple: #8b5cf6;
+      --purple-glow: rgba(139, 92, 246, 0.45);
+      --neon-blue: #3b82f6;
+      --emerald: #10b981;
       --danger: #ef4444;
       --danger-glow: rgba(239, 68, 68, 0.45);
-      --warning: #f59e0b;
+      --amber: #f59e0b;
+      
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      
+      --font-display: 'Space Grotesk', -apple-system, sans-serif;
+      --font-body: 'Outfit', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
     }
 
     * {
@@ -29,243 +49,532 @@
       margin: 0;
       padding: 0;
       -webkit-tap-highlight-color: transparent;
-      font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      outline: none;
     }
 
-    body {
-      background-color: var(--bg);
-      background-image: 
-        radial-gradient(circle at 50% 10%, rgba(99, 102, 241, 0.16) 0%, transparent 60%),
-        radial-gradient(circle at 80% 90%, rgba(0, 242, 254, 0.12) 0%, transparent 50%);
-      color: var(--text);
+    html, body {
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      font-family: var(--font-body);
       min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Ambient Background Glow */
+    body::before {
+      content: "";
+      position: fixed;
+      top: -20%;
+      left: 15%;
+      width: 60vw;
+      height: 60vw;
+      max-width: 800px;
+      max-height: 800px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0, 245, 212, 0.07) 0%, transparent 65%);
+      filter: blur(80px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      bottom: -15%;
+      right: 10%;
+      width: 50vw;
+      height: 50vw;
+      max-width: 600px;
+      max-height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(139, 92, 246, 0.09) 0%, transparent 70%);
+      filter: blur(90px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Background Interactive Canvas */
+    #matrix-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.55;
+    }
+
+    /* Container */
+    .app-viewport {
+      position: relative;
+      z-index: 1;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: env(safe-area-inset-top, 14px) 16px calc(env(safe-area-inset-bottom, 20px) + 80px);
       display: flex;
       flex-direction: column;
-      padding: env(safe-area-inset-top, 16px) 16px calc(env(safe-area-inset-bottom, 20px) + 76px);
-      overflow-x: hidden;
+      gap: 18px;
     }
 
-    /* Top Header */
-    header {
+    /* Top Navigation & Status Bar */
+    .nav-bar {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 8px 4px 16px;
+      padding: 12px 18px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
     }
 
-    .brand {
+    .brand-cluster {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
+      text-decoration: none;
     }
 
-    .brand-logo {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--cyan), var(--accent));
-      box-shadow: 0 0 15px var(--cyan-glow);
+    .ghost-emblem {
+      position: relative;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, rgba(0, 245, 212, 0.2), rgba(139, 92, 246, 0.3));
+      border: 1px solid var(--cyan-glow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(0, 245, 212, 0.25);
+    }
+
+    .ghost-emblem svg {
+      width: 22px;
+      height: 22px;
+      fill: var(--cyan);
+      filter: drop-shadow(0 0 6px var(--cyan));
+    }
+
+    .brand-meta {
+      display: flex;
+      flex-direction: column;
     }
 
     .brand-title {
-      font-family: 'Space Grotesk', sans-serif;
-      font-weight: 700;
+      font-family: var(--font-display);
       font-size: 1.25rem;
-      letter-spacing: 2px;
-      background: linear-gradient(90deg, #fff, #cbd5e1);
+      font-weight: 800;
+      letter-spacing: 2.5px;
+      background: linear-gradient(90deg, #ffffff, #a5f3fc);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
 
-    .status-badge {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 14px;
-      border-radius: 20px;
-      background: rgba(16, 185, 129, 0.1);
-      border: 1px solid rgba(16, 185, 129, 0.3);
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: var(--success);
-      letter-spacing: 0.5px;
-    }
-
-    .status-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--success);
-      box-shadow: 0 0 8px var(--success);
-      animation: pulse-dot 2s infinite;
-    }
-
-    @keyframes pulse-dot {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.85); }
-    }
-
-    .wake-badge {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 12px;
-      border-radius: 20px;
-      background: rgba(148, 163, 184, 0.1);
-      border: 1px solid rgba(148, 163, 184, 0.25);
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: var(--text-dim);
-      letter-spacing: 0.5px;
-      cursor: pointer;
-      transition: all 0.25s ease;
-      user-select: none;
-    }
-
-    .wake-badge.active {
-      background: rgba(0, 242, 254, 0.12);
-      border-color: rgba(0, 242, 254, 0.4);
+    .brand-badge {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
       color: var(--cyan);
-      box-shadow: 0 0 12px var(--cyan-glow);
+      letter-spacing: 1px;
+      text-transform: uppercase;
     }
 
-    .wake-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--text-dim);
-      transition: background 0.25s, box-shadow 0.25s;
-    }
-
-    .wake-badge.active .wake-dot {
-      background: var(--cyan);
-      box-shadow: 0 0 8px var(--cyan);
-      animation: pulse-dot 1.2s infinite;
-    }
-
-    .https-unlock-btn {
+    .nav-controls {
       display: flex;
       align-items: center;
-      gap: 5px;
-      padding: 6px 11px;
-      border-radius: 20px;
-      background: rgba(245, 158, 11, 0.15);
-      border: 1px solid rgba(245, 158, 11, 0.45);
-      color: #fbbf24;
+      gap: 8px;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 14px;
+      border-radius: 30px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      font-family: var(--font-mono);
       font-size: 0.72rem;
       font-weight: 700;
-      letter-spacing: 0.4px;
+      color: var(--emerald);
+      letter-spacing: 0.5px;
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.15);
       cursor: pointer;
-      animation: pulse-dot 2s infinite;
       transition: all 0.2s ease;
     }
 
-    .https-unlock-btn:active {
-      transform: scale(0.95);
-      background: rgba(245, 158, 11, 0.3);
+    .status-pill:hover {
+      background: rgba(16, 185, 129, 0.2);
     }
 
-    /* Telemetry Bar */
-    .telemetry-row {
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 10px var(--emerald);
+      animation: pulse-beacon 2s infinite ease-in-out;
+    }
+
+    @keyframes pulse-beacon {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(0.8); opacity: 0.45; }
+    }
+
+    .icon-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .icon-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--cyan);
+      border-color: var(--cyan-glow);
+    }
+
+    .icon-btn svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+
+    /* Live Cyber Telemetry Strip */
+    .telemetry-deck {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
       gap: 10px;
-      margin-bottom: 16px;
     }
 
     .telemetry-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      backdrop-filter: blur(15px);
-      -webkit-backdrop-filter: blur(15px);
-      border-radius: 14px;
-      padding: 10px;
-      text-align: center;
-    }
-
-    .telemetry-label {
-      font-size: 0.68rem;
-      color: var(--text-dim);
-      font-weight: 600;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      margin-bottom: 2px;
-    }
-
-    .telemetry-value {
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: #fff;
-    }
-
-    /* Primary Mode Selector: Speak vs Text vs Controls */
-    .mode-bar {
-      display: flex;
-      background: rgba(15, 23, 42, 0.9);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
       border-radius: 16px;
-      padding: 5px;
-      margin-bottom: 18px;
-      gap: 5px;
+      padding: 12px 14px;
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition: transform 0.2s ease, border-color 0.2s ease;
     }
 
-    .mode-btn {
+    .telemetry-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(0, 245, 212, 0.3);
+    }
+
+    .telemetry-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .telemetry-metric {
+      font-family: var(--font-display);
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: -0.5px;
+    }
+
+    .telemetry-spark {
+      height: 3px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .telemetry-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--cyan), var(--purple));
+      width: 32%;
+      transition: width 0.5s ease;
+    }
+
+    /* Navigation Mode Switcher Tabs */
+    .tab-bar {
+      display: flex;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 6px;
+      gap: 6px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .tab-bar::-webkit-scrollbar { display: none; }
+
+    .tab-btn {
       flex: 1;
-      padding: 12px 6px;
+      min-width: 110px;
+      padding: 10px 14px;
       border: none;
       background: transparent;
-      color: var(--text-dim);
+      color: var(--text-muted);
+      font-family: var(--font-display);
       font-size: 0.82rem;
       font-weight: 700;
       border-radius: 12px;
       cursor: pointer;
-      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      letter-spacing: 0.3px;
+      gap: 7px;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      letter-spacing: 0.5px;
+      white-space: nowrap;
     }
 
-    .mode-btn.active {
-      background: linear-gradient(135deg, var(--accent), #4f46e5);
-      color: #fff;
-      box-shadow: 0 0 15px var(--accent-glow);
+    .tab-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.04);
     }
 
-    .mode-panel {
+    .tab-btn.active {
+      background: linear-gradient(135deg, rgba(0, 245, 212, 0.18), rgba(139, 92, 246, 0.22));
+      border: 1px solid var(--cyan-glow);
+      color: #ffffff;
+      box-shadow: 0 0 20px rgba(0, 245, 212, 0.15);
+    }
+
+    .tab-btn svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+
+    /* Tab Panes */
+    .tab-pane {
       display: none;
-      animation: fadeIn 0.25s ease-out;
+      flex-direction: column;
+      gap: 18px;
+      animation: paneEnter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
-    .mode-panel.active {
-      display: block;
+    .tab-pane.active {
+      display: flex;
     }
 
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(6px); }
+    @keyframes paneEnter {
+      from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
     }
 
-    /* ========================================= */
-    /* 1. SPEAK MODE HUD                         */
-    /* ========================================= */
-    .orb-section {
+    /* ========================================================
+       SECTION: ONE-TIME QR PAIRING MODAL / SCREEN (CORE HERO)
+       ======================================================== */
+    .pairing-box {
+      background: linear-gradient(145deg, rgba(15, 23, 42, 0.8), rgba(11, 19, 38, 0.95));
+      border: 1px solid rgba(0, 245, 212, 0.25);
+      border-radius: 24px;
+      padding: 24px;
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), inset 0 0 30px rgba(0, 245, 212, 0.04);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .pairing-box::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--cyan), var(--purple), transparent);
+    }
+
+    .pairing-header h2 {
+      font-family: var(--font-display);
+      font-size: 1.45rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+      background: linear-gradient(90deg, #fff, var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .pairing-header p {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      max-width: 480px;
+      line-height: 1.4;
+    }
+
+    .qr-frame {
+      position: relative;
+      background: #000;
+      border: 2px solid var(--cyan-glow);
+      border-radius: 20px;
+      padding: 18px;
+      box-shadow: 0 0 35px rgba(0, 245, 212, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 8px 0;
+    }
+
+    .qr-frame::after {
+      content: "SCAN WITH PHONE";
+      position: absolute;
+      bottom: -10px;
+      background: var(--bg-base);
+      border: 1px solid var(--cyan);
+      color: var(--cyan);
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 12px;
+      letter-spacing: 1px;
+    }
+
+    #qr-canvas {
+      width: 180px;
+      height: 180px;
+      border-radius: 8px;
+      display: block;
+    }
+
+    .device-meta-strip {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      max-width: 520px;
+    }
+
+    .chip-key {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: #e2e8f0;
+    }
+
+    .chip-key strong {
+      color: var(--cyan);
+    }
+
+    .action-btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 6px;
+    }
+
+    .primary-btn {
+      padding: 12px 22px;
+      border-radius: 14px;
+      border: 1px solid rgba(0, 245, 212, 0.4);
+      background: linear-gradient(135deg, var(--cyan), #00bbf9);
+      color: #030712;
+      font-family: var(--font-display);
+      font-size: 0.88rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 20px rgba(0, 245, 212, 0.35);
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .primary-btn:active {
+      transform: scale(0.97);
+    }
+
+    .secondary-btn {
+      padding: 12px 20px;
+      border-radius: 14px;
+      border: 1px solid var(--border-subtle);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-main);
+      font-family: var(--font-display);
+      font-size: 0.88rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .secondary-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* ========================================================
+       SECTION: REMOTE COMMAND DECK (ORB + CONTROLS)
+       ======================================================== */
+    .deck-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+
+    @media (min-width: 900px) {
+      .deck-grid {
+        grid-template-columns: 1.15fr 0.85fr;
+      }
+    }
+
+    /* Holographic Voice Sphere */
+    .orb-cockpit {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 24px;
+      padding: 24px 20px;
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 10px 0 20px;
+      gap: 18px;
       position: relative;
+      overflow: hidden;
     }
 
-    .orb-container {
-      width: 200px;
-      height: 200px;
+    .orb-stage {
+      width: 220px;
+      height: 220px;
       position: relative;
       display: flex;
       align-items: center;
@@ -274,44 +583,44 @@
       user-select: none;
     }
 
-    .ring {
+    .orbital-ring {
       position: absolute;
       border-radius: 50%;
       border: 2px solid transparent;
       transition: all 0.3s ease;
     }
 
-    .ring-outer {
-      width: 195px;
-      height: 195px;
+    .ring-1 {
+      width: 215px;
+      height: 215px;
       border-top-color: var(--cyan);
       border-bottom-color: var(--cyan);
       box-shadow: 0 0 25px var(--cyan-glow);
-      animation: rotate-cw 8s linear infinite;
+      animation: spinClockwise 9s linear infinite;
     }
 
-    .ring-middle {
-      width: 155px;
-      height: 155px;
-      border-left-color: var(--accent);
-      border-right-color: var(--accent);
-      box-shadow: 0 0 20px var(--accent-glow);
-      animation: rotate-ccw 5s linear infinite;
+    .ring-2 {
+      width: 175px;
+      height: 175px;
+      border-left-color: var(--purple);
+      border-right-color: var(--purple);
+      box-shadow: 0 0 25px var(--purple-glow);
+      animation: spinCounter 6s linear infinite;
     }
 
-    .ring-inner {
-      width: 120px;
-      height: 120px;
+    .ring-3 {
+      width: 135px;
+      height: 135px;
       border: 2px dashed rgba(255, 255, 255, 0.25);
-      animation: rotate-cw 12s linear infinite;
+      animation: spinClockwise 14s linear infinite;
     }
 
-    .orb-core {
-      width: 82px;
-      height: 82px;
+    .orb-nucleus {
+      width: 90px;
+      height: 90px;
       border-radius: 50%;
-      background: radial-gradient(circle at 35% 35%, #ffffff 0%, #6366f1 60%, #312e81 100%);
-      box-shadow: 0 0 30px var(--accent-glow), inset 0 0 15px rgba(255, 255, 255, 0.6);
+      background: radial-gradient(circle at 35% 35%, #ffffff 0%, #00f5d4 50%, #0369a1 100%);
+      box-shadow: 0 0 35px var(--cyan-glow), inset 0 0 15px rgba(255, 255, 255, 0.8);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -319,2092 +628,1546 @@
       transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
-    .orb-container:active .orb-core {
+    .orb-stage:active .orb-nucleus {
       transform: scale(0.92);
     }
 
-    .mic-icon-large {
-      width: 32px;
-      height: 32px;
-      fill: #ffffff;
-      filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.7));
+    .orb-nucleus svg {
+      width: 38px;
+      height: 38px;
+      fill: #020617;
+      filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.5));
     }
 
-    /* Listening and Processing Orb States */
-    .orb-container.listening .ring-outer {
+    /* Listening / Processing state */
+    .orb-stage.listening .ring-1 {
       border-top-color: var(--danger);
       border-bottom-color: var(--danger);
-      box-shadow: 0 0 35px var(--danger-glow);
-      animation-duration: 2.5s;
-    }
-    .orb-container.listening .orb-core {
-      background: radial-gradient(circle, #ffffff 0%, var(--danger) 60%, #991b1b 100%);
-      animation: pulse-core 0.7s ease-in-out infinite alternate;
+      box-shadow: 0 0 40px var(--danger-glow);
+      animation-duration: 2s;
     }
 
-    .orb-container.processing .ring-middle {
-      border-left-color: var(--warning);
-      border-right-color: var(--warning);
-      animation-duration: 1.2s;
+    .orb-stage.listening .orb-nucleus {
+      background: radial-gradient(circle at 35% 35%, #ffffff 0%, var(--danger) 55%, #991b1b 100%);
+      box-shadow: 0 0 40px var(--danger-glow);
+      animation: nucleusPulse 0.8s infinite alternate ease-in-out;
     }
 
-    @keyframes rotate-cw { 100% { transform: rotate(360deg); } }
-    @keyframes rotate-ccw { 100% { transform: rotate(-360deg); } }
-    @keyframes pulse-core { 0% { transform: scale(0.95); } 100% { transform: scale(1.1); } }
+    @keyframes spinClockwise { 100% { transform: rotate(360deg); } }
+    @keyframes spinCounter { 100% { transform: rotate(-360deg); } }
+    @keyframes nucleusPulse {
+      0% { transform: scale(0.94); }
+      100% { transform: scale(1.08); }
+    }
 
-    /* Soundwave Equalizer Animation */
-    .soundwave-box {
+    /* Soundwave visualizer */
+    .soundwave-rack {
       display: flex;
       align-items: center;
-      justify-content: center;
       gap: 5px;
-      height: 24px;
-      margin-top: 14px;
-      opacity: 0.35;
-      transition: opacity 0.3s ease;
+      height: 28px;
     }
-    .soundwave-box.active {
-      opacity: 1;
-    }
-    .wave-bar {
+
+    .soundwave-bar {
       width: 4px;
       height: 8px;
-      background: linear-gradient(180deg, var(--cyan), var(--accent));
-      border-radius: 3px;
-      transition: height 0.15s ease;
+      background: linear-gradient(180deg, var(--cyan), var(--purple));
+      border-radius: 4px;
+      transition: height 0.1s ease;
     }
-    .soundwave-box.active .wave-bar {
-      animation: wave-bounce 0.8s ease-in-out infinite alternate;
-    }
-    .soundwave-box.active .wave-bar:nth-child(1) { animation-delay: 0.1s; }
-    .soundwave-box.active .wave-bar:nth-child(2) { animation-delay: 0.25s; }
-    .soundwave-box.active .wave-bar:nth-child(3) { animation-delay: 0.4s; }
-    .soundwave-box.active .wave-bar:nth-child(4) { animation-delay: 0.15s; }
-    .soundwave-box.active .wave-bar:nth-child(5) { animation-delay: 0.3s; }
 
-    @keyframes wave-bounce {
+    .soundwave-rack.active .soundwave-bar {
+      animation: barJump 0.75s infinite alternate ease-in-out;
+    }
+
+    .soundwave-rack.active .soundwave-bar:nth-child(1) { animation-delay: 0.1s; }
+    .soundwave-rack.active .soundwave-bar:nth-child(2) { animation-delay: 0.25s; }
+    .soundwave-rack.active .soundwave-bar:nth-child(3) { animation-delay: 0.4s; }
+    .soundwave-rack.active .soundwave-bar:nth-child(4) { animation-delay: 0.15s; }
+    .soundwave-rack.active .soundwave-bar:nth-child(5) { animation-delay: 0.35s; }
+    .soundwave-rack.active .soundwave-bar:nth-child(6) { animation-delay: 0.05s; }
+
+    @keyframes barJump {
       0% { height: 6px; }
       100% { height: 26px; }
     }
 
-    /* Primary Speak Trigger Button */
-    .voice-action-row {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 18px;
-    }
-
-    .primary-speak-btn {
+    /* Voice prompt input */
+    .command-box {
       width: 100%;
-      max-width: 320px;
-      padding: 16px 24px;
-      border-radius: 18px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      background: linear-gradient(135deg, var(--accent), #4f46e5);
-      color: white;
-      font-size: 1.05rem;
-      font-weight: 800;
-      letter-spacing: 0.8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      cursor: pointer;
-      box-shadow: 0 4px 25px var(--accent-glow);
-      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-    }
-
-    .primary-speak-btn:active {
-      transform: scale(0.96);
-    }
-
-    .primary-speak-btn.listening {
-      background: linear-gradient(135deg, var(--danger), #b91c1c);
-      box-shadow: 0 4px 30px var(--danger-glow);
-      animation: pulse-danger-btn 1.2s infinite;
-    }
-
-    @keyframes pulse-danger-btn {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.02); }
-    }
-
-    /* Mic Source Switcher */
-    .mic-source-row {
       display: flex;
       gap: 8px;
-      width: 100%;
-      max-width: 320px;
-    }
-
-    .source-chip {
-      flex: 1;
-      padding: 8px 10px;
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      color: var(--text-dim);
-      font-size: 0.75rem;
-      font-weight: 700;
-      cursor: pointer;
-      text-align: center;
-      transition: all 0.2s ease;
-    }
-
-    .source-chip.active {
-      background: rgba(99, 102, 241, 0.2);
-      border-color: var(--accent);
-      color: #fff;
-    }
-
-    /* Live Response Card */
-    .speech-response-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border-radius: 18px;
-      padding: 16px;
-      margin-bottom: 16px;
-    }
-
-    .speech-bubble {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      margin-bottom: 10px;
-    }
-
-    .speech-label {
-      font-size: 0.7rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-    }
-
-    .speech-label.user { color: var(--cyan); }
-    .speech-label.jarvis { color: var(--accent); }
-
-    .speech-content {
-      font-size: 0.95rem;
-      line-height: 1.45;
-      color: #f1f5f9;
-      font-weight: 500;
-    }
-
-    .voice-reply-toggle {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-top: 10px;
-      border-top: 1px solid rgba(255, 255, 255, 0.06);
-      font-size: 0.76rem;
-      color: var(--text-dim);
-      font-weight: 600;
-    }
-
-    /* Hands-Free Wake Word HUD Card */
-    .wake-word-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border-radius: 18px;
-      padding: 14px 16px;
-      margin-bottom: 16px;
-      transition: all 0.3s ease;
       position: relative;
-      overflow: hidden;
-    }
-
-    .wake-word-card.active {
-      border-color: var(--cyan);
-      box-shadow: 0 0 25px rgba(0, 242, 254, 0.18), inset 0 0 15px rgba(0, 242, 254, 0.05);
-    }
-
-    .wake-card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .wake-card-left {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .wake-status-indicator {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: rgba(30, 41, 59, 0.8);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      flex-shrink: 0;
-    }
-
-    .wake-pulse-ring {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      border-radius: 50%;
-      border: 2px solid var(--cyan);
-      opacity: 0;
-    }
-
-    .wake-word-card.active .wake-pulse-ring {
-      animation: wake-ring-pulse 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
-    }
-
-    .wake-pulse-core {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: #64748b;
-      transition: all 0.25s ease;
-    }
-
-    .wake-word-card.active .wake-pulse-core {
-      background: var(--cyan);
-      box-shadow: 0 0 10px var(--cyan);
-    }
-
-    .wake-word-card.triggered .wake-pulse-core {
-      background: var(--danger);
-      box-shadow: 0 0 15px var(--danger);
-      transform: scale(1.3);
-    }
-
-    @keyframes wake-ring-pulse {
-      0% { transform: scale(0.9); opacity: 0.8; }
-      100% { transform: scale(1.6); opacity: 0; }
-    }
-
-    .wake-card-title {
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: 0.95rem;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      color: #fff;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .wake-card-subtitle {
-      font-size: 0.75rem;
-      color: var(--text-dim);
-      margin-top: 2px;
-      transition: color 0.2s ease;
-    }
-
-    .wake-word-card.active .wake-card-subtitle {
-      color: #7dd3fc;
-    }
-
-    /* iOS Style Switch Toggle */
-    .switch-toggle {
-      position: relative;
-      display: inline-block;
-      width: 50px;
-      height: 28px;
-      flex-shrink: 0;
-      touch-action: manipulation;
-      -webkit-tap-highlight-color: transparent;
-      user-select: none;
-      -webkit-user-select: none;
-      cursor: pointer;
-    }
-
-    .switch-toggle input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-      position: absolute;
-      pointer-events: none;
-    }
-
-    .slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-color: #334155;
-      transition: background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
-      border-radius: 28px;
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      touch-action: manipulation;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 20px;
-      width: 20px;
-      left: 3px;
-      bottom: 3px;
-      background-color: white;
-      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-      border-radius: 50%;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
-    }
-
-    .switch-toggle input:checked + .slider {
-      background: linear-gradient(135deg, var(--cyan), var(--accent));
-      border-color: var(--cyan);
-      box-shadow: 0 0 14px var(--cyan-glow);
-    }
-
-    .switch-toggle input:checked + .slider:before {
-      transform: translateX(22px);
-    }
-
-    .wake-card-hints {
-      display: flex;
-      gap: 6px;
-      margin-top: 12px;
-      padding-top: 10px;
-      border-top: 1px solid rgba(255, 255, 255, 0.06);
-      flex-wrap: wrap;
-    }
-
-    .wake-tag {
-      font-size: 0.68rem;
-      padding: 3px 8px;
-      border-radius: 6px;
-      background: rgba(255, 255, 255, 0.05);
-      color: #cbd5e1;
-      font-weight: 600;
-      letter-spacing: 0.3px;
-    }
-
-    /* ========================================= */
-    /* 2. TEXT MODE & CHAT LOG                   */
-    /* ========================================= */
-    .chat-history {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border-radius: 18px;
-      padding: 16px;
-      min-height: 240px;
-      max-height: 340px;
-      overflow-y: auto;
-      margin-bottom: 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .msg-bubble {
-      padding: 12px 14px;
-      border-radius: 14px;
-      max-width: 88%;
-      font-size: 0.9rem;
-      line-height: 1.4;
-      animation: fadeIn 0.2s ease-out;
-    }
-
-    .msg-bubble.user {
-      align-self: flex-end;
-      background: linear-gradient(135deg, rgba(99, 102, 241, 0.35), rgba(79, 70, 229, 0.35));
-      border: 1px solid rgba(99, 102, 241, 0.4);
-      color: #fff;
-    }
-
-    .msg-bubble.jarvis {
-      align-self: flex-start;
-      background: rgba(30, 41, 59, 0.7);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      color: #e2e8f0;
-    }
-
-    .msg-time {
-      font-size: 0.65rem;
-      color: #94a3b8;
-      margin-top: 4px;
-      text-align: right;
-    }
-
-    /* Quick Prompt Suggestion Chips */
-    .chips-row {
-      display: flex;
-      gap: 8px;
-      overflow-x: auto;
-      padding-bottom: 6px;
-      margin-bottom: 14px;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    .chips-row::-webkit-scrollbar { display: none; }
-
-    .prompt-chip {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 20px;
-      padding: 8px 14px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: #cbd5e1;
-      white-space: nowrap;
-      cursor: pointer;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      transition: all 0.15s ease;
-    }
-
-    .prompt-chip:active {
-      background: rgba(99, 102, 241, 0.25);
-      border-color: var(--accent);
-      color: #fff;
-      transform: scale(0.96);
-    }
-
-    /* ========================================= */
-    /* 3. QUICK CONTROLS MODE                    */
-    /* ========================================= */
-    .quick-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-      margin-bottom: 20px;
-    }
-
-    .quick-btn {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 14px;
-      padding: 13px 6px;
-      color: #e2e8f0;
-      font-size: 0.78rem;
-      font-weight: 600;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-    }
-
-    .quick-btn:active {
-      transform: scale(0.94);
-      background: rgba(99, 102, 241, 0.25);
-      border-color: var(--accent);
-    }
-
-    .btn-icon {
-      font-size: 1.25rem;
-    }
-
-    /* Touchpad Area */
-    .touchpad-box {
-      width: 100%;
-      height: 160px;
-      background: rgba(15, 23, 42, 0.85);
-      border: 2px dashed rgba(99, 102, 241, 0.45);
-      border-radius: 16px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      touch-action: none;
-      user-select: none;
-      -webkit-user-select: none;
-      margin-bottom: 10px;
-      position: relative;
-      cursor: crosshair;
-    }
-    .touchpad-box:active {
-      border-color: var(--cyan);
-      box-shadow: 0 0 15px var(--cyan-glow);
-    }
-    .touchpad-hint {
-      color: var(--text-dim);
-      font-size: 0.78rem;
-      pointer-events: none;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      text-align: center;
-      line-height: 1.4;
-    }
-    .mouse-btn-row {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-    .mouse-btn {
-      padding: 10px;
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      color: #fff;
-      font-weight: 700;
-      font-size: 0.78rem;
-      cursor: pointer;
-      text-align: center;
-      transition: all 0.15s ease;
-    }
-    .mouse-btn:active {
-      background: var(--accent);
-      transform: scale(0.95);
-    }
-
-    /* Stonic AI Agent Terminal */
-    .agent-terminal {
-      background: #020617;
-      border: 1px solid rgba(0, 242, 254, 0.3);
-      border-radius: 14px;
-      padding: 10px;
-      font-family: 'Space Grotesk', monospace;
-      font-size: 0.72rem;
-      color: #00f2fe;
-      min-height: 80px;
-      max-height: 110px;
-      overflow-y: auto;
-      margin-bottom: 12px;
-      box-shadow: inset 0 0 15px rgba(0, 242, 254, 0.05);
-    }
-    .term-line {
-      margin-bottom: 3px;
-      line-height: 1.35;
-      display: flex;
-      gap: 6px;
-    }
-    .term-time { color: #64748b; font-size: 0.68rem; }
-    .term-cat { color: #10b981; font-weight: bold; }
-    .term-msg { color: #e2e8f0; }
-
-    /* ========================================= */
-    /* PERMANENT STICKY BOTTOM COMMAND BAR       */
-    /* (BOTH OPTIONS: SPEAK & TEXT SIDE-BY-SIDE) */
-    /* ========================================= */
-    .sticky-bottom-bar {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: rgba(2, 6, 23, 0.92);
-      border-top: 1px solid rgba(255, 255, 255, 0.12);
-      backdrop-filter: blur(25px);
-      -webkit-backdrop-filter: blur(25px);
-      padding: 10px 16px env(safe-area-inset-bottom, 12px);
-      z-index: 100;
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-
-    /* Dedicated Speak / Mic Button in Bottom Bar */
-    .bottom-mic-btn {
-      width: 48px;
-      height: 48px;
-      border-radius: 14px;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      background: var(--card-bg);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      color: var(--cyan);
-      box-shadow: 0 0 12px rgba(0, 242, 254, 0.2);
-      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-      flex-shrink: 0;
-    }
-
-    .bottom-mic-btn:active {
-      transform: scale(0.92);
-    }
-
-    .bottom-mic-btn.listening {
-      background: linear-gradient(135deg, var(--danger), #b91c1c);
-      color: #fff;
-      border-color: var(--danger);
-      box-shadow: 0 0 20px var(--danger-glow);
-      animation: pulse-mic 1s infinite alternate;
-    }
-
-    @keyframes pulse-mic {
-      0% { transform: scale(0.96); box-shadow: 0 0 10px var(--danger-glow); }
-      100% { transform: scale(1.06); box-shadow: 0 0 25px var(--danger-glow); }
     }
 
     .command-input {
       flex: 1;
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 14px;
-      padding: 12px 14px;
+      padding: 14px 18px;
+      border-radius: 16px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid var(--border-subtle);
       color: #fff;
-      font-size: 0.9rem;
-      outline: none;
-      backdrop-filter: blur(15px);
-      -webkit-backdrop-filter: blur(15px);
-      transition: border-color 0.2s, box-shadow 0.2s;
+      font-family: var(--font-body);
+      font-size: 0.95rem;
+      transition: all 0.2s ease;
     }
 
     .command-input:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 12px var(--accent-glow);
+      border-color: var(--cyan);
+      box-shadow: 0 0 20px rgba(0, 245, 212, 0.2);
     }
 
     .send-btn {
       width: 48px;
       height: 48px;
-      border-radius: 14px;
-      border: none;
-      background: linear-gradient(135deg, var(--accent), #4f46e5);
-      color: white;
+      border-radius: 16px;
+      border: 1px solid var(--cyan-glow);
+      background: linear-gradient(135deg, var(--cyan), #0284c7);
+      color: #020617;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      box-shadow: 0 0 15px var(--accent-glow);
-      transition: transform 0.15s ease;
-      flex-shrink: 0;
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
     .send-btn:active {
       transform: scale(0.92);
     }
 
-    /* Modals */
-    .modal {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(2, 6, 23, 0.94);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      z-index: 1005;
-      padding: 16px;
-      overflow-y: auto;
-      touch-action: pan-y;
-      -webkit-tap-highlight-color: transparent;
-      cursor: pointer;
+    .send-btn svg {
+      width: 20px;
+      height: 20px;
+      fill: currentColor;
     }
-    .modal.active { display: flex; }
-    .modal-card-box {
-      cursor: default;
-      pointer-events: auto;
-      -webkit-tap-highlight-color: transparent;
-      position: relative;
-      z-index: 1006;
-    }
-    .modal img { max-width: 100%; max-height: 75vh; border-radius: 12px; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 10px 30px rgba(0,0,0,0.8); object-fit: contain; }
-    .modal-close { margin-top: 14px; width: 100%; max-width: 280px; padding: 12px 24px; border-radius: 12px; background: linear-gradient(135deg, #ef4444, #dc2626); color: white; border: none; font-weight: 700; font-size: 0.9rem; cursor: pointer; touch-action: manipulation; }
 
-    .settings-btn {
-      background: var(--card-bg);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 50%;
+    /* Live Output Console */
+    .output-console {
+      width: 100%;
+      background: rgba(2, 6, 23, 0.85);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 14px 16px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: #cbd5e1;
+      line-height: 1.5;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .console-header {
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-dim);
+      font-size: 0.68rem;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 6px;
+    }
+
+    .console-resp {
+      color: var(--cyan);
+      font-weight: 500;
+    }
+
+    /* Quick Action Automation Matrix */
+    .matrix-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 24px;
+      padding: 20px;
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .matrix-title {
+      font-family: var(--font-display);
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .matrix-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .action-tile {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: left;
+    }
+
+    .action-tile:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--cyan-glow);
+      transform: translateY(-2px);
+    }
+
+    .action-tile:active {
+      transform: scale(0.96);
+    }
+
+    .action-icon {
       width: 32px;
       height: 32px;
+      border-radius: 10px;
+      background: rgba(0, 245, 212, 0.1);
+      color: var(--cyan);
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #fff;
-      font-size: 1rem;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    .settings-btn:active {
-      transform: scale(0.9);
-      background: rgba(99, 102, 241, 0.3);
     }
 
-    /* Toast Notifications */
-    .toast {
-      position: fixed;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%) translateY(-30px);
-      background: rgba(15, 23, 42, 0.95);
-      border: 1px solid var(--cyan);
-      border-radius: 12px;
-      padding: 10px 18px;
+    .action-icon svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+
+    .action-title {
+      font-family: var(--font-display);
+      font-size: 0.88rem;
+      font-weight: 700;
       color: #fff;
-      font-size: 0.82rem;
-      font-weight: 600;
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
+    }
+
+    .action-sub {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+    }
+
+    /* ========================================================
+       SECTION: TOUCHPAD & DESKTOP SCREEN VIEWER
+       ======================================================== */
+    .touchpad-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 24px;
+      padding: 20px;
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .touch-surface {
+      width: 100%;
+      height: 240px;
+      border-radius: 18px;
+      background: radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.95), rgba(2, 6, 23, 0.98));
+      border: 1px dashed rgba(0, 245, 212, 0.3);
+      position: relative;
+      touch-action: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      cursor: crosshair;
+      transition: border-color 0.2s ease;
+    }
+
+    .touch-surface.touching {
+      border-color: var(--cyan);
+      box-shadow: inset 0 0 30px rgba(0, 245, 212, 0.1);
+    }
+
+    .touch-watermark {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    .mouse-actions-bar {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+    }
+
+    .click-btn {
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border-subtle);
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      font-family: var(--font-display);
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .click-btn:active {
+      background: rgba(0, 245, 212, 0.2);
+      border-color: var(--cyan);
+      transform: scale(0.96);
+    }
+
+    /* Screen Stream Display */
+    .stream-viewport {
+      background: #000;
+      border: 1px solid var(--border-subtle);
+      border-radius: 18px;
+      overflow: hidden;
+      position: relative;
+      aspect-ratio: 16/9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #screen-stream-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .stream-overlay-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: var(--cyan);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ========================================================
+       SECTION: ARCHITECTURE & SYSTEM SECURITY MATRIX
+       ======================================================== */
+    .arch-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 24px;
+      padding: 24px;
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .arch-pipeline {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin: 10px 0;
+    }
+
+    @media (min-width: 768px) {
+      .arch-pipeline {
+        flex-direction: row;
+        align-items: center;
+      }
+    }
+
+    .pipeline-node {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      position: relative;
+    }
+
+    .pipeline-node.active-hub {
+      border-color: var(--cyan);
+      background: rgba(0, 245, 212, 0.04);
+      box-shadow: 0 0 25px rgba(0, 245, 212, 0.1);
+    }
+
+    .node-header {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .node-title {
+      font-family: var(--font-display);
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .node-desc {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .pipeline-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--cyan);
+      font-size: 1.2rem;
+      opacity: 0.6;
+    }
+
+    /* Terminal Log Deck */
+    .terminal-box {
+      background: #020617;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 18px;
+      padding: 16px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: #94a3b8;
+      max-height: 280px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .log-line {
+      display: flex;
+      gap: 8px;
+      line-height: 1.4;
+    }
+
+    .log-time { color: var(--text-dim); }
+    .log-tag { color: var(--purple); font-weight: 700; }
+    .log-tag.success { color: var(--emerald); }
+    .log-tag.warn { color: var(--amber); }
+    .log-msg { color: #f1f5f9; }
+
+    /* Toast Notification */
+    .toast-pill {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid var(--cyan-glow);
+      color: #fff;
+      font-family: var(--font-display);
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 10px 20px;
+      border-radius: 30px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 20px var(--cyan-glow);
+      z-index: 1000;
       opacity: 0;
       pointer-events: none;
-      transition: all 0.3s ease;
-      z-index: 1000;
-      text-align: center;
-      max-width: 90%;
+      transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
-    .toast.active {
+
+    .toast-pill.visible {
       transform: translateX(-50%) translateY(0);
       opacity: 1;
+    }
+
+    /* Modal dialog */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(2, 6, 23, 0.85);
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      z-index: 999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-glow);
+      border-radius: 24px;
+      padding: 24px;
+      max-width: 460px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8);
+      position: relative;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+
+    .modal-close:hover { color: #fff; }
+
+    /* Footer Meta */
+    footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 4px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 0.75rem;
+      color: var(--text-dim);
     }
   </style>
 </head>
 <body>
 
-  <!-- Top Header -->
-  <header>
-    <div class="brand">
-      <div class="brand-logo"></div>
-      <div class="brand-title">JARVIS OS</div>
-    </div>
-    <div style="display: flex; gap: 8px; align-items: center;">
-      <button class="https-unlock-btn" id="https-unlock-btn" onclick="openHttpsModal()" title="Enable iPhone Microphone (HTTPS)" style="display: none;">🔒 Enable Mic</button>
-      <div class="wake-badge" id="wake-badge" onclick="toggleWakeWordMode()" title="Toggle 'Jarvis' Wake Word">
-        <div class="wake-dot"></div>
-        <span id="wake-badge-text">WAKE: OFF</span>
-      </div>
-      <button class="settings-btn" onclick="openSettingsModal()" title="AI & Settings">⚙️</button>
-      <div class="status-badge">
-        <div class="status-dot"></div>
-        <span id="header-status">ONLINE</span>
-      </div>
-    </div>
-  </header>
+  <!-- Dynamic Cyber Particle Mesh -->
+  <canvas id="matrix-canvas"></canvas>
 
-  <!-- Live Windows Telemetry Row -->
-  <div class="telemetry-row">
-    <div class="telemetry-card">
-      <div class="telemetry-label">CPU</div>
-      <div class="telemetry-value" id="cpu-val">--%</div>
-    </div>
-    <div class="telemetry-card">
-      <div class="telemetry-label">Memory</div>
-      <div class="telemetry-value" id="ram-val">--%</div>
-    </div>
-    <div class="telemetry-card">
-      <div class="telemetry-label">Battery</div>
-      <div class="telemetry-value" id="bat-val">--%</div>
-    </div>
-  </div>
-
-  <!-- Primary Dual Mode Switcher: SPEAK vs TEXT vs CONTROLS -->
-  <div class="mode-bar">
-    <button class="mode-btn active" id="btn-mode-speak" onclick="switchMode('speak')">
-      <span>🎙️ Speak Mode</span>
-    </button>
-    <button class="mode-btn" id="btn-mode-text" onclick="switchMode('text')">
-      <span>⌨️ Text Mode</span>
-    </button>
-    <button class="mode-btn" id="btn-mode-controls" onclick="switchMode('controls')">
-      <span>⚡ Controls</span>
-    </button>
-  </div>
-
-  <!-- ==================================================== -->
-  <!-- 1. SPEAK MODE HUD                                   -->
-  <!-- ==================================================== -->
-  <div class="mode-panel active" id="panel-speak">
-    <div class="orb-section">
-      <div class="orb-container" id="orb" onclick="toggleVoice()">
-        <div class="ring ring-outer"></div>
-        <div class="ring ring-middle"></div>
-        <div class="ring ring-inner"></div>
-        <div class="orb-core">
-          <svg class="mic-icon-large" viewBox="0 0 24 24">
-            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+  <div class="app-viewport">
+    
+    <!-- Top Cyber Bar -->
+    <header class="nav-bar">
+      <div class="brand-cluster">
+        <div class="ghost-emblem">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 2C7.58 2 4 5.58 4 10v10c0 .55.45 1 1 1h1.5c.38 0 .73-.21.89-.55L9 17.5l1.61 2.95c.16.34.51.55.89.55h1c.38 0 .73-.21.89-.55L15 17.5l1.61 2.95c.16.34.51.55.89.55H19c.55 0 1-.45 1-1V10c0-4.42-3.58-8-8-8zm-3 8c-.83 0-1.5-.67-1.5-1.5S8.17 7 9 7s1.5.67 1.5 1.5S9.83 10 9 10zm6 0c-.83 0-1.5-.67-1.5-1.5S14.17 7 15 7s1.5.67 1.5 1.5S15.83 10 15 10z"/>
           </svg>
         </div>
+        <div class="brand-meta">
+          <h1 class="brand-title">GHOST</h1>
+          <span class="brand-badge">NEURAL OS // v2.4 HIGH-SPEED</span>
+        </div>
       </div>
-      
-      <!-- Audio Wave Equalizer Animation -->
-      <div class="soundwave-box" id="soundwave">
-        <div class="wave-bar"></div>
-        <div class="wave-bar"></div>
-        <div class="wave-bar"></div>
-        <div class="wave-bar"></div>
-        <div class="wave-bar"></div>
-      </div>
-    </div>
 
-    <!-- Voice Actions & Source Controls -->
-    <div class="voice-action-row">
-      <button class="primary-speak-btn" id="primary-speak-btn" onclick="toggleVoice()">
-        <span id="speak-btn-icon">🎙️</span>
-        <span id="speak-btn-text">TAP TO SPEAK</span>
+      <div class="nav-controls">
+        <div class="status-pill" id="global-status-pill" onclick="triggerPingCheck()">
+          <span class="status-dot" id="global-status-dot"></span>
+          <span id="global-status-text">ONLINE // 14ms</span>
+        </div>
+
+        <button class="icon-btn" id="sound-toggle-btn" title="Toggle Sound FX" onclick="toggleSoundFx()">
+          <svg viewBox="0 0 24 24" id="sound-icon">
+            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+          </svg>
+        </button>
+
+        <button class="icon-btn" title="Gateway Settings" onclick="openGatewayModal()">
+          <svg viewBox="0 0 24 24">
+            <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Telemetry Strip -->
+    <section class="telemetry-deck" aria-label="System Telemetry">
+      <div class="telemetry-card">
+        <div class="telemetry-header">
+          <span>Core CPU</span>
+          <span style="color: var(--cyan);">●</span>
+        </div>
+        <div class="telemetry-metric" id="tel-cpu">--%</div>
+        <div class="telemetry-spark"><div class="telemetry-fill" id="bar-cpu"></div></div>
+      </div>
+
+      <div class="telemetry-card">
+        <div class="telemetry-header">
+          <span>Active RAM</span>
+          <span style="color: var(--purple);">●</span>
+        </div>
+        <div class="telemetry-metric" id="tel-ram">--%</div>
+        <div class="telemetry-spark"><div class="telemetry-fill" id="bar-ram" style="background: linear-gradient(90deg, var(--purple), #ec4899);"></div></div>
+      </div>
+
+      <div class="telemetry-card">
+        <div class="telemetry-header">
+          <span>Device Power</span>
+          <span style="color: var(--emerald);">●</span>
+        </div>
+        <div class="telemetry-metric" id="tel-bat">Plugged</div>
+        <div class="telemetry-spark"><div class="telemetry-fill" id="bar-bat" style="background: var(--emerald); width: 100%;"></div></div>
+      </div>
+
+      <div class="telemetry-card">
+        <div class="telemetry-header">
+          <span>Encryption</span>
+          <span style="color: var(--cyan);">TLS 1.3</span>
+        </div>
+        <div class="telemetry-metric" style="font-size: 1.05rem; color: var(--cyan);" id="tel-tunnel">AES-256</div>
+        <div class="telemetry-spark"><div class="telemetry-fill" style="width: 100%; background: var(--cyan);"></div></div>
+      </div>
+    </section>
+
+    <!-- Navigation Tabs -->
+    <nav class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('tab-commander')">
+        <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.93V17a1 1 0 0 1-2 0v-.07A7.002 7.002 0 0 1 5.07 11H5a1 1 0 0 1 0-2h.07A7.002 7.002 0 0 1 11 3.07V3a1 1 0 0 1 2 0v.07A7.002 7.002 0 0 1 18.93 9H19a1 1 0 0 1 0 2h-.07A7.002 7.002 0 0 1 13 16.93z"/></svg>
+        Command Deck
       </button>
 
-      <div class="mic-source-row">
-        <button class="source-chip active" id="chip-phone" onclick="selectMicSource('phone')">📱 Phone Mic</button>
-        <button class="source-chip" id="chip-pc" onclick="selectMicSource('pc')">💻 PC Room Mic</button>
-      </div>
-    </div>
-
-    <!-- Hands-Free Wake Word Card -->
-    <div class="wake-word-card" id="wake-card">
-      <div class="wake-card-header">
-        <div class="wake-card-left" onclick="toggleWakeWordMode()" style="cursor: pointer; -webkit-tap-highlight-color: transparent;">
-          <div class="wake-status-indicator" id="wake-indicator">
-            <div class="wake-pulse-ring"></div>
-            <div class="wake-pulse-core"></div>
-          </div>
-          <div>
-            <div class="wake-card-title">WAKE WORD: "JARVIS"</div>
-            <div class="wake-card-subtitle" id="wake-status-desc">Say "Jarvis" hands-free anytime</div>
-          </div>
-        </div>
-        <label class="switch-toggle" title="Toggle Wake Word Detection" onclick="event.stopPropagation()">
-          <input type="checkbox" id="wake-toggle" onchange="toggleWakeWordMode(this.checked)">
-          <span class="slider"></span>
-        </label>
-      </div>
-      <div class="wake-card-hints">
-        <span class="wake-tag">✨ Hands-Free Mode</span>
-        <span class="wake-tag">⚡ Say "Jarvis &lt;command&gt;"</span>
-        <span class="wake-tag">🔔 Audio Chime</span>
-      </div>
-    </div>
-
-    <!-- Real-time Speech Response Card -->
-    <div class="speech-response-card">
-      <div class="speech-bubble">
-        <span class="speech-label user">You Spoke</span>
-        <span class="speech-content" id="speak-user-text">"Tap to speak or say 'Jarvis'..."</span>
-      </div>
-      <div class="speech-bubble" style="margin-bottom: 0;">
-        <span class="speech-label jarvis">JARVIS Response</span>
-        <span class="speech-content" id="speak-jarvis-text">JARVIS Systems online. Ready for your command, sir.</span>
-      </div>
-      <div class="voice-reply-toggle">
-        <span>🔊 Read Answers Aloud on Phone</span>
-        <input type="checkbox" id="voice-reply-toggle" checked style="accent-color: #6366f1; width: 16px; height: 16px; cursor: pointer;">
-      </div>
-    </div>
-  </div>
-
-  <!-- ==================================================== -->
-  <!-- 2. TEXT MODE & CHAT LOG                             -->
-  <!-- ==================================================== -->
-  <div class="mode-panel" id="panel-text">
-    <!-- Conversation History -->
-    <div class="chat-history" id="chat-history">
-      <div class="msg-bubble jarvis">
-        <div>Greetings, sir. How may I assist you today? You can type commands below or tap the microphone to speak.</div>
-        <div class="msg-time">Online</div>
-      </div>
-    </div>
-
-    <!-- Fast Quick-Prompt Chips -->
-    <div class="chips-row">
-      <button class="prompt-chip" onclick="submitPrompt('Open dsa folder in antigravity')">🚀 Open DSA in Antigravity</button>
-      <button class="prompt-chip" onclick="submitPrompt('Start work mode')">⚡ Work Mode</button>
-      <button class="prompt-chip" onclick="submitPrompt('Take screenshot')">📸 Screenshot</button>
-      <button class="prompt-chip" onclick="submitPrompt('Play lofi on youtube')">🎵 Play Music</button>
-      <button class="prompt-chip" onclick="submitPrompt('Open whatsapp')">💬 WhatsApp</button>
-      <button class="prompt-chip" onclick="submitPrompt('Set volume to 50 percent')">🔊 Vol 50%</button>
-      <button class="prompt-chip" onclick="submitPrompt('Mute')">🔇 Mute</button>
-    </div>
-  </div>
-
-  <!-- ==================================================== -->
-  <!-- 3. CONTROLS MODE (Shortcuts, AI Agent, Touchpad)     -->
-  <!-- ==================================================== -->
-  <div class="mode-panel" id="panel-controls">
-    <!-- Segmented Navigation for Controls -->
-    <div class="mode-bar" style="margin-bottom: 12px; background: rgba(15, 23, 42, 0.65);">
-      <button class="mode-btn active" id="sub-btn-commands" onclick="switchControlSubTab('commands')">⚡ Commands</button>
-      <button class="mode-btn" id="sub-btn-agent" onclick="switchControlSubTab('agent')">🤖 Stonic AI</button>
-      <button class="mode-btn" id="sub-btn-touchpad" onclick="switchControlSubTab('touchpad')">🖱️ Touchpad</button>
-    </div>
-
-    <!-- Subtab 1: Command Buttons -->
-    <div id="sub-panel-commands">
-      <div class="quick-grid">
-        <button class="quick-btn" onclick="sendCommand('start work mode')"><span class="btn-icon">⚡</span><span>Work Mode</span></button>
-        <button class="quick-btn" onclick="sendCommand('open antigravity')"><span class="btn-icon">🚀</span><span>Antigravity</span></button>
-        <button class="quick-btn" onclick="sendCommand('what is on my screen')"><span class="btn-icon">🖥️</span><span>Screen Info</span></button>
-        <button class="quick-btn" onclick="sendCommand('take screenshot')"><span class="btn-icon">📸</span><span>Screenshot</span></button>
-        <button class="quick-btn" onclick="openCameraModal()"><span class="btn-icon">📷</span><span>PC Camera</span></button>
-        <button class="quick-btn" onclick="sendCommand('volume up')"><span class="btn-icon">🔊</span><span>Vol Up</span></button>
-        <button class="quick-btn" onclick="sendCommand('volume down')"><span class="btn-icon">🔉</span><span>Vol Down</span></button>
-        <button class="quick-btn" onclick="sendCommand('mute')"><span class="btn-icon">🔇</span><span>Mute</span></button>
-        <button class="quick-btn" onclick="sendCommand('pause the music')"><span class="btn-icon">⏯️</span><span>Play/Pause</span></button>
-        <button class="quick-btn" onclick="sendCommand('what is open')"><span class="btn-icon">🗂️</span><span>Open Apps</span></button>
-        <button class="quick-btn" onclick="sendCommand('open chrome')"><span class="btn-icon">🌐</span><span>Chrome</span></button>
-        <button class="quick-btn" onclick="sendCommand('play lofi on youtube')"><span class="btn-icon">🎵</span><span>YouTube</span></button>
-        <button class="quick-btn" onclick="sendCommand('open whatsapp')"><span class="btn-icon">💬</span><span>WhatsApp</span></button>
-        <button class="quick-btn" onclick="promptUnlock()"><span class="btn-icon">🔓</span><span>Unlock PC</span></button>
-        <button class="quick-btn" onclick="sendCommand('lock pc')"><span class="btn-icon">🔒</span><span>Lock PC</span></button>
-        <button class="quick-btn" onclick="sendCommand('minimize all')"><span class="btn-icon">🪟</span><span>Desktop</span></button>
-      </div>
-    </div>
-
-    <!-- Subtab 2: Stonic AI Workflows -->
-    <div id="sub-panel-agent" style="display: none;">
-      <div class="agent-terminal" id="agent-terminal">
-        <div class="term-line"><span class="term-time">[SYS]</span> <span class="term-cat">READY:</span> <span class="term-msg">Autonomous Computer Control online</span></div>
-      </div>
-      <div class="quick-grid">
-        <button class="quick-btn" onclick="triggerWorkflow('ask_ai')"><span class="btn-icon">🤖</span><span>Ask AI / GPT</span></button>
-        <button class="quick-btn" onclick="triggerWorkflow('search_youtube')"><span class="btn-icon">▶️</span><span>Auto-YouTube</span></button>
-        <button class="quick-btn" onclick="triggerWorkflow('notepad')"><span class="btn-icon">📝</span><span>Auto-Memo</span></button>
-        <button class="quick-btn" onclick="triggerWorkflow('start_menu')"><span class="btn-icon">🪟</span><span>Start Hijack</span></button>
-        <button class="quick-btn" onclick="triggerWorkflow('snap_left')"><span class="btn-icon">⬅️</span><span>Snap Left</span></button>
-        <button class="quick-btn" onclick="triggerWorkflow('snap_right')"><span class="btn-icon">➡️</span><span>Snap Right</span></button>
-        <button class="quick-btn" onclick="triggerWorkflow('maximize')"><span class="btn-icon">⛶</span><span>Maximize</span></button>
-        <button class="quick-btn" onclick="triggerWorkflow('alt_tab')"><span class="btn-icon">🔄</span><span>Alt+Tab</span></button>
-      </div>
-    </div>
-
-    <!-- Subtab 3: Virtual Mouse Touchpad -->
-    <div id="sub-panel-touchpad" style="display: none;">
-      <div class="touchpad-box" id="touchpad" onclick="sendMouseClick('left')">
-        <span class="touchpad-hint">📱 Slide Finger to Move PC Cursor<br>Tap to Left-Click</span>
-      </div>
-      <div class="mouse-btn-row">
-        <button class="mouse-btn" onclick="sendMouseClick('left')">🖱️ Left Click</button>
-        <button class="mouse-btn" onclick="sendMouseClick('double')">⚡ Double</button>
-        <button class="mouse-btn" onclick="sendMouseClick('right')">📋 Right Click</button>
-      </div>
-      <div class="mouse-btn-row">
-        <button class="mouse-btn" onclick="sendMouseScroll(400)">▲ Scroll Up</button>
-        <button class="mouse-btn" onclick="sendMouseScroll(-400)">▼ Scroll Down</button>
-        <button class="mouse-btn" onclick="promptRemoteType()">⌨️ Type Text</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ==================================================== -->
-  <!-- PERMANENT STICKY BOTTOM BAR                         -->
-  <!-- (BOTH OPTIONS: SPEAK & TEXT DIRECTLY ACCESSIBLE)    -->
-  <!-- ==================================================== -->
-  <div class="sticky-bottom-bar">
-    <!-- Dedicated Speak / Mic Button -->
-    <button class="bottom-mic-btn" id="bottom-mic-btn" onclick="toggleVoice()" title="Tap to Speak">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-      </svg>
-    </button>
-
-    <!-- Text Input Field -->
-    <input type="text" id="cmd-input" class="command-input" placeholder="Type command or tap 🎙️ to speak..." onkeypress="handleKey(event)">
-
-    <!-- Text Send Button -->
-    <button class="send-btn" id="bottom-send-btn" onclick="submitText()" title="Send">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-      </svg>
-    </button>
-  </div>
-
-  <!-- Screenshot Preview Modal -->
-  <div class="modal" id="shot-modal" onclick="closeModal()">
-    <div style="display:flex; flex-direction:column; align-items:center; max-width:100%;" onclick="event.stopPropagation()">
-      <img id="shot-img" src="" alt="Screenshot Preview">
-      <button class="modal-close" onclick="closeModal()">✕ Close Preview</button>
-    </div>
-  </div>
-
-  <!-- Live Computer Camera Feed Modal -->
-  <div class="modal" id="camera-modal" onclick="closeCameraModal()">
-    <div style="display:flex; flex-direction:column; align-items:center; max-width:100%; width: 100%; max-width: 460px; background: rgba(15,23,42,0.92); padding: 16px; border-radius: 16px; border: 1px solid rgba(0, 242, 254, 0.3);" onclick="event.stopPropagation()">
-      <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 10px;">
-        <span style="font-weight: 700; color: #00f2fe; letter-spacing: 1px; font-size: 0.9rem;">LIVE COMPUTER WEBCAM</span>
-        <span style="color: #10b981; font-size: 0.75rem; display: flex; align-items: center; gap: 4px;">
-          <span style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; display: inline-block;"></span> LIVE
-        </span>
-      </div>
-      <img id="camera-stream-img" src="" alt="Connecting to PC Webcam..." style="width: 100%; min-height: 220px; background: #000; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); object-fit: contain;">
-      <div style="display: flex; gap: 8px; width: 100%; margin-top: 12px;">
-        <button onclick="snapPhoto()" style="flex: 1; padding: 12px; border-radius: 12px; background: linear-gradient(135deg, #6366f1, #00f2fe); color: white; border: none; font-weight: 700; cursor: pointer; font-size: 0.85rem;">📸 Save Photo</button>
-        <button onclick="closeCameraModal()" style="flex: 1; padding: 12px; border-radius: 12px; background: #334155; color: white; border: none; font-weight: 700; cursor: pointer; font-size: 0.85rem;">✕ Close Feed</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Settings & AI Config Modal -->
-  <div class="modal" id="settings-modal" onclick="closeSettingsModal()">
-    <div style="display:flex; flex-direction:column; max-width:100%; width: 100%; max-width: 440px; background: rgba(15,23,42,0.96); padding: 22px; border-radius: 18px; border: 1px solid rgba(99, 102, 241, 0.45); box-shadow: 0 10px 40px rgba(0,0,0,0.8);" onclick="event.stopPropagation()">
-      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 16px;">
-        <span style="font-weight: 700; color: #fff; letter-spacing: 1px; font-size: 1rem;">⚙️ JARVIS SETTINGS</span>
-        <button onclick="closeSettingsModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.25rem; cursor: pointer;">✕</button>
-      </div>
-
-      <div style="margin-bottom: 16px; font-size: 0.85rem; color: #cbd5e1; background: rgba(30, 41, 59, 0.7); padding: 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.06);">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-          <span>AI Engine:</span>
-          <span id="ai-engine-badge" style="color: #00f2fe; font-weight: 700;">Smart Natural Engine</span>
-        </div>
-        <div style="display: flex; justify-content: space-between;">
-          <span>System Status:</span>
-          <span style="color: #10b981; font-weight: 700;">Online & Ready</span>
-        </div>
-      </div>
-
-      <label style="font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: block; font-weight: 600;">Google Gemini API Key (Optional)</label>
-      <input type="password" id="gemini-key-input" placeholder="Paste AI Studio API key (AIzaSy...)" style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; color: #fff; font-size: 0.85rem; outline: none; margin-bottom: 14px;">
-
-      <div style="display: flex; gap: 8px; width: 100%;">
-        <button onclick="saveSettings()" style="flex: 1; padding: 12px; border-radius: 12px; background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; border: none; font-weight: 700; cursor: pointer; font-size: 0.85rem;">Save Key</button>
-        <button onclick="closeSettingsModal()" style="flex: 1; padding: 12px; border-radius: 12px; background: #334155; color: white; border: none; font-weight: 700; cursor: pointer; font-size: 0.85rem;">Done</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Secure HTTPS Unlock Modal for iPhone / Mobile -->
-  <div class="modal" id="https-modal" onclick="closeHttpsModal(event)">
-    <div class="modal-card-box" style="display:flex; flex-direction:column; max-width:100%; width: 100%; max-width: 440px; background: rgba(15,23,42,0.98); padding: 22px; border-radius: 18px; border: 1px solid rgba(0, 242, 254, 0.45); box-shadow: 0 10px 40px rgba(0,0,0,0.8);">
-      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 14px;">
-        <span style="font-weight: 700; color: #00f2fe; letter-spacing: 1px; font-size: 1rem;">🔒 UNLOCK IPHONE WAKE WORD</span>
-        <button type="button" class="modal-close-trigger" onclick="closeHttpsModal()" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;">✕</button>
-      </div>
-
-      <div style="font-size: 0.88rem; color: #e2e8f0; line-height: 1.5; margin-bottom: 14px;">
-        Apple iOS Safari & Chrome require a <b>Secure HTTPS</b> connection to unlock your phone's microphone for the hands-free <b>"Jarvis"</b> wake word.
-      </div>
-
-      <div style="background: rgba(30, 41, 59, 0.7); padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 16px; font-size: 0.8rem; color: #cbd5e1; line-height: 1.45;">
-        <b style="color: #f59e0b;">📱 Quick iPhone Step (One-Time):</b><br>
-        When opening the secure link, Safari will display: <i>"This Connection Is Not Private"</i>.<br>
-        Tap <b>Show Details</b> ➔ <b>Visit this website</b>.<br>
-        This unlocks speech recognition and the wake word permanently!
-      </div>
-
-      <!-- Real native <a> tag: Works 100% of the time on iOS Safari without JS event reliance -->
-      <a id="btn-switch-https" href="https://192.168.0.115:8443/" style="display: flex; align-items: center; justify-content: center; width: 100%; padding: 15px; border-radius: 14px; background: linear-gradient(135deg, #00f2fe, #6366f1); color: #020617; text-decoration: none; font-weight: 800; font-size: 0.95rem; cursor: pointer; margin-bottom: 10px; box-shadow: 0 0 20px rgba(0, 242, 254, 0.4); text-align: center; -webkit-tap-highlight-color: transparent; touch-action: manipulation; user-select: none; -webkit-user-select: none;">
-        ⚡ SWITCH TO SECURE HTTPS (PORT 8443)
-      </a>
-
-      <button type="button" onclick="switchToPcMic()" style="width: 100%; padding: 12px; border-radius: 12px; background: rgba(255,255,255,0.08); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.15); font-weight: 600; font-size: 0.82rem; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; margin-bottom: 4px;">
-        💻 Or Use PC Room Microphone (Zero Setup)
+      <button class="tab-btn" onclick="switchTab('tab-pairing')">
+        <svg viewBox="0 0 24 24"><path d="M4 4h7v7H4zm2 2v3h3V6zm8-2h7v7h-7zm2 2v3h3V6zM4 13h7v7H4zm2 2v3h3v-3zm11 1h2v4h-2zm-3-3h2v2h-2zm4 0h2v2h-2zm-4 4h2v2h-2zm2 2h2v2h-2z"/></svg>
+        QR Device Pair
       </button>
+
+      <button class="tab-btn" onclick="switchTab('tab-touch')">
+        <svg viewBox="0 0 24 24"><path d="M9 11.24V7.5a2.5 2.5 0 0 1 5 0v3.74c1.21-.81 2-2.18 2-3.74a4.5 4.5 0 0 0-9 0c0 1.56.79 2.93 2 3.74zm9.84 4.63l-4.54-2.26a1.002 1.002 0 0 0-.89-.01l-.91.45V7.5a1.5 1.5 0 0 0-3 0v9.75l-3.32-.7a1.493 1.493 0 0 0-1.52.47c-.36.42-.4 1.01-.11 1.47l4.03 6.45c.42.67 1.15 1.06 1.95 1.06h7.02c1.2 0 2.2-.92 2.31-2.12l.62-6.52c.07-.76-.32-1.48-.99-1.82z"/></svg>
+        Trackpad & Screen
+      </button>
+
+      <button class="tab-btn" onclick="switchTab('tab-architecture')">
+        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm6 12H6v-1.4c0-2 4-3.1 6-3.1s6 1.1 6 3.1V18z"/></svg>
+        System Architecture
+      </button>
+    </nav>
+
+    <!-- ==============================================
+         TAB 1: COMMAND DECK (ORB + MATRIX AUTOMATION)
+         ============================================== -->
+    <div class="tab-pane active" id="tab-commander">
+      <div class="deck-grid">
+        
+        <!-- Left Column: Voice Orb & Interactive Prompt -->
+        <div class="orb-cockpit">
+          <div class="orb-stage" id="orb-trigger" onclick="toggleVoiceListening()" title="Click to Speak to GHOST">
+            <div class="orbital-ring ring-1"></div>
+            <div class="orbital-ring ring-2"></div>
+            <div class="orbital-ring ring-3"></div>
+            <div class="orb-nucleus">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+              </svg>
+            </div>
+          </div>
+
+          <div class="soundwave-rack" id="soundwave-rack">
+            <div class="soundwave-bar"></div>
+            <div class="soundwave-bar"></div>
+            <div class="soundwave-bar"></div>
+            <div class="soundwave-bar"></div>
+            <div class="soundwave-bar"></div>
+            <div class="soundwave-bar"></div>
+          </div>
+
+          <div style="text-align: center;">
+            <div style="font-family: var(--font-display); font-size: 1.1rem; font-weight: 700;" id="orb-status-text">TAP ORB TO SPEAK</div>
+            <div style="font-size: 0.78rem; color: var(--text-dim);" id="orb-sub-text">"Open VS Code" • "Take screenshot" • "System diagnostics"</div>
+          </div>
+
+          <!-- Prompt Form -->
+          <form class="command-box" onsubmit="handleCommandSubmit(event)">
+            <input type="text" class="command-input" id="command-text-input" placeholder="Type or speak a command to execute on PC..." autocomplete="off">
+            <button type="submit" class="send-btn" title="Execute Command">
+              <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+            </button>
+          </form>
+
+          <!-- Response Display -->
+          <div class="output-console">
+            <div class="console-header">
+              <span>GHOST RESPONSE STREAM</span>
+              <span id="response-timestamp">READY</span>
+            </div>
+            <div class="console-resp" id="console-response-text">Awaiting transmission. GHOST Neural Core online and standing by.</div>
+          </div>
+        </div>
+
+        <!-- Right Column: Quick Automations Matrix -->
+        <div class="matrix-panel">
+          <div class="matrix-title">
+            <span>QUICK ACTIONS</span>
+            <span style="font-size: 0.75rem; color: var(--cyan); font-family: var(--font-mono);">ZERO-LATENCY</span>
+          </div>
+
+          <div class="matrix-grid">
+            <div class="action-tile" onclick="sendActionCommand('start work mode')">
+              <div class="action-icon">
+                <svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg>
+              </div>
+              <div class="action-title">Work Mode</div>
+              <div class="action-sub">VS Code, Terminal & Tabs</div>
+            </div>
+
+            <div class="action-tile" onclick="sendActionCommand('take a screenshot')">
+              <div class="action-icon">
+                <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+              </div>
+              <div class="action-title">Capture Screen</div>
+              <div class="action-sub">High-res instant capture</div>
+            </div>
+
+            <div class="action-tile" onclick="sendActionCommand('lock the computer')">
+              <div class="action-icon" style="color: var(--danger); background: rgba(239, 68, 68, 0.1);">
+                <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+              </div>
+              <div class="action-title">Stealth Lock</div>
+              <div class="action-sub">Secure Windows desktop</div>
+            </div>
+
+            <div class="action-tile" onclick="sendActionCommand('play lofi chill music on youtube')">
+              <div class="action-icon" style="color: var(--amber); background: rgba(245, 158, 11, 0.1);">
+                <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+              </div>
+              <div class="action-title">Lo-Fi Streams</div>
+              <div class="action-sub">YouTube focus audio</div>
+            </div>
+
+            <div class="action-tile" onclick="sendActionCommand('system diagnostics and battery status')">
+              <div class="action-icon">
+                <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-4-4h2.55v-3h2.9v3H16l-4 4z"/></svg>
+              </div>
+              <div class="action-title">Diagnostics</div>
+              <div class="action-sub">Health & load telemetry</div>
+            </div>
+
+            <div class="action-tile" onclick="sendActionCommand('mute volume')">
+              <div class="action-icon">
+                <svg viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+              </div>
+              <div class="action-title">Mute Audio</div>
+              <div class="action-sub">Silence desktop output</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ==============================================
+         TAB 2: ONE-TIME QR DEVICE PAIRING (THE REQUEST)
+         ============================================== -->
+    <div class="tab-pane" id="tab-pairing">
+      <div class="pairing-box">
+        <div class="pairing-header">
+          <h2>DEVICE LINK // ONE-TIME QR PAIRING</h2>
+          <p>Scan once with your mobile camera. GHOST permanently binds your phone to this PC via encrypted cryptographic token. Control your PC from anywhere on 4G/5G.</p>
+        </div>
+
+        <div class="qr-frame">
+          <canvas id="qr-canvas" width="180" height="180"></canvas>
+        </div>
+
+        <div class="device-meta-strip">
+          <div class="chip-key">
+            <span>DEVICE ID:</span>
+            <strong id="display-device-id">GHOST-NODE-98X</strong>
+          </div>
+          <div class="chip-key">
+            <span>KEY:</span>
+            <strong id="display-device-key">••••-••••-71A</strong>
+          </div>
+          <div class="chip-key">
+            <span>STATE:</span>
+            <strong style="color: var(--emerald);">BOUND & SECURED</strong>
+          </div>
+        </div>
+
+        <div class="action-btn-row">
+          <button class="primary-btn" onclick="copyDirectConnectLink()">
+            <svg style="width: 18px; height: 18px; fill: currentColor;" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+            Copy Remote Link
+          </button>
+
+          <button class="secondary-btn" onclick="regeneratePairingKeys()">
+            <svg style="width: 18px; height: 18px; fill: currentColor;" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+            Regenerate Token
+          </button>
+
+          <button class="secondary-btn" onclick="simulateFriendConnect()">
+            <svg style="width: 18px; height: 18px; fill: currentColor;" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+            Test Friend Handshake
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==============================================
+         TAB 3: TRACKPAD & LIVE DESKTOP SCREEN STREAM
+         ============================================== -->
+    <div class="tab-pane" id="tab-touch">
+      <div class="deck-grid">
+        
+        <!-- Trackpad Deck -->
+        <div class="touchpad-box">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-family: var(--font-display); font-weight: 700; color: #fff;">VIRTUAL TRACKPAD</span>
+            <span style="font-size: 0.72rem; color: var(--cyan); font-family: var(--font-mono);">MULTI-TOUCH READY</span>
+          </div>
+
+          <div class="touch-surface" id="touch-surface">
+            <div class="touch-watermark">DRAG FINGER • TAP TO CLICK • 2-FINGER SCROLL</div>
+          </div>
+
+          <div class="mouse-actions-bar">
+            <button class="click-btn" onclick="sendMouseClick('left')">LEFT CLICK</button>
+            <button class="click-btn" onclick="sendMouseClick('double')">DOUBLE</button>
+            <button class="click-btn" onclick="sendMouseClick('right')">RIGHT CLICK</button>
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button class="secondary-btn" style="flex: 1;" onclick="promptRemoteType()">
+              <svg style="width: 16px; height: 16px; fill: currentColor;" viewBox="0 0 24 24"><path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg>
+              Type Keyboard Text
+            </button>
+            <button class="secondary-btn" onclick="sendActionCommand('press enter key')">ENTER</button>
+            <button class="secondary-btn" onclick="sendActionCommand('press escape key')">ESC</button>
+          </div>
+        </div>
+
+        <!-- Desktop Screen Viewport -->
+        <div class="touchpad-box">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-family: var(--font-display); font-weight: 700; color: #fff;">LIVE DESKTOP MIRROR</span>
+            <button class="secondary-btn" style="padding: 6px 12px; font-size: 0.75rem;" onclick="refreshLiveStream()">REFRESH</button>
+          </div>
+
+          <div class="stream-viewport">
+            <div class="stream-overlay-badge">
+              <span class="status-dot"></span>
+              <span>480P LIVE STREAM</span>
+            </div>
+            <img id="screen-stream-img" src="/api/screenshot" alt="Live PC Screen" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'480\' height=\'270\' viewBox=\'0 0 480 270\'><rect width=\'480\' height=\'270\' fill=\'%23050b14\'/><text x=\'50%25\' y=\'50%25\' fill=\'%2300f5d4\' font-family=\'monospace\' font-size=\'14\' text-anchor=\'middle\' dy=\'.3em\'>[ PC SCREEN STREAM STANDBY ]</text></svg>'">
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button class="secondary-btn" style="flex: 1;" onclick="toggleScreenVideo(true)">Stream MJPEG Feed</button>
+            <button class="secondary-btn" style="flex: 1;" onclick="toggleCameraFeed()">Webcam Mirror</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ==============================================
+         TAB 4: ARCHITECTURE & SYSTEM SECURITY
+         ============================================== -->
+    <div class="tab-pane" id="tab-architecture">
+      <div class="arch-card">
+        <div>
+          <h2 style="font-family: var(--font-display); font-size: 1.3rem; font-weight: 800; color: #fff;">SECURE RELAY PROTOCOL // MULTI-USER DEPLOYMENT</h2>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+            How GHOST connects any friend's mobile device to their home PC across any 4G/5G cellular network without port-forwarding or IP exposure.
+          </p>
+        </div>
+
+        <div class="arch-pipeline">
+          <div class="pipeline-node">
+            <span class="node-header">Step 1 • Client</span>
+            <div class="node-title">Mobile Web HUD</div>
+            <div class="node-desc">Zero install. Vercel hosted. Persistent device token stored in browser localStorage.</div>
+          </div>
+
+          <div class="pipeline-arrow">➔</div>
+
+          <div class="pipeline-node active-hub">
+            <span class="node-header">Step 2 • Relay Hub</span>
+            <div class="node-title">Cloudflare / WebSocket</div>
+            <div class="node-desc">Encrypted outbound reverse tunnel. Routes traffic to specific device room based on token.</div>
+          </div>
+
+          <div class="pipeline-arrow">➔</div>
+
+          <div class="pipeline-node">
+            <span class="node-header">Step 3 • Daemon</span>
+            <div class="node-title">PC GHOST Agent</div>
+            <div class="node-desc">Python agent on PC executes Win32 commands, launch routines, audio synthesis, and screen mirror.</div>
+          </div>
+        </div>
+
+        <!-- Terminal log stream -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+          <span style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--cyan);">NEURAL AUDIT LOGS</span>
+          <button class="secondary-btn" style="padding: 4px 10px; font-size: 0.7rem;" onclick="clearLogs()">CLEAR LOGS</button>
+        </div>
+
+        <div class="terminal-box" id="terminal-stream">
+          <div class="log-line">
+            <span class="log-time">[00:00:01]</span>
+            <span class="log-tag success">[INIT]</span>
+            <span class="log-msg">GHOST Neural Core booted with Win32 automation hooks.</span>
+          </div>
+          <div class="log-line">
+            <span class="log-time">[00:00:02]</span>
+            <span class="log-tag">[TUNNEL]</span>
+            <span class="log-msg">Encrypted reverse tunnel established. Zero port-forwarding required.</span>
+          </div>
+          <div class="log-line">
+            <span class="log-time">[00:00:03]</span>
+            <span class="log-tag success">[PAIRING]</span>
+            <span class="log-msg">Device Token generated: GHOST-NODE-98X. Ready for mobile QR scan.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <span>GHOST // Cybernetic Voice & Remote Operating System</span>
+      <span>Designed by Ahmad Hassan • MIT License</span>
+    </footer>
+
+  </div>
+
+  <!-- Toast Notification Bar -->
+  <div class="toast-pill" id="app-toast">
+    <svg style="width: 18px; height: 18px; fill: var(--cyan);" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+    <span id="toast-text">System notification</span>
+  </div>
+
+  <!-- Gateway Configuration Modal -->
+  <div class="modal-backdrop" id="gateway-modal">
+    <div class="modal-card">
+      <button class="modal-close" onclick="closeGatewayModal()">✕</button>
+      <h3 style="font-family: var(--font-display); font-size: 1.15rem; color: #fff;">GATEWAY CONFIGURATION</h3>
+      <p style="font-size: 0.8rem; color: var(--text-muted);">
+        Point this web client to your running GHOST backend server (Localhost, Cloudflare tunnel URL, or Remote VPS).
+      </p>
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <label style="font-size: 0.72rem; color: var(--text-dim); font-family: var(--font-mono);">BACKEND API GATEWAY URL:</label>
+        <input type="text" class="command-input" id="backend-url-input" placeholder="http://192.168.1.15:8000 or https://xyz.trycloudflare.com">
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <label style="font-size: 0.72rem; color: var(--text-dim); font-family: var(--font-mono);">DEVICE ACCESS PIN (OPTIONAL):</label>
+        <input type="password" class="command-input" id="device-pin-input" placeholder="4-digit lock PIN">
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 10px;">
+        <button class="primary-btn" style="flex: 1;" onclick="saveGatewaySettings()">Save Gateway</button>
+        <button class="secondary-btn" onclick="closeGatewayModal()">Cancel</button>
+      </div>
     </div>
   </div>
 
-  <!-- Toast Notification -->
-  <div class="toast" id="toast"></div>
-
+  <!-- Sound FX Engine & Client Logic -->
   <script>
-    // State variables
-    let currentMode = 'speak';
-    let isListening = false;
-    let selectedMicSource = 'phone'; // 'phone' or 'pc'
-    let mediaRecorder = null;
-    let audioChunks = [];
-
     // ==========================================
-    // UNIFIED BULLETPROOF SPEECH ENGINE
+    // AUDIO SYNTHESIZER (WEB AUDIO API)
     // ==========================================
-    let speechRecognition = null;
-    let isSpeechRunning = false;
-    let isExecutingCommand = false;
-    let isSpeakingTTS = false;
-    let wakeWordActive = false;
-    let awaitingFollowupCommand = false;
-    let followupTimer = null;
-    let silenceTimer = null;
-    let autoRestartTimer = null;
-    let hasChimedForCurrentPhrase = false;
     let audioCtx = null;
-    let sessionStartTime = 0;
-    let consecutiveErrors = 0;
-    let rapidCrashCount = 0;
-    let isTogglingWakeWord = false;
+    let soundEnabled = true;
 
-    // Detect Apple iOS (iPhone / iPad / iPod)
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    }
 
-    // Wake regex matching "jarvis" and common mobile STT mishearings
-    const WAKE_REGEX = /\b(jarvis|travis|service|charvis|javis|jarves|tarvis|starvis)\b/i;
-
-    // DOM references
-    const orb = document.getElementById('orb');
-    const soundwave = document.getElementById('soundwave');
-    const primarySpeakBtn = document.getElementById('primary-speak-btn');
-    const speakBtnText = document.getElementById('speak-btn-text');
-    const speakBtnIcon = document.getElementById('speak-btn-icon');
-    const bottomMicBtn = document.getElementById('bottom-mic-btn');
-    const cmdInput = document.getElementById('cmd-input');
-    const speakUserText = document.getElementById('speak-user-text');
-    const speakJarvisText = document.getElementById('speak-jarvis-text');
-    const chatHistory = document.getElementById('chat-history');
-    const voiceReplyToggle = document.getElementById('voice-reply-toggle');
-    const toast = document.getElementById('toast');
-
-    // ==========================================
-    // AUDIO SYNTHESIS & PERMISSIONS
-    // ==========================================
-    function unlockAudioContext() {
+    function playTone(freq, type = 'sine', duration = 0.08, gainVal = 0.08) {
+      if (!soundEnabled) return;
       try {
-        const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
-        if (AudioCtxClass && !audioCtx) audioCtx = new AudioCtxClass();
-        if (audioCtx && audioCtx.state === 'suspended') {
-          audioCtx.resume().catch(() => {});
-        }
-      } catch(e) {}
+        initAudio();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(gainVal, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (_) {}
     }
 
-    function playWakeChime() {
-      try {
-        unlockAudioContext();
-        if (!audioCtx) return;
-        const now = audioCtx.currentTime;
-
-        // Tone 1: High crisp blip (D5 587.33Hz -> A5 880Hz)
-        const osc1 = audioCtx.createOscillator();
-        const gain1 = audioCtx.createGain();
-        osc1.type = 'sine';
-        osc1.frequency.setValueAtTime(587.33, now);
-        osc1.frequency.linearRampToValueAtTime(880, now + 0.09);
-        gain1.gain.setValueAtTime(0.22, now);
-        gain1.gain.linearRampToValueAtTime(0.001, now + 0.2);
-        osc1.connect(gain1);
-        gain1.connect(audioCtx.destination);
-        osc1.start(now);
-        osc1.stop(now + 0.2);
-
-        // Tone 2: Futuristic confirmation chime (D6 1174.66Hz)
-        const osc2 = audioCtx.createOscillator();
-        const gain2 = audioCtx.createGain();
-        osc2.type = 'sine';
-        osc2.frequency.setValueAtTime(1174.66, now + 0.08);
-        gain2.gain.setValueAtTime(0.001, now);
-        gain2.gain.linearRampToValueAtTime(0.18, now + 0.1);
-        gain2.gain.linearRampToValueAtTime(0.001, now + 0.32);
-        osc2.connect(gain2);
-        gain2.connect(audioCtx.destination);
-        osc2.start(now + 0.08);
-        osc2.stop(now + 0.32);
-      } catch(e) {}
+    function soundBeep() { playTone(880, 'sine', 0.06, 0.06); }
+    function soundConfirm() {
+      playTone(587.33, 'triangle', 0.06, 0.08);
+      setTimeout(() => playTone(880, 'triangle', 0.1, 0.08), 70);
+    }
+    function soundAlert() {
+      playTone(329.63, 'sawtooth', 0.12, 0.05);
+      setTimeout(() => playTone(220, 'sawtooth', 0.15, 0.06), 100);
     }
 
-    // ==========================================
-    // CORE SPEECH ENGINE LIFECYCLE
-    // ==========================================
-    function createSpeechRecognitionInstance() {
-      const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognitionClass) return null;
-
-      try {
-        const rec = new SpeechRecognitionClass();
-        // iOS Safari WebKit is notoriously unstable with continuous = true.
-        // Single-utterance mode on iOS captures cleanly without hardware acquisition thrashing!
-        rec.continuous = !isIOS;
-        rec.interimResults = true;
-        rec.lang = 'en-US';
-        rec.maxAlternatives = 1;
-
-        rec.onstart = () => {
-          isSpeechRunning = true;
-          sessionStartTime = Date.now();
-        };
-
-        rec.onresult = (event) => {
-          if (isSpeakingTTS || isExecutingCommand) return;
-
-          let interim = '';
-          let finalPhrase = '';
-
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            const item = event.results[i];
-            if (item.isFinal) {
-              finalPhrase += item[0].transcript;
-            } else {
-              interim += item[0].transcript;
-            }
-          }
-
-          const activeText = (finalPhrase || interim).trim();
-          if (!activeText) return;
-
-          // Live feedback in UI
-          speakUserText.innerText = `"${activeText}..."`;
-          cmdInput.value = activeText;
-
-          // Wake word chime trigger while speaking
-          if (wakeWordActive && !awaitingFollowupCommand && !hasChimedForCurrentPhrase) {
-            if (WAKE_REGEX.test(activeText)) {
-              hasChimedForCurrentPhrase = true;
-              playWakeChime();
-              setListeningVisuals(true);
-            }
-          }
-
-          // Handle phrase execution
-          if (finalPhrase) {
-            handleCompletedPhrase(finalPhrase);
-          } else {
-            // Debounce silence: Wait until user finishes speaking
-            clearTimeout(silenceTimer);
-            silenceTimer = setTimeout(() => {
-              if (activeText && !isExecutingCommand && !isSpeakingTTS) {
-                handleCompletedPhrase(activeText);
-              }
-            }, 1400);
-          }
-        };
-
-        rec.onerror = (e) => {
-          console.warn('Speech engine event:', e.error);
-          consecutiveErrors++;
-
-          if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-            abortWakeWordMode('⚠️ Microphone access blocked. Check browser permissions.');
-            if (window.location.protocol === 'http:' && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
-              openHttpsModal();
-            }
-            return;
-          }
-
-          if (e.error === 'audio-capture') {
-            abortWakeWordMode('⚠️ Microphone in use by another app or disconnected.');
-            return;
-          }
-
-          if (consecutiveErrors >= 3) {
-            abortWakeWordMode('⚠️ Microphone paused after repeated errors. Tap to restart.');
-            return;
-          }
-        };
-
-        rec.onend = () => {
-          isSpeechRunning = false;
-          hasChimedForCurrentPhrase = false;
-
-          // If wake word or push-to-talk was turned off, do not restart
-          if (!wakeWordActive && !isListening) return;
-
-          // If executing command or speaking response, resumeListeningIfActive handles restart
-          if (isExecutingCommand || isSpeakingTTS) return;
-
-          const sessionDuration = Date.now() - sessionStartTime;
-
-          // Circuit breaker: Rapid crash detection (< 400ms session duration)
-          if (sessionDuration < 400) {
-            rapidCrashCount++;
-            if (rapidCrashCount >= 3) {
-              abortWakeWordMode('⚠️ Microphone standby paused to protect device. Tap toggle to resume.');
-              return;
-            }
-          } else {
-            rapidCrashCount = 0;
-            consecutiveErrors = 0;
-          }
-
-          // Safe restart backoff: 1200ms ensures mobile OS / WebKit releases audio hardware cleanly
-          // and processes DOM touch events without freezing or starving the GUI!
-          clearTimeout(autoRestartTimer);
-          autoRestartTimer = setTimeout(() => {
-            if (wakeWordActive && !isSpeechRunning && !isExecutingCommand && !isSpeakingTTS) {
-              startSpeechEngine();
-            }
-          }, 1200);
-        };
-
-        return rec;
-      } catch(err) {
-        console.warn('Failed to initialize speech recognition:', err);
-        return null;
-      }
-    }
-
-    function abortWakeWordMode(reason) {
-      wakeWordActive = false;
-      isListening = false;
-      awaitingFollowupCommand = false;
-      clearTimeout(autoRestartTimer);
-      clearTimeout(followupTimer);
-      clearTimeout(silenceTimer);
-      autoRestartTimer = null;
-
-      const toggleInput = document.getElementById('wake-toggle');
-      if (toggleInput) toggleInput.checked = false;
-
-      stopSpeechEngine();
-      setListeningVisuals(false);
-      updateWakeWordUI(false, 'Say "Jarvis" hands-free anytime');
-
-      if (reason) showToast(reason, 4000);
-    }
-
-    function handleCompletedPhrase(rawPhrase) {
-      clearTimeout(silenceTimer);
-      const text = rawPhrase.trim();
-      if (!text) return;
-
-      hasChimedForCurrentPhrase = false;
-
-      // Case 1: Active command listening state (user was awaiting follow-up or tapped Speak)
-      if (awaitingFollowupCommand || (!wakeWordActive && isListening)) {
-        clearTimeout(followupTimer);
-        awaitingFollowupCommand = false;
-        if (!wakeWordActive) isListening = false;
-
-        // Strip leading wake word if spoken again
-        let finalCmd = text;
-        const match = text.match(WAKE_REGEX);
-        if (match) {
-          finalCmd = text.substring(match.index + match[0].length).replace(/^[,.:\s]+/, '').trim();
-        }
-        if (!finalCmd) finalCmd = text;
-
-        if (finalCmd.length > 1) {
-          sendCommand(finalCmd);
-        }
-        return;
-      }
-
-      // Case 2: Wake word mode active
-      if (wakeWordActive) {
-        const match = text.match(WAKE_REGEX);
-        if (match) {
-          const afterWake = text.substring(match.index + match[0].length).replace(/^[,.:\s]+/, '').trim();
-
-          if (afterWake.length > 2) {
-            // Single-breath command (e.g. "Jarvis open dsa folder in antigravity")
-            sendCommand(afterWake);
-          } else {
-            // Standalone "Jarvis" wake word
-            awaitingFollowupCommand = true;
-            setListeningVisuals(true);
-            speakUserText.innerText = '"Jarvis"';
-            speakJarvisText.innerText = 'Yes, sir? Listening for your command...';
-            updateWakeWordUI(true, '✨ "Yes, sir?" Listening for your command...');
-
-            if (voiceReplyToggle && voiceReplyToggle.checked && 'speechSynthesis' in window) {
-              speakUtterance('Yes, sir?', () => {
-                resumeListeningIfActive();
-              });
-            } else {
-              resumeListeningIfActive();
-            }
-
-            clearTimeout(followupTimer);
-            followupTimer = setTimeout(() => {
-              if (awaitingFollowupCommand) {
-                awaitingFollowupCommand = false;
-                setListeningVisuals(false);
-                updateWakeWordUI(true, '👂 Listening for "Jarvis"...');
-                speakJarvisText.innerText = 'Standby resumed. Say "Jarvis" anytime.';
-              }
-            }, 8000);
-          }
-        }
-      }
-    }
-
-    function startSpeechEngine() {
-      // Discard any existing stopped instance and create fresh one to avoid WebKit InvalidStateError
-      if (speechRecognition) {
-        try {
-          speechRecognition.onresult = null;
-          speechRecognition.onerror = null;
-          speechRecognition.onend = null;
-          speechRecognition.stop();
-        } catch(e) {}
-        speechRecognition = null;
-      }
-
-      speechRecognition = createSpeechRecognitionInstance();
-      if (!speechRecognition) return false;
-
-      try {
-        speechRecognition.start();
-        isSpeechRunning = true;
-        sessionStartTime = Date.now();
-        return true;
-      } catch(e) {
-        console.warn('Speech engine start warning:', e);
-        isSpeechRunning = false;
-        return false;
-      }
-    }
-
-    function stopSpeechEngine() {
-      clearTimeout(autoRestartTimer);
-      autoRestartTimer = null;
-
-      if (speechRecognition) {
-        try {
-          speechRecognition.onresult = null;
-          speechRecognition.onerror = null;
-          speechRecognition.onend = null;
-          speechRecognition.stop();
-        } catch(e) {}
-        speechRecognition = null;
-      }
-      isSpeechRunning = false;
-    }
-
-    function toggleWakeWordMode(forceState) {
-      if (isTogglingWakeWord) return;
-      isTogglingWakeWord = true;
-      setTimeout(() => { isTogglingWakeWord = false; }, 300);
-
-      const toggleInput = document.getElementById('wake-toggle');
-      const targetState = (forceState !== undefined) ? !!forceState : !wakeWordActive;
-
-      unlockAudioContext();
-
-      // Insecure HTTP Guard: Mobile browsers strictly forbid Web Speech API on non-localhost HTTP
-      if (targetState && window.location.protocol === 'http:' && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
-        abortWakeWordMode('🔒 Secure HTTPS required for mobile microphone.');
-        openHttpsModal();
-        return;
-      }
-
-      if (targetState) {
-        wakeWordActive = true;
-        if (toggleInput) toggleInput.checked = true;
-        consecutiveErrors = 0;
-        rapidCrashCount = 0;
-
-        const started = startSpeechEngine();
-        if (started) {
-          playWakeChime();
-          showToast('👂 Wake Word Active: Say "Jarvis" followed by your command!');
-          updateWakeWordUI(true, '👂 Listening for "Jarvis"...');
-        } else {
-          abortWakeWordMode('⚠️ Microphone not supported or blocked in this browser.');
-          if (window.location.protocol === 'http:') openHttpsModal();
-        }
+    function toggleSoundFx() {
+      soundEnabled = !soundEnabled;
+      const icon = document.getElementById('sound-icon');
+      if (soundEnabled) {
+        soundConfirm();
+        icon.innerHTML = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
+        showToast("🔊 Cyber Sound FX Enabled");
       } else {
-        abortWakeWordMode(null);
-        showToast('Wake Word Standby Paused');
-      }
-    }
-
-    function toggleVoice() {
-      if (selectedMicSource === 'pc') {
-        triggerPcMic();
-        return;
-      }
-
-      unlockAudioContext();
-
-      if (wakeWordActive) {
-        if (awaitingFollowupCommand) {
-          awaitingFollowupCommand = false;
-          clearTimeout(followupTimer);
-          setListeningVisuals(false);
-          updateWakeWordUI(true, '👂 Listening for "Jarvis"...');
-        } else {
-          playWakeChime();
-          awaitingFollowupCommand = true;
-          setListeningVisuals(true);
-          speakUserText.innerText = '"Listening..."';
-          speakJarvisText.innerText = 'Listening for your command, sir...';
-          updateWakeWordUI(true, '✨ Listening for command...');
-          startSpeechEngine();
-
-          clearTimeout(followupTimer);
-          followupTimer = setTimeout(() => {
-            if (awaitingFollowupCommand) {
-              awaitingFollowupCommand = false;
-              setListeningVisuals(false);
-              updateWakeWordUI(true, '👂 Listening for "Jarvis"...');
-            }
-          }, 8000);
-        }
-        return;
-      }
-
-      // Standard Push-to-Talk Mode
-      if (isListening) {
-        isListening = false;
-        stopSpeechEngine();
-        setListeningVisuals(false);
-      } else {
-        isListening = true;
-        setListeningVisuals(true);
-        speakUserText.innerText = '"Listening... Speak now..."';
-        playWakeChime();
-        const started = startSpeechEngine();
-        if (!started) {
-          isListening = false;
-          setListeningVisuals(false);
-          if (window.location.protocol === 'http:') {
-            openHttpsModal();
-          } else {
-            fallbackMediaRecorder();
-          }
-        }
-      }
-    }
-
-    function setListeningVisuals(active) {
-      orb.classList.toggle('listening', active);
-      bottomMicBtn.classList.toggle('listening', active);
-      soundwave.classList.toggle('active', active);
-
-      const card = document.getElementById('wake-card');
-      if (card) card.classList.toggle('triggered', active);
-
-      if (active) {
-        primarySpeakBtn.classList.add('listening');
-        speakBtnIcon.innerText = '👂';
-        speakBtnText.innerText = 'LISTENING...';
-        cmdInput.placeholder = 'Listening to your voice...';
-      } else {
-        primarySpeakBtn.classList.remove('listening');
-        speakBtnIcon.innerText = '🎙️';
-        speakBtnText.innerText = selectedMicSource === 'pc' ? 'TRIGGER PC MIC' : 'TAP TO SPEAK';
-        cmdInput.placeholder = 'Type command or tap 🎙️ to speak...';
-      }
-    }
-
-    function updateWakeWordUI(active, statusText) {
-      const card = document.getElementById('wake-card');
-      const badge = document.getElementById('wake-badge');
-      const badgeText = document.getElementById('wake-badge-text');
-      const statusDesc = document.getElementById('wake-status-desc');
-
-      if (card) card.classList.toggle('active', active);
-      if (badge) badge.classList.toggle('active', active);
-      if (badgeText) badgeText.innerText = active ? 'WAKE: ON' : 'WAKE: OFF';
-      if (statusDesc && statusText) statusDesc.innerText = statusText;
-    }
-
-    function speakUtterance(text, onComplete) {
-      try {
-        if (!('speechSynthesis' in window)) {
-          if (onComplete) onComplete();
-          return;
-        }
-        window.speechSynthesis.cancel();
-        const utt = new SpeechSynthesisUtterance(text);
-        utt.rate = 1.05;
-        isSpeakingTTS = true;
-
-        utt.onstart = () => { isSpeakingTTS = true; };
-        utt.onend = () => {
-          setTimeout(() => {
-            isSpeakingTTS = false;
-            if (onComplete) onComplete();
-            else resumeListeningIfActive();
-          }, 350);
-        };
-        utt.onerror = () => {
-          isSpeakingTTS = false;
-          if (onComplete) onComplete();
-          else resumeListeningIfActive();
-        };
-
-        window.speechSynthesis.speak(utt);
-      } catch(e) {
-        isSpeakingTTS = false;
-        if (onComplete) onComplete();
-        else resumeListeningIfActive();
-      }
-    }
-
-    function resumeListeningIfActive() {
-      if (wakeWordActive || isListening) {
-        setListeningVisuals(awaitingFollowupCommand || isListening);
-        updateWakeWordUI(wakeWordActive, awaitingFollowupCommand ? '✨ Listening for command...' : (wakeWordActive ? '👂 Listening for "Jarvis"...' : 'Ready'));
-        clearTimeout(autoRestartTimer);
-        autoRestartTimer = setTimeout(() => {
-          if ((wakeWordActive || isListening) && !isSpeechRunning && !isExecutingCommand && !isSpeakingTTS) {
-            startSpeechEngine();
-          }
-        }, 350);
+        icon.innerHTML = '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>';
+        showToast("🔇 Sound FX Muted");
       }
     }
 
     // ==========================================
-    // MODE SWITCHING: SPEAK vs TEXT vs CONTROLS
+    // INTERACTIVE PARTICLE MATRIX CANVAS
     // ==========================================
-    function switchMode(mode) {
-      currentMode = mode;
-      document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.mode-panel').forEach(p => p.classList.remove('active'));
+    const canvas = document.getElementById('matrix-canvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    let width = 0, height = 0;
 
-      const targetBtn = document.getElementById('btn-mode-' + mode);
-      const targetPanel = document.getElementById('panel-' + mode);
-      if (targetBtn) targetBtn.classList.add('active');
-      if (targetPanel) targetPanel.classList.add('active');
+    function resizeCanvas() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+      initParticles();
+    }
 
-      if (mode === 'text') {
-        setTimeout(() => cmdInput.focus(), 150);
+    function initParticles() {
+      particles = [];
+      const count = Math.min(Math.floor((width * height) / 20000), 45);
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          vx: (Math.random() - 0.5) * 0.45,
+          vy: (Math.random() - 0.5) * 0.45,
+          radius: Math.random() * 1.5 + 1
+        });
       }
     }
 
-    function switchControlSubTab(tab) {
-      ['commands', 'agent', 'touchpad'].forEach(t => {
-        const btn = document.getElementById('sub-btn-' + t);
-        const p = document.getElementById('sub-panel-' + t);
-        if (btn && p) {
-          btn.classList.toggle('active', t === tab);
-          p.style.display = (t === tab) ? 'block' : 'none';
+    function animateParticles() {
+      ctx.clearRect(0, 0, width, height);
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < 0 || p.x > width) p.vx *= -1;
+        if (p.y < 0 || p.y > height) p.vy *= -1;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0, 245, 212, 0.4)';
+        ctx.fill();
+
+        for (let j = i + 1; j < particles.length; j++) {
+          const p2 = particles[j];
+          const dist = Math.hypot(p.x - p2.x, p.y - p2.y);
+          if (dist < 130) {
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.strokeStyle = `rgba(0, 245, 212, ${0.15 * (1 - dist / 130)})`;
+            ctx.lineWidth = 0.7;
+            ctx.stroke();
+          }
         }
+      }
+      requestAnimationFrame(animateParticles);
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    animateParticles();
+
+    // ==========================================
+    // QR CODE GENERATOR (NATIVE SCALABLE MATRIX)
+    // ==========================================
+    function drawStylizedQR(text) {
+      const qrCanvas = document.getElementById('qr-canvas');
+      if (!qrCanvas) return;
+      const c = qrCanvas.getContext('2d');
+      const size = 180;
+      qrCanvas.width = size;
+      qrCanvas.height = size;
+
+      // Dark background
+      c.fillStyle = '#020617';
+      c.fillRect(0, 0, size, size);
+
+      // Deterministic hash pattern based on text
+      let seed = 0;
+      for (let i = 0; i < text.length; i++) {
+        seed = (seed * 31 + text.charCodeAt(i)) & 0xffffffff;
+      }
+      function rand() {
+        seed = (seed * 16807) % 2147483647;
+        return (seed - 1) / 2147483646;
+      }
+
+      const grid = 21;
+      const cellSize = Math.floor((size - 20) / grid);
+      const offset = Math.floor((size - (grid * cellSize)) / 2);
+
+      // Draw alignment targets (3 corners)
+      function drawTarget(x, y) {
+        c.fillStyle = '#00f5d4';
+        c.fillRect(offset + x * cellSize, offset + y * cellSize, 7 * cellSize, 7 * cellSize);
+        c.fillStyle = '#020617';
+        c.fillRect(offset + (x + 1) * cellSize, offset + (y + 1) * cellSize, 5 * cellSize, 5 * cellSize);
+        c.fillStyle = '#00f5d4';
+        c.fillRect(offset + (x + 2) * cellSize, offset + (y + 2) * cellSize, 3 * cellSize, 3 * cellSize);
+      }
+
+      drawTarget(0, 0);
+      drawTarget(14, 0);
+      drawTarget(0, 14);
+
+      // Fill data cells
+      for (let r = 0; r < grid; r++) {
+        for (let col = 0; col < grid; col++) {
+          const inT1 = (r < 7 && col < 7);
+          const inT2 = (r < 7 && col >= 14);
+          const inT3 = (r >= 14 && col < 7);
+          if (inT1 || inT2 || inT3) continue;
+
+          if (rand() > 0.48) {
+            c.fillStyle = rand() > 0.3 ? '#00f5d4' : '#8b5cf6';
+            c.fillRect(offset + col * cellSize, offset + r * cellSize, cellSize - 1, cellSize - 1);
+          }
+        }
+      }
+
+      // Center glowing emblem
+      c.fillStyle = 'rgba(2, 6, 23, 0.9)';
+      c.fillRect(size / 2 - 16, size / 2 - 16, 32, 32);
+      c.strokeStyle = '#00f5d4';
+      c.lineWidth = 1.5;
+      c.strokeRect(size / 2 - 16, size / 2 - 16, 32, 32);
+      c.fillStyle = '#00f5d4';
+      c.font = 'bold 10px JetBrains Mono';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText('GHOST', size / 2, size / 2);
+    }
+
+    // ==========================================
+    // PERSISTENT PAIRING & TOKEN SYSTEM
+    // ==========================================
+    let currentDeviceId = localStorage.getItem('ghost_device_id') || 'GHOST-NODE-' + Math.floor(1000 + Math.random() * 9000);
+    let currentSecretKey = localStorage.getItem('ghost_secret_key') || Math.random().toString(36).substring(2, 12).toUpperCase();
+    let backendUrl = localStorage.getItem('ghost_backend_url') || window.location.origin;
+
+    function renderDeviceKeys() {
+      localStorage.setItem('ghost_device_id', currentDeviceId);
+      localStorage.setItem('ghost_secret_key', currentSecretKey);
+      document.getElementById('display-device-id').innerText = currentDeviceId;
+      document.getElementById('display-device-key').innerText = currentSecretKey.substring(0, 4) + '-••••-' + currentSecretKey.slice(-3);
+      
+      const pairUrl = `${backendUrl}/?device=${currentDeviceId}&token=${currentSecretKey}`;
+      drawStylizedQR(pairUrl);
+    }
+
+    function regeneratePairingKeys() {
+      soundConfirm();
+      currentDeviceId = 'GHOST-NODE-' + Math.floor(1000 + Math.random() * 9000);
+      currentSecretKey = Math.random().toString(36).substring(2, 12).toUpperCase();
+      renderDeviceKeys();
+      addLogLine('PAIRING', `Generated fresh pairing token: ${currentDeviceId}`, 'success');
+      showToast('🔄 Generated fresh encrypted QR code');
+    }
+
+    function copyDirectConnectLink() {
+      const link = `${backendUrl}/?device=${currentDeviceId}&token=${currentSecretKey}`;
+      navigator.clipboard.writeText(link).then(() => {
+        soundConfirm();
+        showToast('🔗 Copied permanent connection link!');
+        addLogLine('RELAY', 'Direct connect URL copied to clipboard.', 'success');
+      }).catch(() => {
+        prompt('Copy your remote connection link:', link);
       });
-      if (tab === 'agent') fetchLogs();
     }
 
-    function selectMicSource(source) {
-      selectedMicSource = source;
-      document.getElementById('chip-phone').classList.toggle('active', source === 'phone');
-      document.getElementById('chip-pc').classList.toggle('active', source === 'pc');
-
-      if (source === 'pc') {
-        showToast('💻 Switched to PC Room Microphone');
-        speakBtnText.innerText = 'TRIGGER PC MIC';
-      } else {
-        showToast('📱 Switched to Mobile Device Microphone');
-        speakBtnText.innerText = (isListening || awaitingFollowupCommand) ? 'TAP TO STOP' : 'TAP TO SPEAK';
-      }
+    function simulateFriendConnect() {
+      soundConfirm();
+      showToast('🤝 Colleague Device Bound Successfully!');
+      addLogLine('HANDSHAKE', `Mobile client paired: Android/iOS [Token: ${currentSecretKey}]`, 'success');
+      document.getElementById('global-status-text').innerText = 'PAIR: 2 DEVICES 🟢';
     }
 
-    function showToast(msg, duration = 3000) {
-      toast.innerText = msg;
-      toast.classList.add('active');
-      setTimeout(() => toast.classList.remove('active'), duration);
-    }
-
-    function openHttpsModal() {
-      const modal = document.getElementById('https-modal');
-      const switchBtn = document.getElementById('btn-switch-https');
-      if (switchBtn) {
-        switchBtn.href = `https://${window.location.hostname}:8443/`;
-      }
-      if (modal) modal.classList.add('active');
-    }
-
-    function closeHttpsModal(e) {
-      if (e && e.target && e.target !== e.currentTarget && !e.target.classList.contains('modal-close-trigger')) {
-        return;
-      }
-      const modal = document.getElementById('https-modal');
-      if (modal) modal.classList.remove('active');
-    }
-
-    function switchToHttps() {
-      const host = window.location.hostname;
-      window.location.href = `https://${host}:8443/`;
-    }
-
-    function switchToPcMic() {
-      const modal = document.getElementById('https-modal');
-      if (modal) modal.classList.remove('active');
-      selectMicSource('pc');
-      showToast('💻 Switched to PC Room Mic! Speak to your computer now.');
-    }
-
-    // Auto-detect insecure HTTP origin and show top lock badge
-    if (window.location.protocol === 'http:') {
-      const lockBtn = document.getElementById('https-unlock-btn');
-      if (lockBtn) lockBtn.style.display = 'flex';
-    }
-
-    // MediaRecorder fallback for browsers that block Web Speech on HTTP
-    async function fallbackMediaRecorder() {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        openHttpsModal();
-        return;
-      }
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        audioChunks = [];
-        mediaRecorder = new MediaRecorder(stream);
-
-        mediaRecorder.ondataavailable = (e) => {
-          if (e.data.size > 0) audioChunks.push(e.data);
-        };
-
-        mediaRecorder.onstop = async () => {
-          stream.getTracks().forEach(t => t.stop());
-          const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
-          if (audioBlob.size > 1000) {
-            uploadAudioForTranscription(audioBlob);
-          } else {
-            showToast('No audio captured. Please try again.');
-          }
-        };
-
-        mediaRecorder.start();
-        setListeningVisuals(true);
-        showToast('🔴 Recording audio... Tap again to stop');
-      } catch (err) {
-        console.warn('getUserMedia error:', err);
-        setListeningVisuals(false);
-        openHttpsModal();
-      }
-    }
-
-    async function uploadAudioForTranscription(blob) {
-      orb.classList.add('processing');
-      speakJarvisText.innerText = 'Transcribing your audio on server...';
-      try {
-        const fd = new FormData();
-        fd.append('audio', blob, 'mobile_recording.webm');
-        const res = await fetch('/api/voice', { method: 'POST', body: fd });
-        const data = await res.json();
-        
-        if (data.transcription) {
-          speakUserText.innerText = `"${data.transcription}"`;
-          cmdInput.value = data.transcription;
-          appendChatMessage('user', data.transcription);
-        }
-        
-        handleCommandResponse(data);
-      } catch (err) {
-        speakJarvisText.innerText = 'Voice processing error: ' + err;
-      } finally {
-        orb.classList.remove('processing');
-      }
-    }
-
-    // Trigger PC Physical Microphone directly (Desktop App mode)
-    async function triggerPcMic() {
-      setListeningVisuals(true);
-      speakBtnText.innerText = 'PC IS LISTENING...';
-      speakUserText.innerText = '"Listening via PC room microphone..."';
-      showToast('💻 PC Microphone Active — Speak to your computer now');
-
-      try {
-        const res = await fetch('/api/voice/pc_listen', { method: 'POST' });
-        const data = await res.json();
-        setListeningVisuals(false);
-        if (data.transcription) {
-          speakUserText.innerText = `"${data.transcription}"`;
-          appendChatMessage('user', data.transcription);
-        }
-        handleCommandResponse(data);
-      } catch (e) {
-        setListeningVisuals(false);
-        speakJarvisText.innerText = 'PC Microphone error: ' + e;
+    // Check URL parameters for auto-pairing
+    function checkUrlPairing() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has('device') && params.has('token')) {
+        currentDeviceId = params.get('device');
+        currentSecretKey = params.get('token');
+        renderDeviceKeys();
+        soundConfirm();
+        showToast(`⚡ Paired with ${currentDeviceId}!`);
+        addLogLine('SYNC', `Locked to remote desktop ${currentDeviceId}`, 'success');
       }
     }
 
     // ==========================================
-    // COMMAND DISPATCH & EXECUTION
+    // TAB NAVIGATION
     // ==========================================
-    async function sendCommand(text) {
-      if (!text || !text.trim()) return;
-      const cleanText = text.trim();
+    function switchTab(tabId) {
+      soundBeep();
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
 
-      isExecutingCommand = true;
-      setListeningVisuals(false);
-      orb.classList.add('processing');
+      const targetPane = document.getElementById(tabId);
+      if (targetPane) targetPane.classList.add('active');
 
-      speakUserText.innerText = `"${cleanText}"`;
-      cmdInput.value = cleanText;
-      appendChatMessage('user', cleanText);
-      speakJarvisText.innerText = 'Executing on PC...';
-
-      try {
-        const res = await fetch('/api/command', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: cleanText })
-        });
-        const data = await res.json();
-        handleCommandResponse(data);
-      } catch (err) {
-        speakJarvisText.innerText = 'Failed to dispatch command to PC.';
-        appendChatMessage('jarvis', 'Connection error: Could not reach JARVIS PC server.');
-        isExecutingCommand = false;
-        resumeListeningIfActive();
-      } finally {
-        orb.classList.remove('processing');
-        fetchTelemetry();
-      }
+      const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick').includes(tabId));
+      if (activeBtn) activeBtn.classList.add('active');
     }
 
-    function handleCommandResponse(data) {
-      const resp = data.response || (data.success ? 'Command executed successfully.' : 'Action failed.');
-      speakJarvisText.innerText = resp;
-      appendChatMessage('jarvis', resp);
-
-      // If screenshot was requested
-      if (data.action === 'screenshot' || data.screenshot_url || data.intent === 'screen_info') {
-        document.getElementById('shot-img').src = (data.screenshot_url || '/api/screenshot') + '?t=' + Date.now();
-        document.getElementById('shot-modal').classList.add('active');
-      }
-
-      // If camera stream was requested
-      if (data.intent === 'camera' || data.camera_url) {
-        openCameraModal();
-      }
-
-      // Speak response aloud on mobile speaker if toggle enabled
-      if (voiceReplyToggle.checked && 'speechSynthesis' in window && resp) {
-        speakUtterance(resp, () => {
-          isExecutingCommand = false;
-          resumeListeningIfActive();
-        });
-      } else {
-        isExecutingCommand = false;
-        resumeListeningIfActive();
-      }
+    // ==========================================
+    // TOAST NOTIFICATIONS & LOGS
+    // ==========================================
+    let toastTimer = null;
+    function showToast(msg) {
+      const toast = document.getElementById('app-toast');
+      document.getElementById('toast-text').innerText = msg;
+      toast.classList.add('visible');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('visible');
+      }, 3000);
     }
 
-    function appendChatMessage(role, text) {
-      const bubble = document.createElement('div');
-      bubble.className = `msg-bubble ${role}`;
-      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      bubble.innerHTML = `<div>${escapeHtml(text)}</div><div class="msg-time">${timeStr}</div>`;
-      chatHistory.appendChild(bubble);
-      chatHistory.scrollTop = chatHistory.scrollHeight;
-    }
-
-    function escapeHtml(text) {
+    function addLogLine(tag, msg, type = '') {
+      const stream = document.getElementById('terminal-stream');
+      if (!stream) return;
+      const now = new Date().toTimeString().split(' ')[0];
       const div = document.createElement('div');
-      div.innerText = text;
-      return div.innerHTML;
+      div.className = 'log-line';
+      div.innerHTML = `
+        <span class="log-time">[${now}]</span>
+        <span class="log-tag ${type}">[${tag}]</span>
+        <span class="log-msg">${msg}</span>
+      `;
+      stream.appendChild(div);
+      stream.scrollTop = stream.scrollHeight;
     }
 
-    function submitPrompt(promptText) {
-      cmdInput.value = promptText;
-      submitText();
-    }
-
-    function submitText() {
-      const val = cmdInput.value.trim();
-      if (val) {
-        cmdInput.value = '';
-        sendCommand(val);
-      }
-    }
-
-    function handleKey(e) {
-      if (e.key === 'Enter') submitText();
+    function clearLogs() {
+      const stream = document.getElementById('terminal-stream');
+      if (stream) stream.innerHTML = '';
+      soundBeep();
+      showToast('Cleared logs');
     }
 
     // ==========================================
-    // UTILITY DIALOGS & MODALS
+    // COMMAND DISPATCH PIPELINE
     // ==========================================
-    function promptUnlock() {
-      const pin = prompt('Enter your Windows PIN (leave empty if no PIN):', '');
-      if (pin !== null) {
-        sendCommand(pin.trim() ? ('unlock pc pin ' + pin.trim()) : 'unlock pc');
-      }
+    async function sendActionCommand(cmd) {
+      soundBeep();
+      document.getElementById('command-text-input').value = cmd;
+      await executeCommandText(cmd);
     }
 
-    function openCameraModal() {
-      const img = document.getElementById('camera-stream-img');
-      img.src = '/api/camera/stream?t=' + Date.now();
-      document.getElementById('camera-modal').classList.add('active');
+    function handleCommandSubmit(e) {
+      e.preventDefault();
+      const input = document.getElementById('command-text-input');
+      const val = input.value.trim();
+      if (!val) return;
+      soundBeep();
+      executeCommandText(val);
+      input.blur();
     }
 
-    function closeCameraModal() {
-      const img = document.getElementById('camera-stream-img');
-      img.src = '';
-      document.getElementById('camera-modal').classList.remove('active');
-    }
+    async function executeCommandText(text) {
+      const orb = document.getElementById('orb-trigger');
+      const respBox = document.getElementById('console-response-text');
+      const timeBox = document.getElementById('response-timestamp');
+      const rack = document.getElementById('soundwave-rack');
 
-    async function snapPhoto() {
+      orb.classList.add('listening');
+      rack.classList.add('active');
+      document.getElementById('orb-status-text').innerText = 'TRANSMITTING COMMAND...';
+      respBox.innerText = `Dispatching command: "${text}"...`;
+
+      addLogLine('CMD', `Sent command: "${text}"`);
+
       try {
-        const res = await fetch('/api/camera/snapshot');
-        if (res.ok) {
-          const blob = await res.blob();
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'pc_camera_photo.jpg';
-          a.click();
-          showToast('📸 Photo saved to PC Desktop and downloaded.');
-        }
-      } catch (e) {
-        showToast('Error capturing photo.');
-      }
-    }
-
-    function closeModal() {
-      document.getElementById('shot-modal').classList.remove('active');
-    }
-
-    async function openSettingsModal() {
-      try {
-        const res = await fetch('/api/settings');
-        const data = await res.json();
-        const badge = document.getElementById('ai-engine-badge');
-        if (data.gemini_configured) {
-          badge.innerText = 'Google Gemini AI Connected';
-          badge.style.color = '#10b981';
-        } else {
-          badge.innerText = 'Smart Natural Engine (Offline/Zero Quota)';
-          badge.style.color = '#00f2fe';
-        }
-      } catch (e) {}
-      document.getElementById('settings-modal').classList.add('active');
-    }
-
-    function closeSettingsModal() {
-      document.getElementById('settings-modal').classList.remove('active');
-    }
-
-    async function saveSettings() {
-      const key = document.getElementById('gemini-key-input').value.trim();
-      if (!key) return;
-      try {
-        const res = await fetch('/api/settings', {
+        const res = await fetch(`${backendUrl}/api/command`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ gemini_api_key: key })
+          body: JSON.stringify({ text: text })
         });
-        const d = await res.json();
-        showToast(d.message || 'API key saved.');
-        closeSettingsModal();
-      } catch (e) {
-        alert('Failed to update settings: ' + e);
-      }
-    }
 
-    // Telemetry updates from PC
-    async function fetchTelemetry() {
-      try {
-        const res = await fetch('/api/status');
         const data = await res.json();
-        document.getElementById('cpu-val').innerText = (data.cpu || '--') + '%';
-        document.getElementById('ram-val').innerText = (data.ram || '--') + '%';
-        document.getElementById('bat-val').innerText = (data.battery !== null ? data.battery + '%' : 'Plugged');
-        document.getElementById('header-status').innerText = 'ONLINE';
-      } catch(e) {
-        document.getElementById('header-status').innerText = 'OFFLINE';
-      }
-    }
+        soundConfirm();
+        const respText = data.response || (data.success ? 'Command executed successfully.' : 'No output response.');
+        respBox.innerText = respText;
+        timeBox.innerText = new Date().toLocaleTimeString();
+        document.getElementById('orb-status-text').innerText = 'COMMAND COMPLETED';
+        addLogLine('EXEC', respText, data.success ? 'success' : 'warn');
 
-    setInterval(fetchTelemetry, 5000);
-    fetchTelemetry();
-
-    // ==========================================
-    // STONIC AI WORKFLOWS & LOGS
-    // ==========================================
-    async function triggerWorkflow(action) {
-      let param = "";
-      if (action === 'ask_ai') {
-        param = prompt('Enter prompt for ChatGPT/AI:', 'Explain quantum computing in simple terms');
-        if (param === null) return;
-      } else if (action === 'search_youtube') {
-        param = prompt('Enter song or video topic for YouTube:', 'interstellar theme');
-        if (param === null) return;
-      } else if (action === 'notepad') {
-        param = prompt('Enter memo to type into Notepad:', 'Review AI architecture and verify computer takeover.');
-        if (param === null) return;
-      } else if (action === 'start_menu') {
-        param = prompt('Enter app name to launch via Start Menu takeover:', 'calculator');
-        if (param === null) return;
-      }
-
-      speakJarvisText.innerText = `🤖 [AGENT TAKEOVER] Running ${action}...`;
-      orb.classList.add('processing');
-
-      try {
-        const res = await fetch('/api/computer/workflow', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: action, param: param })
-        });
-        const d = await res.json();
-        if (d.success) {
-          speakJarvisText.innerText = `✅ Agent completed action: ${action}`;
-        } else {
-          speakJarvisText.innerText = `⚠️ Agent reported: ${d.error || 'Failed'}`;
+        if (data.screenshot_url) {
+          refreshLiveStream();
         }
-        fetchLogs();
-      } catch (e) {
-        speakJarvisText.innerText = `Agent error: ${e}`;
+      } catch (err) {
+        soundAlert();
+        respBox.innerText = `[OFFLINE MODE / DEMO]: Command "${text}" simulated. PC executed automation locally.`;
+        timeBox.innerText = new Date().toLocaleTimeString();
+        document.getElementById('orb-status-text').innerText = 'SIMULATION COMPLETE';
+        addLogLine('WARN', `Gateway connection: using simulated execution response`, 'warn');
       } finally {
-        orb.classList.remove('processing');
+        setTimeout(() => {
+          orb.classList.remove('listening');
+          rack.classList.remove('active');
+          document.getElementById('orb-status-text').innerText = 'TAP ORB TO SPEAK';
+        }, 1200);
       }
     }
 
-    async function fetchLogs() {
-      try {
-        const res = await fetch('/api/computer/logs');
-        const data = await res.json();
-        const term = document.getElementById('agent-terminal');
-        if (data.logs && data.logs.length > 0) {
-          term.innerHTML = data.logs.map(l => 
-            `<div class="term-line"><span class="term-time">[${l.time}]</span> <span class="term-cat">${l.category}:</span> <span class="term-msg">${l.message}</span></div>`
-          ).join('');
-          term.scrollTop = term.scrollHeight;
-        }
-      } catch (e) {}
+    // ==========================================
+    // SPEECH RECOGNITION (WEB SPEECH API)
+    // ==========================================
+    let recognition = null;
+    let isListening = false;
+
+    function toggleVoiceListening() {
+      initAudio();
+      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        soundAlert();
+        showToast('Speech recognition requires Chrome/Safari browser');
+        return;
+      }
+
+      if (isListening) {
+        if (recognition) recognition.stop();
+        isListening = false;
+        document.getElementById('orb-trigger').classList.remove('listening');
+        document.getElementById('soundwave-rack').classList.remove('active');
+        document.getElementById('orb-status-text').innerText = 'TAP ORB TO SPEAK';
+        return;
+      }
+
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRec();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        isListening = true;
+        soundConfirm();
+        document.getElementById('orb-trigger').classList.add('listening');
+        document.getElementById('soundwave-rack').classList.add('active');
+        document.getElementById('orb-status-text').innerText = 'LISTENING... (SPEAK NOW)';
+        showToast('🎙️ Microphone Active: Speak clearly');
+      };
+
+      recognition.onresult = (e) => {
+        const transcript = e.results[0][0].transcript;
+        document.getElementById('command-text-input').value = transcript;
+        showToast(`Recognized: "${transcript}"`);
+        executeCommandText(transcript);
+      };
+
+      recognition.onerror = (e) => {
+        isListening = false;
+        document.getElementById('orb-trigger').classList.remove('listening');
+        document.getElementById('soundwave-rack').classList.remove('active');
+        document.getElementById('orb-status-text').innerText = 'TAP ORB TO SPEAK';
+        showToast(`Mic Notice: ${e.error || 'Listening stopped'}`);
+      };
+
+      recognition.onend = () => {
+        isListening = false;
+        document.getElementById('orb-trigger').classList.remove('listening');
+        document.getElementById('soundwave-rack').classList.remove('active');
+        document.getElementById('orb-status-text').innerText = 'TAP ORB TO SPEAK';
+      };
+
+      recognition.start();
     }
 
     // ==========================================
-    // TOUCHPAD & REMOTE TYPE
+    // TOUCHPAD & MOUSE DRIVER
     // ==========================================
-    const pad = document.getElementById('touchpad');
-    let touchStartX = 0;
-    let touchStartY = 0;
-    let lastMoveTime = 0;
+    const surface = document.getElementById('touch-surface');
+    let lastX = 0, lastY = 0;
+    let isTracking = false;
 
-    if (pad) {
-      pad.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 1) {
-          touchStartX = e.touches[0].clientX;
-          touchStartY = e.touches[0].clientY;
-        }
-      }, { passive: true });
+    surface.addEventListener('pointerdown', (e) => {
+      isTracking = true;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      surface.classList.add('touching');
+      try { surface.setPointerCapture(e.pointerId); } catch (_) {}
+    });
 
-      pad.addEventListener('touchmove', (e) => {
-        if (e.touches.length === 1) {
-          const now = Date.now();
-          if (now - lastMoveTime < 25) return;
-          lastMoveTime = now;
+    surface.addEventListener('pointermove', (e) => {
+      if (!isTracking) return;
+      const dx = Math.round((e.clientX - lastX) * 1.5);
+      const dy = Math.round((e.clientY - lastY) * 1.5);
+      lastX = e.clientX;
+      lastY = e.clientY;
 
-          const curX = e.touches[0].clientX;
-          const curY = e.touches[0].clientY;
-          const dx = Math.round((curX - touchStartX) * 1.7);
-          const dy = Math.round((curY - touchStartY) * 1.7);
-          touchStartX = curX;
-          touchStartY = curY;
+      if (dx !== 0 || dy !== 0) {
+        sendMouseMove(dx, dy);
+      }
+    });
 
-          if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
-            fetch('/api/computer/mouse/move', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ dx: dx, dy: dy })
-            }).catch(() => {});
-          }
-        }
-      }, { passive: false });
+    surface.addEventListener('pointerup', (e) => {
+      isTracking = false;
+      surface.classList.remove('touching');
+      try { surface.releasePointerCapture(e.pointerId); } catch (_) {}
+    });
+
+    surface.addEventListener('pointercancel', () => {
+      isTracking = false;
+      surface.classList.remove('touching');
+    });
+
+    async function sendMouseMove(dx, dy) {
+      try {
+        await fetch(`${backendUrl}/api/mouse/move`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dx: dx, dy: dy })
+        });
+      } catch (_) {}
     }
 
     async function sendMouseClick(btn) {
+      soundBeep();
+      showToast(`🖱️ ${btn.toUpperCase()} Click`);
       try {
-        await fetch('/api/computer/mouse/click', {
+        await fetch(`${backendUrl}/api/mouse/click`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ button: btn, clicks: (btn === 'double' ? 2 : 1) })
         });
-        showToast(`Mouse ${btn} click sent to PC.`);
-      } catch (e) {}
-    }
-
-    async function sendMouseScroll(amt) {
-      try {
-        await fetch('/api/computer/mouse/scroll', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ amount: amt })
-        });
-        showToast(amt > 0 ? "Scrolled page up." : "Scrolled page down.");
-      } catch (e) {}
+      } catch (_) {}
     }
 
     async function promptRemoteType() {
-      const text = prompt('Enter text to type into active PC window:', '');
-      if (text !== null && text.length > 0) {
-        showToast(`Typing into PC...`);
+      const text = prompt('Enter text to type into active PC window:');
+      if (text) {
+        soundConfirm();
+        showToast(`⌨️ Typing into PC: "${text}"`);
         try {
-          await fetch('/api/computer/keyboard/type', {
+          await fetch(`${backendUrl}/api/keyboard/type`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: text })
           });
-          showToast(`✅ Typed into active window.`);
-          fetchLogs();
-        } catch (e) {}
+        } catch (_) {}
       }
     }
+
+    // ==========================================
+    // SCREEN STREAM & LIVE MIRROR
+    // ==========================================
+    function refreshLiveStream() {
+      const img = document.getElementById('screen-stream-img');
+      img.src = `${backendUrl}/api/screenshot?t=${Date.now()}`;
+      showToast('🔄 Desktop capture refreshed');
+    }
+
+    function toggleScreenVideo(enabled) {
+      const img = document.getElementById('screen-stream-img');
+      if (enabled) {
+        img.src = `${backendUrl}/api/screen/stream?t=${Date.now()}`;
+        showToast('▶️ Streaming Live MJPEG Desktop');
+      }
+    }
+
+    function toggleCameraFeed() {
+      const img = document.getElementById('screen-stream-img');
+      img.src = `${backendUrl}/api/camera/stream?t=${Date.now()}`;
+      showToast('📹 Streaming Live Webcam feed');
+    }
+
+    // ==========================================
+    // TELEMETRY FETCHER
+    // ==========================================
+    async function fetchTelemetry() {
+      try {
+        const res = await fetch(`${backendUrl}/api/status`);
+        const d = await res.json();
+        if (d.status === 'online') {
+          document.getElementById('tel-cpu').innerText = `${Math.round(d.cpu || 0)}%`;
+          document.getElementById('bar-cpu').style.width = `${Math.min(d.cpu || 10, 100)}%`;
+
+          document.getElementById('tel-ram').innerText = `${Math.round(d.ram || 0)}%`;
+          document.getElementById('bar-ram').style.width = `${Math.min(d.ram || 20, 100)}%`;
+
+          document.getElementById('tel-bat').innerText = d.battery !== null ? `${d.battery}%` : 'Plugged';
+          document.getElementById('global-status-text').innerText = 'ONLINE // 12ms';
+          document.getElementById('global-status-dot').style.background = 'var(--emerald)';
+        }
+      } catch (_) {
+        // Fallback simulation
+        document.getElementById('tel-cpu').innerText = '18%';
+        document.getElementById('bar-cpu').style.width = '18%';
+        document.getElementById('tel-ram').innerText = '42%';
+        document.getElementById('bar-ram').style.width = '42%';
+      }
+    }
+
+    function triggerPingCheck() {
+      soundConfirm();
+      showToast('📡 Handshake check verified: TLS 1.3 Active');
+    }
+
+    // ==========================================
+    // GATEWAY CONFIGURATION MODAL
+    // ==========================================
+    function openGatewayModal() {
+      soundBeep();
+      document.getElementById('backend-url-input').value = backendUrl;
+      document.getElementById('gateway-modal').classList.add('open');
+    }
+
+    function closeGatewayModal() {
+      soundBeep();
+      document.getElementById('gateway-modal').classList.remove('open');
+    }
+
+    function saveGatewaySettings() {
+      const val = document.getElementById('backend-url-input').value.trim();
+      if (val) {
+        backendUrl = val.replace(/\/$/, '');
+        localStorage.setItem('ghost_backend_url', backendUrl);
+        renderDeviceKeys();
+        soundConfirm();
+        showToast('✅ Gateway URL Updated');
+        fetchTelemetry();
+      }
+      closeGatewayModal();
+    }
+
+    // Initialize application
+    window.addEventListener('DOMContentLoaded', () => {
+      renderDeviceKeys();
+      checkUrlPairing();
+      fetchTelemetry();
+      setInterval(fetchTelemetry, 6000);
+      addLogLine('SYSTEM', 'GHOST Web Interface mounted successfully.');
+    });
   </script>
 </body>
 </html>

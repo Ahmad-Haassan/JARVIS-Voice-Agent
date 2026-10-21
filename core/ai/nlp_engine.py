@@ -35,7 +35,11 @@ class NLPEngine:
     def clean_query(self, text: str) -> str:
         """Removes leading wake words and filler speech."""
         cleaned = (text or "").strip()
-        wake_words = ["hey jarvis", "jarvis", "ok jarvis", "okay jarvis", "hello jarvis", "please", "can you please", "could you", "can you"]
+        wake_words = [
+            "hey ghost", "ghost", "ok ghost", "okay ghost", "hello ghost",
+            "hey jarvis", "jarvis", "ok jarvis", "okay jarvis", "hello jarvis",
+            "please", "can you please", "could you", "can you"
+        ]
         lower = cleaned.lower()
         for w in wake_words:
             if lower.startswith(w):
@@ -156,8 +160,21 @@ class NLPEngine:
         if any(w in q for w in ["what is open", "what's open", "what apps are running", "list open windows", "show running apps", "open windows"]):
             return {"intent": "window_control", "entities": {"action": "list"}, "response": "Scanning open windows."}
 
-        if any(w in q for w in ["minimize all", "show desktop", "hide windows", "minimize windows", "clear desktop"]):
+        if q.strip() in ["desktop", "show desktop", "minimize all", "minimize", "clear desktop", "toggle desktop", "go to desktop"] or any(w in q for w in ["minimize all", "show desktop", "hide windows", "minimize windows", "clear desktop", "go to desktop"]):
             return {"intent": "window_control", "entities": {"action": "minimize_all"}, "response": "Minimizing all windows to show desktop."}
+
+        # Snap & Window Layout Controls
+        if any(w in q for w in ["snap window left", "snap left", "left snap"]):
+            return {"intent": "computer_agent", "entities": {"action": "snap", "direction": "left"}, "response": "Snapping window left."}
+
+        if any(w in q for w in ["snap window right", "snap right", "right snap"]):
+            return {"intent": "computer_agent", "entities": {"action": "snap", "direction": "right"}, "response": "Snapping window right."}
+
+        if any(w in q for w in ["maximize window", "maximize", "full screen window", "max window"]):
+            return {"intent": "computer_agent", "entities": {"action": "snap", "direction": "max"}, "response": "Maximizing window."}
+
+        if any(w in q for w in ["switch window", "alt tab", "alt+tab", "next window"]):
+            return {"intent": "computer_agent", "entities": {"action": "switch_window"}, "response": "Switching active window."}
 
         focus_match = re.search(r"(?:bring|switch to|focus|show)\s+(?:window\s+)?([a-zA-Z0-9_\s]+?)(?:\s+to front|\s+window)?$", q)
         if focus_match:
@@ -421,10 +438,13 @@ class NLPEngine:
                 return {"intent": "open_folder", "entities": {"folder": clean_target or app_to_open}, "response": f"Opening {clean_target or app_to_open} folder."}
             return {"intent": "open_app", "entities": {"app": app_to_open}, "response": f"Opening {app_to_open}."}
 
-        # 10. YouTube Media Playback
+        # 10. YouTube Media Playback & Opening
+        if q in ["youtube", "open youtube", "launch youtube"]:
+            return {"intent": "open_app", "entities": {"app": "youtube"}, "response": "Opening YouTube."}
+
         if "youtube" in q or q.startswith("play ") or q.startswith("listen to "):
             play_query = q
-            for prefix in ["play on youtube", "play in youtube", "play on you tube", "play", "listen to", "put on some", "put on", "youtube"]:
+            for prefix in ["play on youtube", "play in youtube", "play on you tube", "open youtube and play", "play", "listen to", "put on some", "put on", "youtube"]:
                 if play_query.startswith(prefix):
                     play_query = play_query[len(prefix):].strip()
             play_query = play_query.replace("on youtube", "").strip()
@@ -500,7 +520,7 @@ class NLPEngine:
             "hello": "Hello Ahmad. How may I assist you today?",
             "hi": "Greetings Ahmad. Systems are running smoothly.",
             "how are you": "I am fully operational and ready at your command, Ahmad.",
-            "who are you": "I am JARVIS, your personal intelligent desktop assistant.",
+            "who are you": "I am Ghost, your personal intelligent desktop assistant.",
             "thank you": "Always a pleasure to serve, Ahmad.",
             "thanks": "You're welcome, Ahmad.",
             "good morning": "Good morning Ahmad. All core diagnostics are green.",
