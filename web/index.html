@@ -1777,7 +1777,13 @@
       document.getElementById('display-device-id').innerText = currentDeviceId;
       document.getElementById('display-device-key').innerText = currentSecretKey.substring(0, 4) + '-••••-' + currentSecretKey.slice(-3);
       
-      const pairUrl = `${backendUrl}/?device=${currentDeviceId}&token=${currentSecretKey}`;
+      let effectiveGateway = backendUrl;
+      const savedGw = localStorage.getItem('ghost_backend_url');
+      if (savedGw && !savedGw.includes('localhost') && !savedGw.includes('127.0.0.1')) {
+        effectiveGateway = savedGw;
+      }
+
+      const pairUrl = `${window.location.origin}/?device=${currentDeviceId}&token=${currentSecretKey}&gateway=${encodeURIComponent(effectiveGateway)}`;
       drawStylizedQR(pairUrl);
     }
 
@@ -1791,7 +1797,12 @@
     }
 
     function copyDirectConnectLink() {
-      const link = `${backendUrl}/?device=${currentDeviceId}&token=${currentSecretKey}`;
+      let effectiveGateway = backendUrl;
+      const savedGw = localStorage.getItem('ghost_backend_url');
+      if (savedGw && !savedGw.includes('localhost') && !savedGw.includes('127.0.0.1')) {
+        effectiveGateway = savedGw;
+      }
+      const link = `${window.location.origin}/?device=${currentDeviceId}&token=${currentSecretKey}&gateway=${encodeURIComponent(effectiveGateway)}`;
       navigator.clipboard.writeText(link).then(() => {
         soundConfirm();
         showToast('🔗 Copied permanent connection link!');
@@ -1811,6 +1822,14 @@
     // Check URL parameters for auto-pairing
     function checkUrlPairing() {
       const params = new URLSearchParams(window.location.search);
+      if (params.has('gateway')) {
+        const gw = decodeURIComponent(params.get('gateway')).replace(/\/$/, '');
+        if (gw && !gw.includes('localhost') && !gw.includes('127.0.0.1')) {
+          backendUrl = gw;
+          localStorage.setItem('ghost_backend_url', backendUrl);
+          showToast(`⚡ Auto-connected to PC Gateway!`);
+        }
+      }
       if (params.has('device') && params.has('token')) {
         currentDeviceId = params.get('device');
         currentSecretKey = params.get('token');
