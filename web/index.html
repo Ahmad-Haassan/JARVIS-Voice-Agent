@@ -1277,6 +1277,11 @@
           Download PC Client
         </a>
 
+        <div class="status-pill" id="header-device-pill" onclick="switchTab('tab-devices')" style="border-color: rgba(0, 245, 212, 0.35); background: rgba(0, 245, 212, 0.08); color: var(--cyan); cursor: pointer;" title="View Connected Mobile Devices">
+          <span>📱</span>
+          <span id="header-connected-count">0 Connected</span>
+        </div>
+
         <div class="status-pill" id="global-status-pill" onclick="triggerPingCheck()">
           <span class="status-dot" id="global-status-dot"></span>
           <span id="global-status-text">ONLINE // 14ms</span>
@@ -1340,6 +1345,11 @@
       <button class="tab-btn active" onclick="switchTab('tab-commander')">
         <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.93V17a1 1 0 0 1-2 0v-.07A7.002 7.002 0 0 1 5.07 11H5a1 1 0 0 1 0-2h.07A7.002 7.002 0 0 1 11 3.07V3a1 1 0 0 1 2 0v.07A7.002 7.002 0 0 1 18.93 9H19a1 1 0 0 1 0 2h-.07A7.002 7.002 0 0 1 13 16.93z"/></svg>
         Command Deck
+      </button>
+
+      <button class="tab-btn" id="nav-btn-devices" onclick="switchTab('tab-devices')">
+        <svg viewBox="0 0 24 24"><path d="M4 6h18V4H4c-1.1 0-2 .9-2 2v11H0v3h14v-3H4V6zm19 2h-6c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V9c0-.55-.45-1-1-1zm-1 9h-4v-7h4v7z"/></svg>
+        Devices (<span id="devices-badge-count">0</span>)
       </button>
 
       <button class="tab-btn" onclick="switchTab('tab-pairing')">
@@ -1673,6 +1683,74 @@
       </div>
     </div>
 
+    <!-- ==============================================
+         TAB 5: CONNECTED DEVICES & ACCESS CONTROL
+         ============================================== -->
+    <div class="tab-pane" id="tab-devices">
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+        
+        <!-- Header Info Card -->
+        <div class="panel-card" style="display: flex; flex-direction: column; gap: 14px; background: linear-gradient(135deg, rgba(15, 23, 42, 0.85), rgba(6, 12, 28, 0.95)); border: 1px solid var(--border-glow); border-radius: 20px; padding: 22px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 1.4rem;">📱</span>
+                <h2 style="font-family: var(--font-display); font-size: 1.28rem; font-weight: 800; letter-spacing: 1px; color: #fff;">CONNECTED DEVICES MANAGER</h2>
+              </div>
+              <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;">
+                Shows all mobile devices connected to this PC. Delete or revoke access anytime to kick off unwanted users.
+              </p>
+            </div>
+            <button class="primary-btn" onclick="refreshDevicesList()" style="font-size: 0.78rem; padding: 8px 16px; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+              <svg style="width: 14px; height: 14px; fill: currentColor;" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+              Refresh List
+            </button>
+          </div>
+
+          <!-- Quick Metrics Bar -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 4px;">
+            <div style="background: rgba(0, 245, 212, 0.08); border: 1px solid rgba(0, 245, 212, 0.25); border-radius: 12px; padding: 12px 14px;">
+              <div style="font-size: 0.7rem; color: var(--cyan); font-family: var(--font-mono); text-transform: uppercase;">● Active Now</div>
+              <div style="font-size: 1.4rem; font-weight: 700; color: #fff; font-family: var(--font-display); margin-top: 2px;" id="stat-online-count">0</div>
+            </div>
+            <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 12px; padding: 12px 14px;">
+              <div style="font-size: 0.7rem; color: var(--neon-blue); font-family: var(--font-mono); text-transform: uppercase;">Total Registered</div>
+              <div style="font-size: 1.4rem; font-weight: 700; color: #fff; font-family: var(--font-display); margin-top: 2px;" id="stat-total-count">0</div>
+            </div>
+            <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 12px; padding: 12px 14px;">
+              <div style="font-size: 0.7rem; color: var(--danger); font-family: var(--font-mono); text-transform: uppercase;">Revoked / Blocked</div>
+              <div style="font-size: 1.4rem; font-weight: 700; color: #fff; font-family: var(--font-display); margin-top: 2px;" id="stat-blocked-count">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Devices Cards List Grid -->
+        <div id="devices-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;">
+          <!-- Dynamically populated by renderDevicesList() -->
+          <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-dim); background: var(--bg-card); border-radius: 16px; border: 1px dashed var(--border-subtle);">
+            <div style="font-size: 2rem; margin-bottom: 8px;">📡</div>
+            <div style="font-weight: 600; color: #fff;">Scanning for Connected Devices...</div>
+            <div style="font-size: 0.8rem; margin-top: 4px;">Open this website link on your phone to connect!</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Full Screen Access Revoked Lockout Shield -->
+    <div id="revoked-lockout-shield" style="display: none; position: fixed; inset: 0; background: #030712; z-index: 999999; flex-direction: column; align-items: center; justify-content: center; padding: 30px; text-align: center;">
+      <div style="width: 80px; height: 80px; border-radius: 50%; background: rgba(239, 68, 68, 0.15); border: 2px solid var(--danger); display: flex; align-items: center; justify-content: center; margin-bottom: 20px; box-shadow: 0 0 35px var(--danger-glow);">
+        <svg style="width: 44px; height: 44px; fill: var(--danger);" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8 0-1.85.63-3.55 1.69-4.9L16.9 18.31C15.55 19.37 13.85 20 12 20zm6.31-3.1L7.1 5.69C8.45 4.63 10.15 4 12 4c4.42 0 8 3.58 8 8 0 1.85-.63 3.55-1.69 4.9z"/></svg>
+      </div>
+      <h1 style="font-family: var(--font-display); font-size: 1.7rem; color: #fff; margin-bottom: 8px; letter-spacing: 1.5px;">DEVICE ACCESS REVOKED</h1>
+      <p style="color: var(--text-muted); max-width: 420px; font-size: 0.9rem; line-height: 1.5; margin-bottom: 25px;">
+        This mobile device has been removed and disconnected by the PC administrator. You can no longer access or execute controls on this computer.
+      </p>
+      <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--danger); padding: 8px 16px; border-radius: 8px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3);" id="revoked-dev-id-tag">
+        NODE ID: GHOST-REVOKED
+      </div>
+    </div>
+
     <!-- Footer -->
     <footer>
       <span>GHOST // Cybernetic Voice & Remote Operating System</span>
@@ -1971,13 +2049,17 @@
       const targetPane = document.getElementById(tabId);
       if (targetPane) targetPane.classList.add('active');
 
-      const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick').includes(tabId));
+      const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(tabId));
       if (activeBtn) activeBtn.classList.add('active');
+
+      if (tabId === 'tab-devices') {
+        refreshDevicesList();
+      }
 
       const screenImg = document.getElementById('screen-stream-img');
       if (screenImg) {
         if (tabId === 'tab-touch' && !isScreenStreamPaused) {
-          screenImg.src = `${backendUrl}/api/screen/stream?t=${Date.now()}`;
+          screenImg.src = `${backendUrl}/api/screen/stream?t=${Date.now()}&device_id=${encodeURIComponent(myDeviceId)}`;
           connectMouseWs();
         } else {
           screenImg.src = '';
@@ -2057,8 +2139,14 @@
         const res = await fetch(`${backendUrl}/api/command`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: text })
+          body: JSON.stringify({ text: text, device_id: myDeviceId })
         });
+
+        if (res.status === 403) {
+          showRevokedLockout();
+          respBox.innerText = 'ACCESS REVOKED: This device has been disconnected by administrator.';
+          return;
+        }
 
         const data = await res.json();
         soundConfirm();
@@ -2197,7 +2285,7 @@
             wsProto = u.protocol === 'https:' ? 'wss:' : 'ws:';
           } catch (_) {}
         }
-        const wsUrl = `${wsProto}//${wsHost}/ws/mouse`;
+        const wsUrl = `${wsProto}//${wsHost}/ws/mouse?device_id=${encodeURIComponent(myDeviceId)}`;
         mouseWs = new WebSocket(wsUrl);
 
         mouseWs.onopen = () => {
@@ -2210,6 +2298,10 @@
         };
 
         mouseWs.onmessage = (event) => {
+          if (typeof event.data === 'string' && event.data.includes('access_revoked')) {
+            showRevokedLockout();
+            return;
+          }
           if (typeof event.data === 'string' && event.data.startsWith('p:')) {
             const parts = event.data.substring(2).split(',');
             if (parts.length === 2) {
@@ -2446,8 +2538,8 @@
       fetch(`${backendUrl}/api/mouse/move`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dx: dx, dy: dy })
-      }).catch(() => {});
+        body: JSON.stringify({ dx: dx, dy: dy, device_id: myDeviceId })
+      }).then(r => { if (r.status === 403) showRevokedLockout(); }).catch(() => {});
     }
 
     function sendMouseClick(btn) {
@@ -2461,8 +2553,8 @@
       fetch(`${backendUrl}/api/mouse/click`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ button: btn, clicks: (btn === 'double' ? 2 : 1) })
-      }).catch(() => {});
+        body: JSON.stringify({ button: btn, clicks: (btn === 'double' ? 2 : 1), device_id: myDeviceId })
+      }).then(r => { if (r.status === 403) showRevokedLockout(); }).catch(() => {});
     }
 
     function sendMouseScroll(amt) {
@@ -2474,8 +2566,11 @@
       fetch(`${backendUrl}/api/mouse/scroll`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: amt })
-      }).then(() => showToast(amt > 0 ? "▲ Scrolled Up" : "▼ Scrolled Down")).catch(() => {});
+        body: JSON.stringify({ amount: amt, device_id: myDeviceId })
+      }).then(r => {
+        if (r.status === 403) showRevokedLockout();
+        else showToast(amt > 0 ? "▲ Scrolled Up" : "▼ Scrolled Down");
+      }).catch(() => {});
     }
 
     async function promptRemoteType() {
@@ -2484,11 +2579,12 @@
         soundConfirm();
         showToast(`⌨️ Typing into PC: "${text}"`);
         try {
-          await fetch(`${backendUrl}/api/keyboard/type`, {
+          const r = await fetch(`${backendUrl}/api/keyboard/type`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: text })
+            body: JSON.stringify({ text: text, device_id: myDeviceId })
           });
+          if (r.status === 403) showRevokedLockout();
         } catch (_) {}
       }
     }
@@ -2644,12 +2740,246 @@
       closeGatewayModal();
     }
 
+    // ==========================================
+    // CLIENT DEVICE IDENTIFIER & ACCESS HEARTBEAT
+    // ==========================================
+    function getClientDeviceId() {
+      let devId = localStorage.getItem('ghost_client_device_id');
+      if (!devId) {
+        devId = 'NODE-' + Math.floor(1000 + Math.random() * 9000);
+        localStorage.setItem('ghost_client_device_id', devId);
+      }
+      return devId;
+    }
+
+    function getClientDeviceName() {
+      const ua = navigator.userAgent || '';
+      if (/iPad|iPhone|iPod/.test(ua)) return 'iPhone / iPad (Safari)';
+      if (/Android/.test(ua)) return 'Android Device (Chrome)';
+      if (/Macintosh/.test(ua)) return 'Mac (Desktop)';
+      if (/Windows/.test(ua)) return 'Windows PC (Desktop)';
+      return 'Remote Client Browser';
+    }
+
+    const myDeviceId = getClientDeviceId();
+    const myDeviceName = getClientDeviceName();
+
+    async function pingDevicePresence() {
+      try {
+        const res = await fetch(`${backendUrl}/api/devices/ping`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            device_id: myDeviceId,
+            device_name: myDeviceName,
+            user_agent: navigator.userAgent
+          })
+        });
+        const d = await res.json();
+        if (d && d.allowed === false) {
+          showRevokedLockout();
+        }
+      } catch (_) {}
+    }
+
+    function showRevokedLockout() {
+      const shield = document.getElementById('revoked-lockout-shield');
+      if (shield) {
+        document.getElementById('revoked-dev-id-tag').innerText = `BLOCKED NODE: ${myDeviceId}`;
+        shield.style.display = 'flex';
+      }
+      if (mouseWs) {
+        try { mouseWs.close(); } catch(_) {}
+      }
+    }
+
+    async function refreshDevicesList() {
+      try {
+        const res = await fetch(`${backendUrl}/api/devices`);
+        const data = await res.json();
+        if (data && data.success) {
+          renderDevicesList(data);
+        }
+      } catch (_) {}
+    }
+
+    function renderDevicesList(data) {
+      const grid = document.getElementById('devices-cards-grid');
+      const countBadge = document.getElementById('devices-badge-count');
+      const headerCount = document.getElementById('header-connected-count');
+      const statOnline = document.getElementById('stat-online-count');
+      const statTotal = document.getElementById('stat-total-count');
+      const statBlocked = document.getElementById('stat-blocked-count');
+
+      if (countBadge) countBadge.innerText = data.total_connected || '0';
+      if (headerCount) headerCount.innerText = `${data.total_connected || 0} Connected`;
+      if (statOnline) statOnline.innerText = data.total_connected || '0';
+      if (statTotal) statTotal.innerText = data.total_registered || '0';
+      if (statBlocked) statBlocked.innerText = data.total_blocked || '0';
+
+      if (!grid) return;
+      if (!data.devices || data.devices.length === 0) {
+        grid.innerHTML = `
+          <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-dim); background: var(--bg-card); border-radius: 16px; border: 1px dashed var(--border-subtle);">
+            <div style="font-size: 2rem; margin-bottom: 8px;">📡</div>
+            <div style="font-weight: 600; color: #fff;">No Devices Detected Yet</div>
+            <div style="font-size: 0.8rem; margin-top: 4px;">Open this website link on your phone to connect!</div>
+          </div>
+        `;
+        return;
+      }
+
+      let html = '';
+      data.devices.forEach(dev => {
+        const isMe = (dev.device_id === myDeviceId);
+        const isOnline = dev.is_online;
+        const isBlocked = dev.is_blocked;
+
+        let icon = '📱';
+        if (dev.device_name.toLowerCase().includes('windows') || dev.device_name.toLowerCase().includes('mac')) {
+          icon = '💻';
+        } else if (dev.device_name.toLowerCase().includes('iphone') || dev.device_name.toLowerCase().includes('ipad')) {
+          icon = '🍎';
+        } else if (dev.device_name.toLowerCase().includes('android')) {
+          icon = '🤖';
+        }
+
+        const cardBorder = isBlocked
+          ? 'border: 1px solid rgba(239, 68, 68, 0.45); background: rgba(30, 15, 20, 0.7);'
+          : (isOnline
+            ? 'border: 1px solid rgba(0, 245, 212, 0.35); background: var(--bg-card); box-shadow: 0 4px 20px rgba(0, 245, 212, 0.08);'
+            : 'border: 1px solid var(--border-subtle); background: rgba(15, 23, 42, 0.4); opacity: 0.85;');
+
+        const statusBadge = isBlocked
+          ? '<span style="color: var(--danger); font-size: 0.72rem; font-weight: 700; background: rgba(239, 68, 68, 0.15); padding: 3px 8px; border-radius: 20px; border: 1px solid rgba(239, 68, 68, 0.3);">⛔ REVOKED</span>'
+          : (isOnline
+            ? '<span style="color: var(--emerald); font-size: 0.72rem; font-weight: 700; background: rgba(16, 185, 129, 0.15); padding: 3px 8px; border-radius: 20px; border: 1px solid rgba(16, 185, 129, 0.3);">🟢 ACTIVE NOW</span>'
+            : `<span style="color: var(--text-dim); font-size: 0.72rem; background: rgba(255, 255, 255, 0.05); padding: 3px 8px; border-radius: 20px;">⚪ ${dev.last_seen_seconds_ago > 60 ? Math.round(dev.last_seen_seconds_ago/60) + 'm ago' : dev.last_seen_seconds_ago + 's ago'}</span>`);
+
+        html += `
+          <div style="border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 14px; position: relative; ${cardBorder}">
+            
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="font-size: 1.8rem; width: 44px; height: 44px; border-radius: 12px; background: rgba(255, 255, 255, 0.05); display: flex; align-items: center; justify-content: center;">
+                  ${icon}
+                </div>
+                <div>
+                  <div style="font-weight: 700; font-size: 0.95rem; color: #fff; display: flex; align-items: center; gap: 6px;">
+                    ${dev.device_name}
+                    ${isMe ? '<span style="font-size: 0.65rem; padding: 2px 6px; border-radius: 6px; background: var(--purple-glow); color: #fff; font-family: var(--font-mono);">YOU</span>' : ''}
+                  </div>
+                  <div style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--cyan); margin-top: 2px;">
+                    ${dev.device_id}
+                  </div>
+                </div>
+              </div>
+              ${statusBadge}
+            </div>
+
+            <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.06); font-family: var(--font-mono);">
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-dim);">IP Address:</span>
+                <span style="color: #fff;">${dev.ip}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-dim);">First Connected:</span>
+                <span>${dev.first_seen}</span>
+              </div>
+            </div>
+
+            <div style="margin-top: auto; padding-top: 8px;">
+              ${!isBlocked ? `
+                <button onclick="revokeDeviceAccess('${dev.device_id}', '${dev.device_name}')" style="width: 100%; padding: 8px 12px; border-radius: 10px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5; font-size: 0.76rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s ease;">
+                  <svg style="width: 14px; height: 14px; fill: currentColor;" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                  Delete / Revoke Access
+                </button>
+              ` : `
+                <button onclick="unblockDeviceAccess('${dev.device_id}')" style="width: 100%; padding: 8px 12px; border-radius: 10px; background: rgba(0, 245, 212, 0.12); border: 1px solid rgba(0, 245, 212, 0.35); color: var(--cyan); font-size: 0.76rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s ease;">
+                  <svg style="width: 14px; height: 14px; fill: currentColor;" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+                  Restore Access
+                </button>
+              `}
+            </div>
+
+          </div>
+        `;
+      });
+
+      grid.innerHTML = html;
+    }
+
+    async function revokeDeviceAccess(devId, devName) {
+      soundAlert();
+      const ok = confirm(`REVOKE DEVICE ACCESS:\n\nAre you sure you want to delete and block "${devName}" (${devId})?\n\nThis device will be immediately kicked off and cannot send commands to your PC.`);
+      if (!ok) return;
+
+      try {
+        const res = await fetch(`${backendUrl}/api/devices/delete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ device_id: devId })
+        });
+        const d = await res.json();
+        if (d.success) {
+          soundConfirm();
+          showToast(`🚫 Revoked access for ${devName}`);
+          addLogLine('SECURITY', `Device ${devId} (${devName}) was revoked and blocked.`, 'warn');
+          refreshDevicesList();
+          if (devId === myDeviceId) {
+            showRevokedLockout();
+          }
+        }
+      } catch (err) {
+        showToast(`Error revoking device: ${err}`);
+      }
+    }
+
+    async function unblockDeviceAccess(devId) {
+      soundConfirm();
+      try {
+        const res = await fetch(`${backendUrl}/api/devices/unblock`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ device_id: devId })
+        });
+        const d = await res.json();
+        if (d.success) {
+          showToast(`✅ Device ${devId} unblocked.`);
+          addLogLine('SECURITY', `Device ${devId} access was restored.`, 'success');
+          refreshDevicesList();
+        }
+      } catch (err) {
+        showToast(`Error unblocking device: ${err}`);
+      }
+    }
+
+    async function checkAutoTunnelGateway() {
+      try {
+        const res = await fetch('/api/tunnel_info');
+        const data = await res.json();
+        if (data && data.tunnel_url) {
+          if (!backendUrl || backendUrl.includes('trycloudflare') || backendUrl.includes('localhost')) {
+            backendUrl = data.tunnel_url;
+            localStorage.setItem('ghost_backend_url', backendUrl);
+            const input = document.getElementById('backend-url-input');
+            if (input) input.value = backendUrl;
+          }
+        }
+      } catch (_) {}
+    }
+
     // Initialize application
     window.addEventListener('DOMContentLoaded', () => {
+      checkAutoTunnelGateway();
       renderDeviceKeys();
       checkUrlPairing();
       fetchTelemetry();
       setInterval(fetchTelemetry, 6000);
+      pingDevicePresence();
+      setInterval(pingDevicePresence, 8000);
+      refreshDevicesList();
+      setInterval(refreshDevicesList, 10000);
       addLogLine('SYSTEM', 'GHOST Web Interface mounted successfully.');
     });
   </script>
