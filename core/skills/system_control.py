@@ -888,7 +888,21 @@ class SystemControl:
     # ==========================================
     # VOLUME & AUDIO CONTROL (pycaw)
     # ==========================================
+    # VOLUME & AUDIO CONTROLS
+    # ==========================================
+    def _ensure_com(self):
+        try:
+            import pythoncom
+            pythoncom.CoInitialize()
+        except Exception:
+            try:
+                import comtypes
+                comtypes.CoInitialize()
+            except Exception:
+                pass
+
     def get_volume(self) -> int:
+        self._ensure_com()
         try:
             from pycaw.pycaw import AudioUtilities
             speakers = AudioUtilities.GetSpeakers()
@@ -898,6 +912,7 @@ class SystemControl:
             return 50
 
     def set_volume(self, level: int) -> int:
+        self._ensure_com()
         try:
             level = max(0, min(100, int(level)))
             from pycaw.pycaw import AudioUtilities
@@ -915,6 +930,7 @@ class SystemControl:
         return self.set_volume(target)
 
     def set_mute(self, mute: bool = True) -> bool:
+        self._ensure_com()
         try:
             from pycaw.pycaw import AudioUtilities
             speakers = AudioUtilities.GetSpeakers()
@@ -926,6 +942,7 @@ class SystemControl:
             return False
 
     def toggle_mute(self) -> bool:
+        self._ensure_com()
         try:
             from pycaw.pycaw import AudioUtilities
             speakers = AudioUtilities.GetSpeakers()

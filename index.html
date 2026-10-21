@@ -1769,7 +1769,18 @@
     // ==========================================
     let currentDeviceId = localStorage.getItem('ghost_device_id') || 'GHOST-NODE-' + Math.floor(1000 + Math.random() * 9000);
     let currentSecretKey = localStorage.getItem('ghost_secret_key') || Math.random().toString(36).substring(2, 12).toUpperCase();
-    let backendUrl = localStorage.getItem('ghost_backend_url') || window.location.origin;
+    function getPublicBaseUrl() {
+      const savedGw = localStorage.getItem('ghost_backend_url');
+      if (savedGw && !savedGw.includes('localhost') && !savedGw.includes('127.0.0.1') && !savedGw.startsWith('file:') && savedGw !== 'null') {
+        return savedGw.replace(/\/$/, '');
+      }
+      if (window.location.origin && window.location.origin !== 'null' && !window.location.origin.includes('localhost') && !window.location.origin.includes('127.0.0.1') && !window.location.origin.startsWith('file:')) {
+        return window.location.origin;
+      }
+      return 'https://laser-virgin-hamburg-active.trycloudflare.com';
+    }
+
+    let backendUrl = localStorage.getItem('ghost_backend_url') || getPublicBaseUrl();
 
     function renderDeviceKeys() {
       localStorage.setItem('ghost_device_id', currentDeviceId);
@@ -1777,13 +1788,8 @@
       document.getElementById('display-device-id').innerText = currentDeviceId;
       document.getElementById('display-device-key').innerText = currentSecretKey.substring(0, 4) + '-••••-' + currentSecretKey.slice(-3);
       
-      let effectiveGateway = backendUrl;
-      const savedGw = localStorage.getItem('ghost_backend_url');
-      if (savedGw && !savedGw.includes('localhost') && !savedGw.includes('127.0.0.1')) {
-        effectiveGateway = savedGw;
-      }
-
-      const pairUrl = `${window.location.origin}/?device=${currentDeviceId}&token=${currentSecretKey}&gateway=${encodeURIComponent(effectiveGateway)}`;
+      const baseUrl = getPublicBaseUrl();
+      const pairUrl = `${baseUrl}/?device=${currentDeviceId}&token=${currentSecretKey}&gateway=${encodeURIComponent(baseUrl)}`;
       drawStylizedQR(pairUrl);
     }
 
@@ -1797,12 +1803,8 @@
     }
 
     function copyDirectConnectLink() {
-      let effectiveGateway = backendUrl;
-      const savedGw = localStorage.getItem('ghost_backend_url');
-      if (savedGw && !savedGw.includes('localhost') && !savedGw.includes('127.0.0.1')) {
-        effectiveGateway = savedGw;
-      }
-      const link = `${window.location.origin}/?device=${currentDeviceId}&token=${currentSecretKey}&gateway=${encodeURIComponent(effectiveGateway)}`;
+      const baseUrl = getPublicBaseUrl();
+      const link = `${baseUrl}/?device=${currentDeviceId}&token=${currentSecretKey}&gateway=${encodeURIComponent(baseUrl)}`;
       navigator.clipboard.writeText(link).then(() => {
         soundConfirm();
         showToast('🔗 Copied permanent connection link!');
