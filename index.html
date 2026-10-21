@@ -1488,20 +1488,23 @@
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <div style="display: flex; align-items: center; gap: 8px;">
               <span class="status-dot" style="background: var(--cyan); box-shadow: 0 0 10px var(--cyan);"></span>
-              <span style="font-family: var(--font-display); font-weight: 700; color: #fff; font-size: 0.95rem;">LIVE PC SCREEN</span>
+              <span style="font-family: var(--font-display); font-weight: 700; color: #fff; font-size: 0.95rem;">LIVE PC SCREEN (1080P)</span>
             </div>
-            <div style="display: flex; gap: 6px;">
-              <button class="secondary-btn" style="padding: 4px 10px; font-size: 0.72rem;" onclick="toggleScreenVideo()" id="btn-toggle-screen">⏸️ Pause</button>
-              <button class="secondary-btn" style="padding: 4px 10px; font-size: 0.72rem;" onclick="refreshLiveStream()">🔄 Refresh</button>
+            <div style="display: flex; gap: 5px;">
+              <button class="secondary-btn" style="padding: 4px 8px; font-size: 0.72rem; font-weight: 800;" onclick="changeZoom(-0.25)" title="Zoom Out">🔍 -</button>
+              <button class="secondary-btn" style="padding: 4px 8px; font-size: 0.72rem; font-family: var(--font-mono); font-weight: 700; min-width: 48px; text-align: center;" id="zoom-level-btn" onclick="resetZoom()" title="Click to Toggle 100% / 150%">100%</button>
+              <button class="secondary-btn" style="padding: 4px 8px; font-size: 0.72rem; font-weight: 800;" onclick="changeZoom(0.25)" title="Zoom In">🔍 +</button>
+              <button class="secondary-btn" style="padding: 4px 8px; font-size: 0.72rem;" onclick="toggleScreenFullscreen()" title="Fullscreen View">⛶ Full</button>
+              <button class="secondary-btn" style="padding: 4px 8px; font-size: 0.72rem;" onclick="refreshLiveStream()" title="Refresh Frame">🔄</button>
             </div>
           </div>
 
-          <div class="stream-viewport">
+          <div class="stream-viewport" id="stream-viewport-box" style="position: relative; overflow: hidden; border-radius: 18px; touch-action: none;">
             <div class="stream-overlay-badge">
               <span class="status-dot"></span>
-              <span id="stream-status-badge">480P LIVE STREAM</span>
+              <span id="stream-status-badge">1080P FULL HD STREAM</span>
             </div>
-            <img id="screen-stream-img" src="/api/screen/stream" alt="Live PC Screen" onerror="this.src='/api/screenshot'">
+            <img id="screen-stream-img" src="/api/screen/stream" alt="Live PC Screen 1080p" style="transform-origin: center center; transition: transform 0.12s ease; will-change: transform;" onerror="this.src='/api/screenshot'">
           </div>
 
           <!-- Speed Controls between screen and trackpad -->
@@ -2271,12 +2274,89 @@
     }
 
     // ==========================================
+    // SCREEN 1080P ZOOM & PAN CONTROLS
+    // ==========================================
+    let currentZoom = 1.0;
+    let panX = 0, panY = 0;
+    let isPanning = false;
+    let panStartX = 0, panStartY = 0;
+
+    function applyScreenTransform() {
+      const img = document.getElementById('screen-stream-img');
+      const btn = document.getElementById('zoom-level-btn');
+      if (btn) btn.innerText = `${Math.round(currentZoom * 100)}%`;
+      if (img) {
+        img.style.transform = `scale(${currentZoom}) translate(${panX}px, ${panY}px)`;
+      }
+    }
+
+    function changeZoom(delta) {
+      currentZoom = Math.min(3.5, Math.max(0.75, Math.round((currentZoom + delta) * 100) / 100));
+      if (currentZoom === 1.0) {
+        panX = 0;
+        panY = 0;
+      }
+      applyScreenTransform();
+      showToast(`🔍 Screen Zoom: ${Math.round(currentZoom * 100)}%`);
+    }
+
+    function resetZoom() {
+      currentZoom = (currentZoom === 1.0 ? 1.5 : 1.0);
+      panX = 0;
+      panY = 0;
+      applyScreenTransform();
+      showToast(currentZoom === 1.5 ? "🔍 Zoomed 150%" : "🔍 Reset to 100%");
+    }
+
+    function toggleScreenFullscreen() {
+      const box = document.getElementById('stream-viewport-box');
+      if (!document.fullscreenElement) {
+        if (box && box.requestFullscreen) box.requestFullscreen();
+        else if (box && box.webkitRequestFullscreen) box.webkitRequestFullscreen();
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+      }
+    }
+
+    // Touch & pointer pan dragging when zoomed in
+    const viewportBox = document.getElementById('stream-viewport-box');
+    if (viewportBox) {
+      viewportBox.addEventListener('pointerdown', (e) => {
+        if (currentZoom > 1.0) {
+          isPanning = true;
+          panStartX = e.clientX - panX;
+          panStartY = e.clientY - panY;
+          viewportBox.style.cursor = 'grabbing';
+          try { viewportBox.setPointerCapture(e.pointerId); } catch (_) {}
+        }
+      });
+      viewportBox.addEventListener('pointermove', (e) => {
+        if (isPanning && currentZoom > 1.0) {
+          panX = Math.round(e.clientX - panStartX);
+          panY = Math.round(e.clientY - panStartY);
+          applyScreenTransform();
+        }
+      });
+      const endPan = (e) => {
+        if (isPanning) {
+          isPanning = false;
+          if (viewportBox) {
+            viewportBox.style.cursor = currentZoom > 1.0 ? 'grab' : 'default';
+            try { viewportBox.releasePointerCapture(e.pointerId); } catch (_) {}
+          }
+        }
+      };
+      viewportBox.addEventListener('pointerup', endPan);
+      viewportBox.addEventListener('pointercancel', endPan);
+    }
+
+    // ==========================================
     // SCREEN STREAM & LIVE MIRROR
     // ==========================================
     function refreshLiveStream() {
       const img = document.getElementById('screen-stream-img');
       if (img) img.src = `${backendUrl}/api/screen/stream?t=${Date.now()}`;
-      showToast('🔄 Desktop capture refreshed');
+      showToast('🔄 Desktop 1080p stream refreshed');
     }
 
     function toggleCameraFeed() {
