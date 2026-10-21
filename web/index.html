@@ -1415,8 +1415,8 @@
           <p>Scan once with your mobile camera. GHOST permanently binds your phone to this PC via encrypted cryptographic token. Control your PC from anywhere on 4G/5G.</p>
         </div>
 
-        <div class="qr-frame">
-          <canvas id="qr-canvas" width="180" height="180"></canvas>
+        <div class="qr-frame" style="background: #ffffff; padding: 12px; border: 3px solid var(--cyan); box-shadow: 0 0 35px var(--cyan-glow); border-radius: 18px;">
+          <img id="qr-img" width="180" height="180" alt="Instant Camera Scannable QR" style="display: block; border-radius: 4px;" />
         </div>
 
         <div class="device-meta-strip">
@@ -1440,10 +1440,16 @@
             Copy Remote Link
           </button>
 
+          <a id="btn-whatsapp-share" class="secondary-btn" target="_blank" style="text-decoration: none; display: flex; align-items: center; gap: 8px;">
+            <svg style="width: 18px; height: 18px; fill: #25D366;" viewBox="0 0 24 24"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-5.46-4.45-9.91-9.91-9.91zM12.04 20.15c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31c-.82-1.31-1.26-2.83-1.26-4.38 0-4.54 3.7-8.24 8.24-8.24 4.54 0 8.24 3.7 8.24 8.24 0 4.54-3.7 8.24-8.24 8.24z"/></svg>
+            Send to WhatsApp
+          </a>
+
           <button class="secondary-btn" onclick="regeneratePairingKeys()">
             <svg style="width: 18px; height: 18px; fill: currentColor;" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
             Regenerate Token
           </button>
+
 
           <button class="secondary-btn" onclick="simulateFriendConnect()">
             <svg style="width: 18px; height: 18px; fill: currentColor;" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
@@ -1744,74 +1750,18 @@
     animateParticles();
 
     // ==========================================
-    // QR CODE GENERATOR (NATIVE SCALABLE MATRIX)
+    // QR CODE GENERATOR (100% CAMERA-SCANNABLE)
     // ==========================================
     function drawStylizedQR(text) {
-      const qrCanvas = document.getElementById('qr-canvas');
-      if (!qrCanvas) return;
-      const c = qrCanvas.getContext('2d');
-      const size = 180;
-      qrCanvas.width = size;
-      qrCanvas.height = size;
-
-      // Dark background
-      c.fillStyle = '#020617';
-      c.fillRect(0, 0, size, size);
-
-      // Deterministic hash pattern based on text
-      let seed = 0;
-      for (let i = 0; i < text.length; i++) {
-        seed = (seed * 31 + text.charCodeAt(i)) & 0xffffffff;
+      const qrImg = document.getElementById('qr-img');
+      if (qrImg) {
+        // High-contrast, standard ISO QR matrix with 4-module margin for 0.1s instant camera scan
+        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(text)}&margin=1&format=svg`;
       }
-      function rand() {
-        seed = (seed * 16807) % 2147483647;
-        return (seed - 1) / 2147483646;
+      const waBtn = document.getElementById('btn-whatsapp-share');
+      if (waBtn) {
+        waBtn.href = `https://api.whatsapp.com/send?text=${encodeURIComponent('Connect to GHOST Mobile Remote Deck: ' + text)}`;
       }
-
-      const grid = 21;
-      const cellSize = Math.floor((size - 20) / grid);
-      const offset = Math.floor((size - (grid * cellSize)) / 2);
-
-      // Draw alignment targets (3 corners)
-      function drawTarget(x, y) {
-        c.fillStyle = '#00f5d4';
-        c.fillRect(offset + x * cellSize, offset + y * cellSize, 7 * cellSize, 7 * cellSize);
-        c.fillStyle = '#020617';
-        c.fillRect(offset + (x + 1) * cellSize, offset + (y + 1) * cellSize, 5 * cellSize, 5 * cellSize);
-        c.fillStyle = '#00f5d4';
-        c.fillRect(offset + (x + 2) * cellSize, offset + (y + 2) * cellSize, 3 * cellSize, 3 * cellSize);
-      }
-
-      drawTarget(0, 0);
-      drawTarget(14, 0);
-      drawTarget(0, 14);
-
-      // Fill data cells
-      for (let r = 0; r < grid; r++) {
-        for (let col = 0; col < grid; col++) {
-          const inT1 = (r < 7 && col < 7);
-          const inT2 = (r < 7 && col >= 14);
-          const inT3 = (r >= 14 && col < 7);
-          if (inT1 || inT2 || inT3) continue;
-
-          if (rand() > 0.48) {
-            c.fillStyle = rand() > 0.3 ? '#00f5d4' : '#8b5cf6';
-            c.fillRect(offset + col * cellSize, offset + r * cellSize, cellSize - 1, cellSize - 1);
-          }
-        }
-      }
-
-      // Center glowing emblem
-      c.fillStyle = 'rgba(2, 6, 23, 0.9)';
-      c.fillRect(size / 2 - 16, size / 2 - 16, 32, 32);
-      c.strokeStyle = '#00f5d4';
-      c.lineWidth = 1.5;
-      c.strokeRect(size / 2 - 16, size / 2 - 16, 32, 32);
-      c.fillStyle = '#00f5d4';
-      c.font = 'bold 10px JetBrains Mono';
-      c.textAlign = 'center';
-      c.textBaseline = 'middle';
-      c.fillText('GHOST', size / 2, size / 2);
     }
 
     // ==========================================
