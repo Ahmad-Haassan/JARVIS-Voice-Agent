@@ -948,6 +948,39 @@
       display: block;
     }
 
+    .speed-control-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 14px;
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
+    .speed-chip {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      color: var(--text-main);
+      padding: 5px 12px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .speed-chip.active {
+      background: linear-gradient(135deg, var(--cyan), var(--purple));
+      color: #020617;
+      border-color: var(--cyan);
+      box-shadow: 0 0 12px var(--cyan-glow);
+    }
+
     .stream-overlay-badge {
       position: absolute;
       top: 10px;
@@ -1423,24 +1456,59 @@
     <!-- ==============================================
          TAB 3: TRACKPAD & LIVE DESKTOP SCREEN STREAM
          ============================================== -->
+    <!-- ==============================================
+         TAB 3: TRACKPAD & LIVE DESKTOP SCREEN STREAM
+         ============================================== -->
     <div class="tab-pane" id="tab-touch">
-      <div class="deck-grid">
+      <div style="max-width: 620px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px;">
         
-        <!-- Trackpad Deck -->
-        <div class="touchpad-box">
+        <!-- UPPER SIDE: LIVE DESKTOP SCREEN BOX -->
+        <div class="touchpad-box" style="padding: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="status-dot" style="background: var(--cyan); box-shadow: 0 0 10px var(--cyan);"></span>
+              <span style="font-family: var(--font-display); font-weight: 700; color: #fff; font-size: 0.95rem;">LIVE PC SCREEN</span>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <button class="secondary-btn" style="padding: 4px 10px; font-size: 0.72rem;" onclick="toggleScreenVideo()" id="btn-toggle-screen">⏸️ Pause</button>
+              <button class="secondary-btn" style="padding: 4px 10px; font-size: 0.72rem;" onclick="refreshLiveStream()">🔄 Refresh</button>
+            </div>
+          </div>
+
+          <div class="stream-viewport">
+            <div class="stream-overlay-badge">
+              <span class="status-dot"></span>
+              <span id="stream-status-badge">480P LIVE STREAM</span>
+            </div>
+            <img id="screen-stream-img" src="/api/screen/stream" alt="Live PC Screen" onerror="this.src='/api/screenshot'">
+          </div>
+
+          <!-- Speed Controls between screen and trackpad -->
+          <div class="speed-control-bar" style="margin-top: 10px;">
+            <span>⚡ Cursor Speed:</span>
+            <div style="display: flex; gap: 6px;">
+              <button type="button" class="speed-chip" onclick="setSensitivity(2.2, this)">Normal</button>
+              <button type="button" class="speed-chip active" onclick="setSensitivity(3.8, this)">Fast</button>
+              <button type="button" class="speed-chip" onclick="setSensitivity(5.8, this)">Turbo</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- LOWER SIDE: VIRTUAL TOUCHPAD (Slide Cursor Box) -->
+        <div class="touchpad-box" style="padding: 16px;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-family: var(--font-display); font-weight: 700; color: #fff;">VIRTUAL TRACKPAD</span>
-            <span style="font-size: 0.72rem; color: var(--cyan); font-family: var(--font-mono);">MULTI-TOUCH READY</span>
+            <span style="font-family: var(--font-display); font-weight: 700; color: #fff; font-size: 0.95rem;">SLIDE CURSOR BOX</span>
+            <span style="font-size: 0.72rem; color: var(--cyan); font-family: var(--font-mono);" id="ws-status-badge">WS: CONNECTED ⚡</span>
           </div>
 
           <div class="touch-surface" id="touch-surface">
-            <div class="touch-watermark">DRAG FINGER • TAP TO CLICK • 2-FINGER SCROLL</div>
+            <div class="touch-watermark">📱 SLIDE FINGER TO MOVE • TAP = CLICK • 2 FINGERS = SCROLL</div>
           </div>
 
           <div class="mouse-actions-bar">
-            <button class="click-btn" onclick="sendMouseClick('left')">LEFT CLICK</button>
-            <button class="click-btn" onclick="sendMouseClick('double')">DOUBLE</button>
-            <button class="click-btn" onclick="sendMouseClick('right')">RIGHT CLICK</button>
+            <button class="click-btn" onclick="sendMouseClick('left')">🖱️ LEFT CLICK</button>
+            <button class="click-btn" onclick="sendMouseClick('double')">⚡ DOUBLE</button>
+            <button class="click-btn" onclick="sendMouseClick('right')">📋 RIGHT CLICK</button>
           </div>
 
           <div style="display: flex; gap: 8px;">
@@ -1448,29 +1516,8 @@
               <svg style="width: 16px; height: 16px; fill: currentColor;" viewBox="0 0 24 24"><path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg>
               Type Keyboard Text
             </button>
-            <button class="secondary-btn" onclick="sendActionCommand('press enter key')">ENTER</button>
-            <button class="secondary-btn" onclick="sendActionCommand('press escape key')">ESC</button>
-          </div>
-        </div>
-
-        <!-- Desktop Screen Viewport -->
-        <div class="touchpad-box">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-family: var(--font-display); font-weight: 700; color: #fff;">LIVE DESKTOP MIRROR</span>
-            <button class="secondary-btn" style="padding: 6px 12px; font-size: 0.75rem;" onclick="refreshLiveStream()">REFRESH</button>
-          </div>
-
-          <div class="stream-viewport">
-            <div class="stream-overlay-badge">
-              <span class="status-dot"></span>
-              <span>480P LIVE STREAM</span>
-            </div>
-            <img id="screen-stream-img" src="/api/screenshot" alt="Live PC Screen" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'480\' height=\'270\' viewBox=\'0 0 480 270\'><rect width=\'480\' height=\'270\' fill=\'%23050b14\'/><text x=\'50%25\' y=\'50%25\' fill=\'%2300f5d4\' font-family=\'monospace\' font-size=\'14\' text-anchor=\'middle\' dy=\'.3em\'>[ PC SCREEN STREAM STANDBY ]</text></svg>'">
-          </div>
-
-          <div style="display: flex; gap: 8px;">
-            <button class="secondary-btn" style="flex: 1;" onclick="toggleScreenVideo(true)">Stream MJPEG Feed</button>
-            <button class="secondary-btn" style="flex: 1;" onclick="toggleCameraFeed()">Webcam Mirror</button>
+            <button class="secondary-btn" onclick="sendMouseScroll(350)">▲ Scroll Up</button>
+            <button class="secondary-btn" onclick="sendMouseScroll(-350)">▼ Scroll Down</button>
           </div>
         </div>
 
@@ -1837,6 +1884,16 @@
 
       const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick').includes(tabId));
       if (activeBtn) activeBtn.classList.add('active');
+
+      const screenImg = document.getElementById('screen-stream-img');
+      if (screenImg) {
+        if (tabId === 'tab-touch' && !isScreenStreamPaused) {
+          screenImg.src = `${backendUrl}/api/screen/stream?t=${Date.now()}`;
+          connectMouseWs();
+        } else {
+          screenImg.src = '';
+        }
+      }
     }
 
     // ==========================================
@@ -2004,63 +2061,212 @@
     }
 
     // ==========================================
-    // TOUCHPAD & MOUSE DRIVER
+    // ULTRA-FAST WEBSOCKET MOUSE DRIVER & TOUCHPAD
     // ==========================================
-    const surface = document.getElementById('touch-surface');
-    let lastX = 0, lastY = 0;
-    let isTracking = false;
+    let cursorSensitivity = 3.8;
+    let isScreenStreamPaused = false;
+    let mouseWs = null;
+    let wsConnectTimer = null;
 
-    surface.addEventListener('pointerdown', (e) => {
-      isTracking = true;
-      lastX = e.clientX;
-      lastY = e.clientY;
-      surface.classList.add('touching');
-      try { surface.setPointerCapture(e.pointerId); } catch (_) {}
-    });
-
-    surface.addEventListener('pointermove', (e) => {
-      if (!isTracking) return;
-      const dx = Math.round((e.clientX - lastX) * 1.5);
-      const dy = Math.round((e.clientY - lastY) * 1.5);
-      lastX = e.clientX;
-      lastY = e.clientY;
-
-      if (dx !== 0 || dy !== 0) {
-        sendMouseMove(dx, dy);
-      }
-    });
-
-    surface.addEventListener('pointerup', (e) => {
-      isTracking = false;
-      surface.classList.remove('touching');
-      try { surface.releasePointerCapture(e.pointerId); } catch (_) {}
-    });
-
-    surface.addEventListener('pointercancel', () => {
-      isTracking = false;
-      surface.classList.remove('touching');
-    });
-
-    async function sendMouseMove(dx, dy) {
-      try {
-        await fetch(`${backendUrl}/api/mouse/move`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dx: dx, dy: dy })
-        });
-      } catch (_) {}
+    function setSensitivity(val, btn) {
+      cursorSensitivity = val;
+      document.querySelectorAll('.speed-chip').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      const label = val >= 5.0 ? 'TURBO 🚀' : (val >= 3.0 ? 'FAST ⚡' : 'NORMAL 🟢');
+      showToast(`⚡ Cursor Speed: ${label}`);
     }
 
-    async function sendMouseClick(btn) {
+    function toggleScreenVideo() {
+      const img = document.getElementById('screen-stream-img');
+      const btn = document.getElementById('btn-toggle-screen');
+      const badge = document.getElementById('stream-status-badge');
+      isScreenStreamPaused = !isScreenStreamPaused;
+      if (isScreenStreamPaused) {
+        if (img) img.src = '';
+        if (btn) btn.innerText = '▶️ Resume';
+        if (badge) badge.innerText = 'STREAM PAUSED';
+        showToast('Screen stream paused.');
+      } else {
+        if (img) img.src = `${backendUrl}/api/screen/stream?t=${Date.now()}`;
+        if (btn) btn.innerText = '⏸️ Pause';
+        if (badge) badge.innerText = '480P LIVE STREAM';
+        showToast('Screen stream resumed.');
+      }
+    }
+
+    function connectMouseWs() {
+      if (mouseWs && (mouseWs.readyState === WebSocket.OPEN || mouseWs.readyState === WebSocket.CONNECTING)) {
+        return;
+      }
+      try {
+        let wsHost = window.location.host;
+        let wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        if (backendUrl && !backendUrl.includes(window.location.host)) {
+          try {
+            const u = new URL(backendUrl);
+            wsHost = u.host;
+            wsProto = u.protocol === 'https:' ? 'wss:' : 'ws:';
+          } catch (_) {}
+        }
+        const wsUrl = `${wsProto}//${wsHost}/ws/mouse`;
+        mouseWs = new WebSocket(wsUrl);
+
+        mouseWs.onopen = () => {
+          const badge = document.getElementById('ws-status-badge');
+          if (badge) {
+            badge.innerText = 'WS: ULTRA-FAST ⚡';
+            badge.style.color = 'var(--cyan)';
+          }
+          clearTimeout(wsConnectTimer);
+        };
+
+        mouseWs.onclose = () => {
+          mouseWs = null;
+          const badge = document.getElementById('ws-status-badge');
+          if (badge) {
+            badge.innerText = 'WS: RECONNECTING...';
+            badge.style.color = 'var(--amber)';
+          }
+          clearTimeout(wsConnectTimer);
+          wsConnectTimer = setTimeout(connectMouseWs, 2500);
+        };
+
+        mouseWs.onerror = () => {
+          try { mouseWs.close(); } catch(_) {}
+        };
+      } catch (e) {
+        console.warn('WS error:', e);
+      }
+    }
+
+    // Connect WebSocket on load
+    connectMouseWs();
+
+    const surface = document.getElementById('touch-surface');
+    let lastX = 0, lastY = 0;
+    let startX = 0, startY = 0;
+    let startTime = 0;
+    let isTracking = false;
+    let isMoved = false;
+
+    if (surface) {
+      surface.addEventListener('pointerdown', (e) => {
+        isTracking = true;
+        isMoved = false;
+        lastX = startX = e.clientX;
+        lastY = startY = e.clientY;
+        startTime = Date.now();
+        surface.classList.add('touching');
+        if (!mouseWs || mouseWs.readyState !== WebSocket.OPEN) {
+          connectMouseWs();
+        }
+        try { surface.setPointerCapture(e.pointerId); } catch (_) {}
+      });
+
+      surface.addEventListener('pointermove', (e) => {
+        if (!isTracking) return;
+        const curX = e.clientX;
+        const curY = e.clientY;
+        const rawDx = curX - lastX;
+        const rawDy = curY - lastY;
+        lastX = curX;
+        lastY = curY;
+
+        if (Math.hypot(curX - startX, curY - startY) > 4) {
+          isMoved = true;
+        }
+
+        const dist = Math.hypot(rawDx, rawDy);
+        let accel = 1.0;
+        if (dist > 18) {
+          accel = 1.85; // Fast swipe flick
+        } else if (dist > 7) {
+          accel = 1.35; // Moderate movement
+        }
+
+        const dx = Math.round(rawDx * cursorSensitivity * accel);
+        const dy = Math.round(rawDy * cursorSensitivity * accel);
+
+        if (dx !== 0 || dy !== 0) {
+          sendMouseMove(dx, dy);
+        }
+      });
+
+      surface.addEventListener('pointerup', (e) => {
+        if (!isTracking) return;
+        isTracking = false;
+        surface.classList.remove('touching');
+        try { surface.releasePointerCapture(e.pointerId); } catch (_) {}
+
+        // Tap to Click (< 250ms without drag)
+        if (!isMoved && (Date.now() - startTime < 250)) {
+          sendMouseClick('left');
+        }
+      });
+
+      surface.addEventListener('pointercancel', () => {
+        isTracking = false;
+        surface.classList.remove('touching');
+      });
+
+      // 2-Finger Scroll for Mobile
+      let scrollStartY = 0;
+      surface.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) {
+          scrollStartY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        }
+      }, { passive: true });
+
+      surface.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2) {
+          const curY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+          const deltaY = curY - scrollStartY;
+          if (Math.abs(deltaY) > 10) {
+            sendMouseScroll(deltaY > 0 ? 300 : -300);
+            scrollStartY = curY;
+          }
+        }
+      }, { passive: true });
+    }
+
+    function sendMouseMove(dx, dy) {
+      if (mouseWs && mouseWs.readyState === WebSocket.OPEN) {
+        mouseWs.send(`m:${dx},${dy}`);
+        return;
+      }
+      // HTTP Fallback
+      fetch(`${backendUrl}/api/mouse/move`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dx: dx, dy: dy })
+      }).catch(() => {});
+    }
+
+    function sendMouseClick(btn) {
       soundBeep();
       showToast(`🖱️ ${btn.toUpperCase()} Click`);
-      try {
-        await fetch(`${backendUrl}/api/mouse/click`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ button: btn, clicks: (btn === 'double' ? 2 : 1) })
-        });
-      } catch (_) {}
+      if (mouseWs && mouseWs.readyState === WebSocket.OPEN) {
+        mouseWs.send(`c:${btn}`);
+        return;
+      }
+      fetch(`${backendUrl}/api/mouse/click`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ button: btn, clicks: (btn === 'double' ? 2 : 1) })
+      }).catch(() => {});
+    }
+
+    function sendMouseScroll(amt) {
+      if (mouseWs && mouseWs.readyState === WebSocket.OPEN) {
+        mouseWs.send(`s:${amt}`);
+        showToast(amt > 0 ? "▲ Scrolled Up" : "▼ Scrolled Down");
+        return;
+      }
+      fetch(`${backendUrl}/api/mouse/scroll`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: amt })
+      }).then(() => showToast(amt > 0 ? "▲ Scrolled Up" : "▼ Scrolled Down")).catch(() => {});
     }
 
     async function promptRemoteType() {
@@ -2083,21 +2289,13 @@
     // ==========================================
     function refreshLiveStream() {
       const img = document.getElementById('screen-stream-img');
-      img.src = `${backendUrl}/api/screenshot?t=${Date.now()}`;
+      if (img) img.src = `${backendUrl}/api/screen/stream?t=${Date.now()}`;
       showToast('🔄 Desktop capture refreshed');
-    }
-
-    function toggleScreenVideo(enabled) {
-      const img = document.getElementById('screen-stream-img');
-      if (enabled) {
-        img.src = `${backendUrl}/api/screen/stream?t=${Date.now()}`;
-        showToast('▶️ Streaming Live MJPEG Desktop');
-      }
     }
 
     function toggleCameraFeed() {
       const img = document.getElementById('screen-stream-img');
-      img.src = `${backendUrl}/api/camera/stream?t=${Date.now()}`;
+      if (img) img.src = `${backendUrl}/api/camera/stream?t=${Date.now()}`;
       showToast('📹 Streaming Live Webcam feed');
     }
 

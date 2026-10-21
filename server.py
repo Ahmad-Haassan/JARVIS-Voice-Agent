@@ -459,24 +459,28 @@ async def websocket_mouse_endpoint(websocket: WebSocket):
         logger.debug(f"Mouse WS closed: {e}")
 
 @app.post("/api/computer/mouse/move")
+@app.post("/api/mouse/move")
 async def mouse_move(req: MouseMoveRequest):
     agent = get_computer_agent()
     success = agent.move_rel(req.dx, req.dy)
     return {"success": success}
 
 @app.post("/api/computer/mouse/click")
+@app.post("/api/mouse/click")
 async def mouse_click(req: MouseClickRequest):
     agent = get_computer_agent()
     success = agent.click(button=req.button, clicks=req.clicks)
     return {"success": success}
 
 @app.post("/api/computer/mouse/scroll")
+@app.post("/api/mouse/scroll")
 async def mouse_scroll(req: MouseScrollRequest):
     agent = get_computer_agent()
     success = agent.scroll(req.amount)
     return {"success": success}
 
 @app.post("/api/computer/keyboard/type")
+@app.post("/api/keyboard/type")
 def keyboard_type(req: KeyboardTypeRequest):
     agent = get_computer_agent()
     success = agent.type_text(req.text)

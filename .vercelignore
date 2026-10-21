@@ -1,0 +1,18 @@
+# Ignore Python backend dependencies and Windows specific files for Vercel Static Frontend Deployment
+requirements.txt
+pyproject.toml
+*.py
+core/
+gui/
+how_jarvis_works/
+docs/
+model/
+venv/
+data/
+*.bat
+*.ps1
+*.ico
+*.pem
+*.key
+*.log
+*.exe
