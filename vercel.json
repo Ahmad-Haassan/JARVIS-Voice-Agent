@@ -1,4 +1,7 @@
 {
+  "framework": null,
+  "buildCommand": null,
+  "installCommand": null,
   "outputDirectory": "web",
   "cleanUrls": true
 }
