@@ -296,15 +296,6 @@ def generate_screen_mjpeg_stream():
 
             frame = np.frombuffer(raw_buf, dtype=np.uint8).reshape((target_h, target_w, 3)).copy()
 
-            # Render glowing cursor at current mouse position
-            user32.GetCursorPos(ctypes.byref(pt))
-            cx, cy = pt.x, pt.y
-            if 0 <= cx < sw and 0 <= cy < sh:
-                sc_x = int(cx * target_w / sw)
-                sc_y = int(cy * target_h / sh)
-                cv2.circle(frame, (sc_x, sc_y), 7, (0, 245, 212), -1)
-                cv2.circle(frame, (sc_x, sc_y), 10, (255, 255, 255), 2)
-
             ret, buffer = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 62])
             if ret:
                 frame_bytes = buffer.tobytes()
