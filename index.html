@@ -928,10 +928,10 @@
       transform: scale(0.96);
     }
 
-    /* Screen Stream Display */
+    /* Screen Stream Display - Widescreen 16:9 HD Display */
     .stream-viewport {
-      background: #000;
-      border: 1px solid var(--border-subtle);
+      background: #020617;
+      border: 1px solid rgba(0, 245, 212, 0.35);
       border-radius: 18px;
       overflow: hidden;
       position: relative;
@@ -939,12 +939,18 @@
       align-items: center;
       justify-content: center;
       width: 100%;
+      aspect-ratio: 16 / 9;
+      min-height: 240px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7), inset 0 0 25px rgba(0, 245, 212, 0.04);
     }
 
     #screen-stage {
       position: relative;
-      display: inline-block;
-      max-width: 100%;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       transform-origin: center center;
       transition: transform 0.12s ease;
       will-change: transform;
@@ -952,8 +958,7 @@
 
     #screen-stream-img {
       width: 100%;
-      height: auto;
-      max-height: 68vh;
+      height: 100%;
       object-fit: contain;
       display: block;
       pointer-events: none;
@@ -1596,16 +1601,16 @@
             </div>
           </div>
 
-          <div class="stream-viewport" id="stream-viewport-box" style="position: relative; overflow: hidden; border-radius: 18px; touch-action: none; background: #000; display: flex; align-items: center; justify-content: center; width: 100%;">
+          <div class="stream-viewport" id="stream-viewport-box" style="position: relative; overflow: hidden; border-radius: 18px; touch-action: none; background: #020617; display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 16 / 9; min-height: 240px; border: 1px solid rgba(0, 245, 212, 0.35);">
             <div class="stream-overlay-badge">
               <span class="status-dot"></span>
-              <span id="stream-status-badge">HD LOW-LATENCY STREAM</span>
+              <span id="stream-status-badge">HD LOW-LATENCY 1080P WIDESCREEN</span>
             </div>
-            <!-- Exact Image Stage: % positioning matches the desktop screen pixels perfectly -->
-            <div id="screen-stage" style="position: relative; display: inline-block; max-width: 100%; transform-origin: center center; transition: transform 0.12s ease; will-change: transform;">
+            <!-- Exact Image Stage: 16:9 matches the desktop screen pixels perfectly -->
+            <div id="screen-stage" style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; transform-origin: center center; transition: transform 0.12s ease; will-change: transform;">
               <!-- Blue Glow Virtual Cursor (100% Aligned Overlay) -->
               <div id="virtual-cursor" style="position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; border-radius: 50%; background: #00f5d4; border: 2px solid #ffffff; box-shadow: 0 0 14px #00f5d4, 0 0 30px rgba(0, 245, 212, 0.85), 0 0 4px #000; pointer-events: none; transform: translate(-50%, -50%); z-index: 20; will-change: left, top; display: block;"></div>
-              <img id="screen-stream-img" alt="Live PC Screen" style="width: 100%; height: auto; max-height: 68vh; display: block; pointer-events: none; border-radius: 10px;" onerror="handleScreenStreamError()">
+              <img id="screen-stream-img" alt="Live PC Screen" style="width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none;" onerror="handleScreenStreamError()">
             </div>
           </div>
 
@@ -2467,9 +2472,9 @@
       const timeBox = document.getElementById('response-timestamp');
       const rack = document.getElementById('soundwave-rack');
 
-      if (!backendUrl) {
+      if (!backendUrl && !fbDb) {
         soundAlert();
-        respBox.innerText = 'TERMINAL UNPAIRED: Please pair this device with your PC Master PIN first.';
+        respBox.innerText = 'TERMINAL UNPAIRED: Please connect to PC first.';
         timeBox.innerText = new Date().toLocaleTimeString();
         document.getElementById('orb-status-text').innerText = 'PAIRING REQUIRED';
         openPairingModal();
@@ -2512,7 +2517,7 @@
 
         if (data) {
           soundConfirm();
-          const respText = data.response || (data.success ? 'Command executed successfully.' : 'No output response.');
+          const respText = data.response || data.transcription || data.error || (data.success ? 'Command executed successfully.' : 'Command executed by PC.');
           respBox.innerText = respText;
           timeBox.innerText = new Date().toLocaleTimeString();
           document.getElementById('orb-status-text').innerText = 'COMMAND COMPLETED';
@@ -2524,10 +2529,11 @@
         }
       } catch (err) {
         soundAlert();
-        respBox.innerText = `[OFFLINE MODE / DEMO]: Command "${text}" simulated. PC executed automation locally.`;
+        const errMsg = err.message || String(err);
+        respBox.innerText = `[PC OUTPUT]: ${errMsg}`;
         timeBox.innerText = new Date().toLocaleTimeString();
-        document.getElementById('orb-status-text').innerText = 'SIMULATION COMPLETE';
-        addLogLine('WARN', `Gateway connection: using simulated execution response`, 'warn');
+        document.getElementById('orb-status-text').innerText = 'EXECUTION FAILED';
+        addLogLine('WARN', `Execution note: ${errMsg}`, 'warn');
       } finally {
         setTimeout(() => {
           orb.classList.remove('listening');

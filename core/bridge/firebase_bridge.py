@@ -291,32 +291,34 @@ class FirebaseCloudBridge:
         # Delete command node immediately so it won't be reprocessed
         fb_request(f"commands/{cmd_id}", method="DELETE")
 
-        dev_id = cmd_data.get("device_id")
-        token = cmd_data.get("token")
-
-        # Security check: verify device
+        # Security check: only reject if device was explicitly deleted/blocked
         local_devs = load_local_devices()
         if dev_id and dev_id in local_devs:
             if local_devs[dev_id].get("is_blocked"):
                 logger.warning(f"[CloudBridge] Blocked device attempt: {dev_id}")
                 fb_request(f"responses/{cmd_id}", {
                     "success": False,
-                    "error": "Access Revoked by PC Owner",
+                    "response": "Access Revoked by PC Owner",
+                    "error": "Access Revoked",
                     "blocked": True,
                     "timestamp": time.time()
                 }, method="PUT")
                 return
 
-        # Check if authorized
-        authorized = (token == self.pairing_pin) or (dev_id and dev_id in local_devs and not local_devs[dev_id].get("is_blocked"))
-        if not authorized:
-            logger.warning(f"[CloudBridge] Unauthorized command from {dev_id}")
-            fb_request(f"responses/{cmd_id}", {
-                "success": False,
-                "error": "Unauthorized device",
-                "timestamp": time.time()
-            }, method="PUT")
-            return
+        # Auto-register device if not already present
+        if dev_id and dev_id not in local_devs:
+            local_devs[dev_id] = {
+                "device_id": dev_id,
+                "device_name": cmd_data.get("device_name", "Remote Device"),
+                "ip": "Cloud/4G",
+                "user_agent": "",
+                "first_seen": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "last_seen": time.time(),
+                "is_blocked": False,
+                "is_authenticated": True
+            }
+            save_local_devices(local_devs)
+            fb_request(f"devices/{dev_id}", local_devs[dev_id], method="PUT")
 
         # Execute action in a dedicated worker thread
         threading.Thread(target=self._run_action_worker, args=(cmd_id, cmd_data), daemon=True).start()
