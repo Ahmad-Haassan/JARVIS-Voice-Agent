@@ -1793,6 +1793,19 @@
 
   <!-- Sound FX Engine & Client Logic -->
   <script>
+    // Bypass Ngrok free interstitial warning transparently on all API fetch requests
+    const _origFetch = window.fetch;
+    window.fetch = function(url, init = {}) {
+      init = init || {};
+      init.headers = init.headers || {};
+      if (typeof init.headers === 'object' && !(init.headers instanceof Headers)) {
+        init.headers['ngrok-skip-browser-warning'] = 'true';
+      } else if (init.headers instanceof Headers) {
+        init.headers.set('ngrok-skip-browser-warning', 'true');
+      }
+      return _origFetch(url, init);
+    };
+
     // ==========================================
     // AUDIO SYNTHESIZER (WEB AUDIO API)
     // ==========================================
@@ -1933,10 +1946,11 @@
       if (savedGw && !savedGw.includes('localhost') && !savedGw.includes('127.0.0.1') && !savedGw.startsWith('file:') && savedGw !== 'null') {
         return savedGw.replace(/\/$/, '');
       }
-      if (window.location.origin && window.location.origin !== 'null' && !window.location.origin.includes('localhost') && !window.location.origin.includes('127.0.0.1') && !window.location.origin.startsWith('file:')) {
+      // If served directly from PC local server (not static Vercel), use origin
+      if (window.location.origin && !window.location.origin.includes('vercel.app') && !window.location.origin.includes('localhost') && !window.location.origin.includes('127.0.0.1') && !window.location.origin.startsWith('file:')) {
         return window.location.origin;
       }
-      return 'https://laser-virgin-hamburg-active.trycloudflare.com';
+      return 'https://backpack-vanity-poser.ngrok-free.dev';
     }
 
     let backendUrl = localStorage.getItem('ghost_backend_url') || getPublicBaseUrl();
