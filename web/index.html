@@ -1605,7 +1605,7 @@
             <div id="screen-stage" style="position: relative; display: inline-block; max-width: 100%; transform-origin: center center; transition: transform 0.12s ease; will-change: transform;">
               <!-- Blue Glow Virtual Cursor (100% Aligned Overlay) -->
               <div id="virtual-cursor" style="position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; border-radius: 50%; background: #00f5d4; border: 2px solid #ffffff; box-shadow: 0 0 14px #00f5d4, 0 0 30px rgba(0, 245, 212, 0.85), 0 0 4px #000; pointer-events: none; transform: translate(-50%, -50%); z-index: 20; will-change: left, top; display: block;"></div>
-              <img id="screen-stream-img" src="/api/screen/stream" alt="Live PC Screen" style="width: 100%; height: auto; max-height: 68vh; display: block; pointer-events: none; border-radius: 10px;" onerror="this.src='/api/screenshot'">
+              <img id="screen-stream-img" alt="Live PC Screen" style="width: 100%; height: auto; max-height: 68vh; display: block; pointer-events: none; border-radius: 10px;" onerror="handleScreenStreamError()">
             </div>
           </div>
 
@@ -2159,6 +2159,7 @@
             addLogLine('AUTH', `Device ${myDeviceId} verified and granted access.`, 'success');
             fetchTelemetry();
             refreshDevicesList();
+            startScreenStream();
             connectMouseWs();
           } else {
             showToast('❌ Invalid pairing PIN.');
@@ -2194,9 +2195,9 @@
       const screenImg = document.getElementById('screen-stream-img');
       if (screenImg) {
         if (tabId === 'tab-touch' && !isScreenStreamPaused) {
-          screenImg.src = `${backendUrl}/api/screen/stream?t=${Date.now()}&device_id=${encodeURIComponent(myDeviceId)}`;
+          startScreenStream();
           connectMouseWs();
-        } else {
+        } else if (tabId !== 'tab-touch') {
           screenImg.src = '';
         }
       }
@@ -2401,6 +2402,31 @@
       showToast(`⚡ Cursor Speed: ${label}`);
     }
 
+    function startScreenStream() {
+      const img = document.getElementById('screen-stream-img');
+      const badge = document.getElementById('stream-status-badge');
+      if (!img) return;
+      if (!backendUrl) {
+        if (badge) badge.innerText = 'CONNECTING PC...';
+        return;
+      }
+      if (isScreenStreamPaused) return;
+      img.src = `${backendUrl}/api/screen/stream?ngrok-skip-browser-warning=true&device_id=${encodeURIComponent(myDeviceId)}&t=${Date.now()}`;
+      if (badge) badge.innerText = 'HD LIVE SCREEN STREAM';
+    }
+
+    function handleScreenStreamError() {
+      const img = document.getElementById('screen-stream-img');
+      const badge = document.getElementById('stream-status-badge');
+      if (!img || !backendUrl || isScreenStreamPaused) return;
+      if (badge) badge.innerText = 'RECONNECTING STREAM...';
+      setTimeout(() => {
+        if (!isScreenStreamPaused && backendUrl) {
+          img.src = `${backendUrl}/api/screen/stream?ngrok-skip-browser-warning=true&device_id=${encodeURIComponent(myDeviceId)}&t=${Date.now()}`;
+        }
+      }, 1500);
+    }
+
     function toggleScreenVideo() {
       const img = document.getElementById('screen-stream-img');
       const btn = document.getElementById('btn-toggle-screen');
@@ -2412,9 +2438,8 @@
         if (badge) badge.innerText = 'STREAM PAUSED';
         showToast('Screen stream paused.');
       } else {
-        if (img) img.src = `${backendUrl}/api/screen/stream?t=${Date.now()}`;
+        startScreenStream();
         if (btn) btn.innerText = '⏸️ Pause';
-        if (badge) badge.innerText = '480P LIVE STREAM';
         showToast('Screen stream resumed.');
       }
     }
@@ -2826,8 +2851,7 @@
     // SCREEN STREAM & LIVE MIRROR
     // ==========================================
     function refreshLiveStream() {
-      const img = document.getElementById('screen-stream-img');
-      if (img) img.src = `${backendUrl}/api/screen/stream?t=${Date.now()}`;
+      startScreenStream();
       showToast('🔄 Desktop 1080p stream refreshed');
     }
 
@@ -2954,6 +2978,7 @@
           fetchTelemetry();
           pingDevicePresence();
           refreshDevicesList();
+          startScreenStream();
           connectMouseWs();
         } else {
           soundAlert();
@@ -2995,6 +3020,8 @@
       showToast('✅ Gateway & Credentials Updated');
       fetchTelemetry();
       pingDevicePresence();
+      startScreenStream();
+      connectMouseWs();
       closeGatewayModal();
     }
 
@@ -3266,6 +3293,11 @@
       setInterval(pingDevicePresence, 8000);
       refreshDevicesList();
       setInterval(refreshDevicesList, 10000);
+      const touchTab = document.getElementById('tab-touch');
+      if (touchTab && touchTab.classList.contains('active')) {
+        startScreenStream();
+        connectMouseWs();
+      }
       addLogLine('SYSTEM', 'GHOST Web Interface mounted successfully.');
     });
   </script>
