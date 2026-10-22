@@ -17,6 +17,7 @@ logger = get_logger("skills.computer_agent")
 # Configure PyAutoGUI with minimal pause for fluid remote response
 pyautogui.FAILSAFE = False
 pyautogui.PAUSE = 0.001
+_thread_local = threading.local()
 
 class ComputerAgent:
     def __init__(self):
@@ -49,12 +50,16 @@ class ComputerAgent:
     # MOUSE CONTROL (HIGH-PERFORMANCE WIN32 API)
     # ==========================================
     def _attach_desktop(self):
-        """Attaches current thread to interactive desktop session WinSta0\\Default."""
+        """Attaches current thread to interactive desktop session WinSta0\\Default without handle leaks."""
+        if getattr(_thread_local, "desktop_attached", False):
+            return
         try:
             user32 = ctypes.windll.user32
             h_desk = user32.OpenDesktopW("default", 0, False, 0x1FF)
             if h_desk:
                 user32.SetThreadDesktop(h_desk)
+                user32.CloseDesktop(h_desk)
+            _thread_local.desktop_attached = True
         except Exception:
             pass
 

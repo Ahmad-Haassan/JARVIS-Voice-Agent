@@ -935,15 +935,25 @@
       border-radius: 18px;
       overflow: hidden;
       position: relative;
-      aspect-ratio: 16/9;
       display: flex;
       align-items: center;
       justify-content: center;
+      width: 100%;
+    }
+
+    #screen-stage {
+      position: relative;
+      display: inline-block;
+      max-width: 100%;
+      transform-origin: center center;
+      transition: transform 0.12s ease;
+      will-change: transform;
     }
 
     #screen-stream-img {
       width: 100%;
-      height: 100%;
+      height: auto;
+      max-height: 68vh;
       object-fit: contain;
       display: block;
       pointer-events: none;
@@ -1372,6 +1382,23 @@
          TAB 1: COMMAND DECK (ORB + MATRIX AUTOMATION)
          ============================================== -->
     <div class="tab-pane active" id="tab-commander">
+      <!-- Standby Warning Banner (Shown on public Vercel visits when unauthenticated) -->
+      <div id="unpaired-alert-banner" style="display: none; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(0, 245, 212, 0.3); border-radius: 16px; padding: 14px 18px; margin-bottom: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; box-shadow: 0 4px 25px rgba(0,0,0,0.4);">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(0, 245, 212, 0.12); border: 1px solid var(--cyan); display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+            🛡️
+          </div>
+          <div>
+            <div style="font-weight: 700; color: #fff; font-size: 0.92rem; font-family: var(--font-display);">TERMINAL IN STANDBY // PRIVATE ACCESS</div>
+            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">This terminal is not paired with a PC. Enter your PC's 6-digit Master PIN to connect.</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button onclick="openPairingModal()" class="primary-btn" style="padding: 6px 14px; font-size: 0.76rem; cursor: pointer;">🔑 Enter Pairing PIN</button>
+          <button onclick="downloadClientFile(event)" class="secondary-btn" style="padding: 6px 14px; font-size: 0.76rem; cursor: pointer;">📥 Setup My PC</button>
+        </div>
+      </div>
+
       <div class="deck-grid">
         
         <!-- Left Column: Voice Orb & Interactive Prompt -->
@@ -1506,17 +1533,17 @@
         </div>
 
         <div class="device-meta-strip">
+          <div class="chip-key" style="border: 1px solid rgba(0, 245, 212, 0.4); background: rgba(0, 245, 212, 0.08);">
+            <span>MASTER PIN:</span>
+            <strong id="display-master-pin" style="color: var(--cyan); font-size: 1.15rem; letter-spacing: 3px; font-family: var(--font-mono);">749281</strong>
+          </div>
           <div class="chip-key">
             <span>DEVICE ID:</span>
-            <strong id="display-device-id">GHOST-NODE-98X</strong>
+            <strong id="display-device-id">NODE-HOST</strong>
           </div>
           <div class="chip-key">
-            <span>KEY:</span>
-            <strong id="display-device-key">••••-••••-71A</strong>
-          </div>
-          <div class="chip-key">
-            <span>STATE:</span>
-            <strong style="color: var(--emerald);">BOUND & SECURED</strong>
+            <span>SECURITY:</span>
+            <strong style="color: var(--emerald);">PROTECTED</strong>
           </div>
         </div>
 
@@ -1526,6 +1553,11 @@
             Copy Remote Link
           </button>
 
+          <button class="secondary-btn" onclick="openPairingModal()">
+            <svg style="width: 18px; height: 18px; fill: currentColor;" viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+            Enter PIN Manually
+          </button>
+
           <a id="btn-whatsapp-share" class="secondary-btn" target="_blank" style="text-decoration: none; display: flex; align-items: center; gap: 8px;">
             <svg style="width: 18px; height: 18px; fill: #25D366;" viewBox="0 0 24 24"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-5.46-4.45-9.91-9.91-9.91zM12.04 20.15c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31c-.82-1.31-1.26-2.83-1.26-4.38 0-4.54 3.7-8.24 8.24-8.24 4.54 0 8.24 3.7 8.24 8.24 0 4.54-3.7 8.24-8.24 8.24z"/></svg>
             Send to WhatsApp
@@ -1533,13 +1565,7 @@
 
           <button class="secondary-btn" onclick="regeneratePairingKeys()">
             <svg style="width: 18px; height: 18px; fill: currentColor;" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-            Regenerate Token
-          </button>
-
-
-          <button class="secondary-btn" onclick="simulateFriendConnect()">
-            <svg style="width: 18px; height: 18px; fill: currentColor;" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-            Test Friend Handshake
+            Refresh QR
           </button>
         </div>
       </div>
@@ -1570,14 +1596,17 @@
             </div>
           </div>
 
-          <div class="stream-viewport" id="stream-viewport-box" style="position: relative; overflow: hidden; border-radius: 18px; touch-action: none;">
+          <div class="stream-viewport" id="stream-viewport-box" style="position: relative; overflow: hidden; border-radius: 18px; touch-action: none; background: #000; display: flex; align-items: center; justify-content: center; width: 100%;">
             <div class="stream-overlay-badge">
               <span class="status-dot"></span>
               <span id="stream-status-badge">HD LOW-LATENCY STREAM</span>
             </div>
-            <!-- Zero-Latency Real-Time Virtual Cursor Overlay -->
-            <div id="virtual-cursor" style="position: absolute; top: 50%; left: 50%; width: 14px; height: 14px; border-radius: 50%; background: #00f5d4; border: 2px solid #ffffff; box-shadow: 0 0 12px #00f5d4, 0 0 4px #000; pointer-events: none; transform: translate(-50%, -50%); z-index: 10; transition: transform 0.04s ease-out; will-change: left, top; display: block;"></div>
-            <img id="screen-stream-img" src="/api/screen/stream" alt="Live PC Screen" style="transform-origin: center center; transition: transform 0.12s ease; will-change: transform;" onerror="this.src='/api/screenshot'">
+            <!-- Exact Image Stage: % positioning matches the desktop screen pixels perfectly -->
+            <div id="screen-stage" style="position: relative; display: inline-block; max-width: 100%; transform-origin: center center; transition: transform 0.12s ease; will-change: transform;">
+              <!-- Blue Glow Virtual Cursor (100% Aligned Overlay) -->
+              <div id="virtual-cursor" style="position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; border-radius: 50%; background: #00f5d4; border: 2px solid #ffffff; box-shadow: 0 0 14px #00f5d4, 0 0 30px rgba(0, 245, 212, 0.85), 0 0 4px #000; pointer-events: none; transform: translate(-50%, -50%); z-index: 20; will-change: left, top; display: block;"></div>
+              <img id="screen-stream-img" src="/api/screen/stream" alt="Live PC Screen" style="width: 100%; height: auto; max-height: 68vh; display: block; pointer-events: none; border-radius: 10px;" onerror="this.src='/api/screenshot'">
+            </div>
           </div>
 
           <!-- Speed Controls between screen and trackpad -->
@@ -1791,6 +1820,35 @@
     </div>
   </div>
 
+  <!-- Device Pairing & PIN Modal -->
+  <div class="modal-backdrop" id="pairing-modal">
+    <div class="modal-card">
+      <button class="modal-close" onclick="closePairingModal()">✕</button>
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+        <span style="font-size: 1.4rem;">🔑</span>
+        <h3 style="font-family: var(--font-display); font-size: 1.15rem; color: #fff;">PAIR WITH YOUR PC</h3>
+      </div>
+      <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.5;">
+        Enter your PC Gateway URL and the 6-digit Master PIN shown on your PC screen to establish a private, encrypted connection.
+      </p>
+
+      <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 10px;">
+        <label style="font-size: 0.72rem; color: var(--text-dim); font-family: var(--font-mono);">PC GATEWAY URL:</label>
+        <input type="text" class="command-input" id="pairing-gateway-input" placeholder="https://backpack-vanity-poser.ngrok-free.dev" value="https://backpack-vanity-poser.ngrok-free.dev">
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px;">
+        <label style="font-size: 0.72rem; color: var(--text-dim); font-family: var(--font-mono);">6-DIGIT MASTER PAIRING PIN:</label>
+        <input type="text" maxlength="6" class="command-input" id="pairing-pin-input" placeholder="e.g. 749281" style="font-size: 1.25rem; letter-spacing: 4px; font-family: var(--font-mono); text-align: center;">
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 14px;">
+        <button class="primary-btn" style="flex: 1;" onclick="submitPairingPin()">⚡ Authorize & Connect</button>
+        <button class="secondary-btn" onclick="closePairingModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Sound FX Engine & Client Logic -->
   <script>
     // Bypass Ngrok free interstitial warning transparently on all API fetch requests
@@ -1940,44 +1998,75 @@
     // PERSISTENT PAIRING & TOKEN SYSTEM
     // ==========================================
     let currentDeviceId = localStorage.getItem('ghost_device_id') || 'GHOST-NODE-' + Math.floor(1000 + Math.random() * 9000);
-    let currentSecretKey = localStorage.getItem('ghost_secret_key') || Math.random().toString(36).substring(2, 12).toUpperCase();
+    let currentSecretKey = localStorage.getItem('ghost_pairing_token') || '749281';
+
     function getPublicBaseUrl() {
+      // 1. Explicitly saved Gateway URL in localStorage
       const savedGw = localStorage.getItem('ghost_backend_url');
       if (savedGw && !savedGw.includes('localhost') && !savedGw.includes('127.0.0.1') && !savedGw.startsWith('file:') && savedGw !== 'null') {
         return savedGw.replace(/\/$/, '');
       }
-      // If served directly from PC local server (not static Vercel), use origin
-      if (window.location.origin && !window.location.origin.includes('vercel.app') && !window.location.origin.includes('localhost') && !window.location.origin.includes('127.0.0.1') && !window.location.origin.startsWith('file:')) {
+      // 2. Local PC Server (when running on host PC directly)
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.startsWith('192.168.')) {
         return window.location.origin;
       }
-      return 'https://backpack-vanity-poser.ngrok-free.dev';
+      // 3. For public Vercel visits without saved pairing credentials:
+      // Return null so public visitors stay in Standby Mode and DO NOT connect to your PC!
+      return null;
     }
 
     let backendUrl = localStorage.getItem('ghost_backend_url') || getPublicBaseUrl();
 
-    function renderDeviceKeys() {
-      localStorage.setItem('ghost_device_id', currentDeviceId);
-      localStorage.setItem('ghost_secret_key', currentSecretKey);
-      document.getElementById('display-device-id').innerText = currentDeviceId;
-      document.getElementById('display-device-key').innerText = currentSecretKey.substring(0, 4) + '-••••-' + currentSecretKey.slice(-3);
-      
-      const baseUrl = getPublicBaseUrl();
-      const pairUrl = `${baseUrl}/?device=${currentDeviceId}&token=${currentSecretKey}&gateway=${encodeURIComponent(baseUrl)}`;
+    async function renderDeviceKeys() {
+      let masterPin = localStorage.getItem('ghost_pairing_token') || '749281';
+      let gatewayUrl = 'https://backpack-vanity-poser.ngrok-free.dev';
+
+      // If running on host PC or connected to gateway, fetch live master PIN
+      try {
+        const infoTarget = (backendUrl || window.location.origin);
+        if (infoTarget && !infoTarget.includes('vercel.app')) {
+          const res = await fetch(`${infoTarget}/api/auth/info`);
+          if (res.ok) {
+            const info = await res.json();
+            if (info.pairing_token) {
+              masterPin = info.pairing_token;
+              localStorage.setItem('ghost_pairing_token', masterPin);
+            }
+            if (info.gateway_url) gatewayUrl = info.gateway_url;
+          }
+        }
+      } catch (_) {}
+
+      const pinEl = document.getElementById('display-master-pin');
+      if (pinEl) pinEl.innerText = masterPin;
+      const keyEl = document.getElementById('display-device-key');
+      if (keyEl) keyEl.innerText = masterPin;
+      const devEl = document.getElementById('display-device-id');
+      if (devEl) devEl.innerText = myDeviceId;
+
+      // When building the QR link, use the public web URL + gateway + PIN
+      const webOrigin = (window.location.origin && !window.location.origin.includes('localhost') && !window.location.origin.includes('127.0.0.1'))
+        ? window.location.origin
+        : gatewayUrl;
+      const pairUrl = `${webOrigin}/?gateway=${encodeURIComponent(gatewayUrl)}&token=${encodeURIComponent(masterPin)}`;
       drawStylizedQR(pairUrl);
     }
 
     function regeneratePairingKeys() {
       soundConfirm();
-      currentDeviceId = 'GHOST-NODE-' + Math.floor(1000 + Math.random() * 9000);
-      currentSecretKey = Math.random().toString(36).substring(2, 12).toUpperCase();
       renderDeviceKeys();
-      addLogLine('PAIRING', `Generated fresh pairing token: ${currentDeviceId}`, 'success');
-      showToast('🔄 Generated fresh encrypted QR code');
+      addLogLine('PAIRING', `Refreshed pairing QR code.`, 'success');
+      showToast('🔄 Refreshed QR & Pairing credentials');
     }
 
     function copyDirectConnectLink() {
-      const baseUrl = getPublicBaseUrl();
-      const link = `${baseUrl}/?device=${currentDeviceId}&token=${currentSecretKey}&gateway=${encodeURIComponent(baseUrl)}`;
+      const pinEl = document.getElementById('display-master-pin');
+      const masterPin = pinEl ? pinEl.innerText.trim() : (localStorage.getItem('ghost_pairing_token') || '749281');
+      const gatewayUrl = 'https://backpack-vanity-poser.ngrok-free.dev';
+      const webOrigin = (window.location.origin && !window.location.origin.includes('localhost') && !window.location.origin.includes('127.0.0.1'))
+        ? window.location.origin
+        : gatewayUrl;
+      const link = `${webOrigin}/?gateway=${encodeURIComponent(gatewayUrl)}&token=${encodeURIComponent(masterPin)}`;
       navigator.clipboard.writeText(link).then(() => {
         soundConfirm();
         showToast('🔗 Copied permanent connection link!');
@@ -2024,31 +2113,55 @@
       }
     }
 
-    function simulateFriendConnect() {
-      soundConfirm();
-      showToast('🤝 Colleague Device Bound Successfully!');
-      addLogLine('HANDSHAKE', `Mobile client paired: Android/iOS [Token: ${currentSecretKey}]`, 'success');
-      document.getElementById('global-status-text').innerText = 'PAIR: 2 DEVICES 🟢';
-    }
-
     // Check URL parameters for auto-pairing
-    function checkUrlPairing() {
+    async function checkUrlPairing() {
       const params = new URLSearchParams(window.location.search);
+      let targetGw = null;
+      let targetToken = null;
+
       if (params.has('gateway')) {
         const gw = decodeURIComponent(params.get('gateway')).replace(/\/$/, '');
         if (gw && !gw.includes('localhost') && !gw.includes('127.0.0.1')) {
+          targetGw = gw;
           backendUrl = gw;
           localStorage.setItem('ghost_backend_url', backendUrl);
-          showToast(`⚡ Auto-connected to PC Gateway!`);
         }
       }
-      if (params.has('device') && params.has('token')) {
-        currentDeviceId = params.get('device');
-        currentSecretKey = params.get('token');
-        renderDeviceKeys();
+      if (params.has('token') || params.has('pin')) {
+        targetToken = (params.get('token') || params.get('pin')).trim();
+        localStorage.setItem('ghost_pairing_token', targetToken);
+      }
+
+      if (targetGw && targetToken) {
         soundConfirm();
-        showToast(`⚡ Paired with ${currentDeviceId}!`);
-        addLogLine('SYNC', `Locked to remote desktop ${currentDeviceId}`, 'success');
+        showToast(`🔑 Authorizing device with PC Gateway...`);
+        try {
+          const res = await fetch(`${targetGw}/api/auth/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              token: targetToken,
+              device_id: myDeviceId,
+              device_name: myDeviceName,
+              user_agent: navigator.userAgent
+            })
+          });
+          const d = await res.json();
+          if (d && d.success) {
+            showToast('✅ Device paired & verified with PC!');
+            addLogLine('AUTH', `Device ${myDeviceId} verified and granted access.`, 'success');
+            fetchTelemetry();
+            refreshDevicesList();
+          } else {
+            showToast('❌ Invalid pairing PIN.');
+          }
+        } catch (_) {}
+      }
+
+      if (window.location.search) {
+        try {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } catch (_) {}
       }
     }
 
@@ -2142,6 +2255,15 @@
       const timeBox = document.getElementById('response-timestamp');
       const rack = document.getElementById('soundwave-rack');
 
+      if (!backendUrl) {
+        soundAlert();
+        respBox.innerText = 'TERMINAL UNPAIRED: Please pair this device with your PC Master PIN first.';
+        timeBox.innerText = new Date().toLocaleTimeString();
+        document.getElementById('orb-status-text').innerText = 'PAIRING REQUIRED';
+        openPairingModal();
+        return;
+      }
+
       orb.classList.add('listening');
       rack.classList.add('active');
       document.getElementById('orb-status-text').innerText = 'TRANSMITTING COMMAND...';
@@ -2150,9 +2272,13 @@
       addLogLine('CMD', `Sent command: "${text}"`);
 
       try {
+        const pairingToken = localStorage.getItem('ghost_pairing_token') || '';
         const res = await fetch(`${backendUrl}/api/command`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-pairing-token': pairingToken
+          },
           body: JSON.stringify({ text: text, device_id: myDeviceId })
         });
 
@@ -2286,6 +2412,14 @@
     }
 
     function connectMouseWs() {
+      if (!backendUrl) {
+        const badge = document.getElementById('ws-status-badge');
+        if (badge) {
+          badge.innerText = 'WS: UNPAIRED ⚪';
+          badge.style.color = 'var(--text-dim)';
+        }
+        return;
+      }
       if (mouseWs && (mouseWs.readyState === WebSocket.OPEN || mouseWs.readyState === WebSocket.CONNECTING)) {
         return;
       }
@@ -2299,7 +2433,8 @@
             wsProto = u.protocol === 'https:' ? 'wss:' : 'ws:';
           } catch (_) {}
         }
-        const wsUrl = `${wsProto}//${wsHost}/ws/mouse?device_id=${encodeURIComponent(myDeviceId)}`;
+        const pairingToken = localStorage.getItem('ghost_pairing_token') || '';
+        const wsUrl = `${wsProto}//${wsHost}/ws/mouse?device_id=${encodeURIComponent(myDeviceId)}&token=${encodeURIComponent(pairingToken)}`;
         mouseWs = new WebSocket(wsUrl);
 
         mouseWs.onopen = () => {
@@ -2315,6 +2450,13 @@
           if (typeof event.data === 'string' && event.data.includes('access_revoked')) {
             showRevokedLockout();
             return;
+          }
+          if (typeof event.data === 'string' && event.data.startsWith('res:')) {
+            const parts = event.data.substring(4).split(',');
+            if (parts.length === 2) {
+              remoteScreenWidth = parseFloat(parts[0]) || 1920;
+              remoteScreenHeight = parseFloat(parts[1]) || 1200;
+            }
           }
           if (typeof event.data === 'string' && event.data.startsWith('p:')) {
             const parts = event.data.substring(2).split(',');
@@ -2348,40 +2490,27 @@
     // Connect WebSocket on load
     connectMouseWs();
 
-    // Mathematically Perfect Real-Time Pulse Cursor Alignment
+    // Mathematically Exact Real-Time Cursor Alignment
+    let remoteScreenWidth = 1920;
+    let remoteScreenHeight = 1200;
     let curXPercent = 50.0;
     let curYPercent = 50.0;
 
     function setVirtualCursorDirect(pctX, pctY) {
       const vCursor = document.getElementById('virtual-cursor');
-      const streamImg = document.getElementById('screen-stream-img');
-      const viewportBox = document.getElementById('stream-viewport-box');
       if (!vCursor) return;
 
       curXPercent = Math.max(0, Math.min(100, pctX));
       curYPercent = Math.max(0, Math.min(100, pctY));
 
-      if (streamImg && viewportBox) {
-        const imgRect = streamImg.getBoundingClientRect();
-        const boxRect = viewportBox.getBoundingClientRect();
-        if (imgRect.width > 20 && imgRect.height > 20) {
-          const posX = (imgRect.left - boxRect.left) + ((curXPercent / 100.0) * imgRect.width);
-          const posY = (imgRect.top - boxRect.top) + ((curYPercent / 100.0) * imgRect.height);
-          vCursor.style.left = posX + 'px';
-          vCursor.style.top = posY + 'px';
-          return;
-        }
-      }
       vCursor.style.left = curXPercent + '%';
       vCursor.style.top = curYPercent + '%';
     }
 
     function updateVirtualCursor(dx, dy) {
-      const streamImg = document.getElementById('screen-stream-img');
-      const imgW = streamImg ? (streamImg.clientWidth || 320) : 320;
-      const imgH = streamImg ? (streamImg.clientHeight || 180) : 180;
-      const stepX = (dx / imgW) * 100.0;
-      const stepY = (dy / imgH) * 100.0;
+      // Step percentage matches the real PC screen width and height
+      const stepX = (dx / remoteScreenWidth) * 100.0;
+      const stepY = (dy / remoteScreenHeight) * 100.0;
       setVirtualCursorDirect(curXPercent + stepX, curYPercent + stepY);
     }
 
@@ -2486,45 +2615,43 @@
       }, { passive: true });
     }
 
-    // Direct Screen Touch: slide finger or tap directly on the screen box
+    // Direct Screen Touch: Tap or slide anywhere on the live PC screen to instantly position and click
     const screenBox = document.getElementById('stream-viewport-box');
     if (screenBox) {
+      function getStageTouchPct(e) {
+        const stage = document.getElementById('screen-stage') || document.getElementById('screen-stream-img');
+        if (!stage) return null;
+        const rect = stage.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return null;
+        const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+        const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+        const px = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+        const py = Math.max(0, Math.min(100, ((clientY - rect.top) / rect.height) * 100));
+        return { x: px, y: py };
+      }
+
       screenBox.addEventListener('pointerdown', (e) => {
         isTracking = true;
         isMoved = false;
-        lastX = startX = e.clientX;
-        lastY = startY = e.clientY;
         startTime = Date.now();
         if (!mouseWs || mouseWs.readyState !== WebSocket.OPEN) {
           connectMouseWs();
         }
         try { screenBox.setPointerCapture(e.pointerId); } catch (_) {}
+        const pos = getStageTouchPct(e);
+        if (pos) {
+          setVirtualCursorDirect(pos.x, pos.y);
+          sendMouseAbsolute(pos.x, pos.y);
+        }
       });
 
       screenBox.addEventListener('pointermove', (e) => {
         if (!isTracking) return;
-        const curX = e.clientX;
-        const curY = e.clientY;
-        const rawDx = curX - lastX;
-        const rawDy = curY - lastY;
-        lastX = curX;
-        lastY = curY;
-
-        if (Math.hypot(curX - startX, curY - startY) > 4) {
-          isMoved = true;
-        }
-
-        const dist = Math.hypot(rawDx, rawDy);
-        let accel = 1.0;
-        if (dist > 18) accel = 1.85;
-        else if (dist > 7) accel = 1.35;
-
-        const dx = Math.round(rawDx * cursorSensitivity * accel);
-        const dy = Math.round(rawDy * cursorSensitivity * accel);
-
-        if (dx !== 0 || dy !== 0) {
-          updateVirtualCursor(dx, dy);
-          sendMouseMove(dx, dy);
+        isMoved = true;
+        const pos = getStageTouchPct(e);
+        if (pos) {
+          setVirtualCursorDirect(pos.x, pos.y);
+          sendMouseAbsolute(pos.x, pos.y);
         }
       });
 
@@ -2533,7 +2660,8 @@
         isTracking = false;
         try { screenBox.releasePointerCapture(e.pointerId); } catch (_) {}
 
-        if (!isMoved && (Date.now() - startTime < 250)) {
+        // Tap to Click at exact touched position
+        if (!isMoved || (Date.now() - startTime < 300)) {
           sendMouseClick('left');
         }
       });
@@ -2541,6 +2669,12 @@
       screenBox.addEventListener('pointercancel', () => {
         isTracking = false;
       });
+    }
+
+    function sendMouseAbsolute(pctX, pctY) {
+      if (mouseWs && mouseWs.readyState === WebSocket.OPEN) {
+        mouseWs.send(`a:${pctX.toFixed(2)},${pctY.toFixed(2)}`);
+      }
     }
 
     function sendMouseMove(dx, dy) {
@@ -2612,11 +2746,11 @@
     let panStartX = 0, panStartY = 0;
 
     function applyScreenTransform() {
-      const img = document.getElementById('screen-stream-img');
+      const stage = document.getElementById('screen-stage') || document.getElementById('screen-stream-img');
       const btn = document.getElementById('zoom-level-btn');
       if (btn) btn.innerText = `${Math.round(currentZoom * 100)}%`;
-      if (img) {
-        img.style.transform = `scale(${currentZoom}) translate(${panX}px, ${panY}px)`;
+      if (stage) {
+        stage.style.transform = `scale(${currentZoom}) translate(${panX}px, ${panY}px)`;
       }
     }
 
@@ -2699,10 +2833,26 @@
     // TELEMETRY FETCHER
     // ==========================================
     async function fetchTelemetry() {
+      const banner = document.getElementById('unpaired-alert-banner');
+      if (!backendUrl) {
+        if (banner) banner.style.display = 'flex';
+        document.getElementById('global-status-text').innerText = 'STANDBY // Disconnected';
+        document.getElementById('global-status-dot').style.background = '#64748b';
+        document.getElementById('tel-cpu').innerText = '--';
+        document.getElementById('bar-cpu').style.width = '0%';
+        document.getElementById('tel-ram').innerText = '--';
+        document.getElementById('bar-ram').style.width = '0%';
+        document.getElementById('tel-bat').innerText = '--';
+        return;
+      }
       try {
-        const res = await fetch(`${backendUrl}/api/status`);
+        const pairingToken = localStorage.getItem('ghost_pairing_token') || '';
+        const res = await fetch(`${backendUrl}/api/status?device_id=${encodeURIComponent(myDeviceId)}`, {
+          headers: { 'x-pairing-token': pairingToken }
+        });
         const d = await res.json();
         if (d.status === 'online') {
+          if (banner) banner.style.display = 'none';
           document.getElementById('tel-cpu').innerText = `${Math.round(d.cpu || 0)}%`;
           document.getElementById('bar-cpu').style.width = `${Math.min(d.cpu || 10, 100)}%`;
 
@@ -2712,13 +2862,25 @@
           document.getElementById('tel-bat').innerText = d.battery !== null ? `${d.battery}%` : 'Plugged';
           document.getElementById('global-status-text').innerText = 'ONLINE // 12ms';
           document.getElementById('global-status-dot').style.background = 'var(--emerald)';
+        } else if (d.status === 'unpaired') {
+          if (banner) banner.style.display = 'flex';
+          document.getElementById('global-status-text').innerText = 'STANDBY // Unpaired';
+          document.getElementById('global-status-dot').style.background = '#eab308';
+          document.getElementById('tel-cpu').innerText = '--';
+          document.getElementById('bar-cpu').style.width = '0%';
+          document.getElementById('tel-ram').innerText = '--';
+          document.getElementById('bar-ram').style.width = '0%';
+          document.getElementById('tel-bat').innerText = '--';
         }
       } catch (_) {
-        // Fallback simulation
-        document.getElementById('tel-cpu').innerText = '18%';
-        document.getElementById('bar-cpu').style.width = '18%';
-        document.getElementById('tel-ram').innerText = '42%';
-        document.getElementById('bar-ram').style.width = '42%';
+        if (banner) banner.style.display = 'flex';
+        document.getElementById('global-status-text').innerText = 'OFFLINE // Unreachable';
+        document.getElementById('global-status-dot').style.background = '#ef4444';
+        document.getElementById('tel-cpu').innerText = '--';
+        document.getElementById('bar-cpu').style.width = '0%';
+        document.getElementById('tel-ram').innerText = '--';
+        document.getElementById('bar-ram').style.width = '0%';
+        document.getElementById('tel-bat').innerText = '--';
       }
     }
 
@@ -2728,11 +2890,79 @@
     }
 
     // ==========================================
+    // PAIRING MODAL CONTROLS
+    // ==========================================
+    function openPairingModal() {
+      soundBeep();
+      const gwInput = document.getElementById('pairing-gateway-input');
+      if (gwInput && !gwInput.value) {
+        gwInput.value = 'https://backpack-vanity-poser.ngrok-free.dev';
+      }
+      document.getElementById('pairing-modal').classList.add('open');
+      const pinInput = document.getElementById('pairing-pin-input');
+      if (pinInput) setTimeout(() => pinInput.focus(), 150);
+    }
+
+    function closePairingModal() {
+      soundBeep();
+      document.getElementById('pairing-modal').classList.remove('open');
+    }
+
+    async function submitPairingPin() {
+      const gw = (document.getElementById('pairing-gateway-input').value || '').trim().replace(/\/$/, '');
+      const pin = (document.getElementById('pairing-pin-input').value || '').trim();
+
+      if (!gw) {
+        showToast('Please enter your PC Gateway URL');
+        return;
+      }
+      if (!pin) {
+        showToast('Please enter your 6-digit Master PIN');
+        return;
+      }
+
+      soundBeep();
+      showToast('Authenticating with PC...');
+      try {
+        const res = await fetch(`${gw}/api/auth/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token: pin,
+            device_id: myDeviceId,
+            device_name: myDeviceName,
+            user_agent: navigator.userAgent
+          })
+        });
+        const d = await res.json();
+        if (d && d.success) {
+          backendUrl = gw;
+          localStorage.setItem('ghost_backend_url', backendUrl);
+          localStorage.setItem('ghost_pairing_token', pin);
+          closePairingModal();
+          soundConfirm();
+          showToast('✅ Authenticated & Connected to PC!');
+          addLogLine('AUTH', `Device ${myDeviceId} paired with host PC.`, 'success');
+          fetchTelemetry();
+          pingDevicePresence();
+          refreshDevicesList();
+          connectMouseWs();
+        } else {
+          soundAlert();
+          showToast('❌ Incorrect PIN: ' + (d.message || 'Access denied'));
+        }
+      } catch (err) {
+        soundAlert();
+        showToast('❌ Could not connect to Gateway: ' + err.message);
+      }
+    }
+
+    // ==========================================
     // GATEWAY CONFIGURATION MODAL
     // ==========================================
     function openGatewayModal() {
       soundBeep();
-      document.getElementById('backend-url-input').value = backendUrl;
+      document.getElementById('backend-url-input').value = backendUrl || '';
       document.getElementById('gateway-modal').classList.add('open');
     }
 
@@ -2779,19 +3009,27 @@
     const myDeviceName = getClientDeviceName();
 
     async function pingDevicePresence() {
+      if (!backendUrl) return;
+      const pairingToken = localStorage.getItem('ghost_pairing_token') || '';
       try {
         const res = await fetch(`${backendUrl}/api/devices/ping`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-pairing-token': pairingToken
+          },
           body: JSON.stringify({
             device_id: myDeviceId,
             device_name: myDeviceName,
-            user_agent: navigator.userAgent
+            user_agent: navigator.userAgent,
+            token: pairingToken
           })
         });
         const d = await res.json();
         if (d && d.allowed === false) {
-          showRevokedLockout();
+          if (d.status === 'blocked') {
+            showRevokedLockout();
+          }
         }
       } catch (_) {}
     }
@@ -2808,8 +3046,25 @@
     }
 
     async function refreshDevicesList() {
+      const grid = document.getElementById('devices-cards-grid');
+      if (!backendUrl) {
+        if (grid) {
+          grid.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-dim); background: var(--bg-card); border-radius: 16px; border: 1px dashed var(--border-subtle);">
+              <div style="font-size: 2rem; margin-bottom: 8px;">🔒</div>
+              <div style="font-weight: 600; color: #fff;">Terminal Not Paired</div>
+              <div style="font-size: 0.8rem; margin-top: 4px; margin-bottom: 14px;">Pair with your host PC using your 6-digit PIN to manage connected devices.</div>
+              <button onclick="openPairingModal()" class="primary-btn" style="padding: 8px 16px; font-size: 0.8rem; cursor: pointer; display: inline-flex;">🔑 Enter Pairing PIN</button>
+            </div>
+          `;
+        }
+        return;
+      }
       try {
-        const res = await fetch(`${backendUrl}/api/devices`);
+        const pairingToken = localStorage.getItem('ghost_pairing_token') || '';
+        const res = await fetch(`${backendUrl}/api/devices?device_id=${encodeURIComponent(myDeviceId)}`, {
+          headers: { 'x-pairing-token': pairingToken }
+        });
         const data = await res.json();
         if (data && data.success) {
           renderDevicesList(data);
@@ -2969,25 +3224,28 @@
     }
 
     async function checkAutoTunnelGateway() {
-      try {
-        const res = await fetch('/api/tunnel_info');
-        const data = await res.json();
-        if (data && data.tunnel_url) {
-          if (!backendUrl || backendUrl.includes('trycloudflare') || backendUrl.includes('localhost')) {
-            backendUrl = data.tunnel_url;
-            localStorage.setItem('ghost_backend_url', backendUrl);
-            const input = document.getElementById('backend-url-input');
-            if (input) input.value = backendUrl;
+      // Only query local PC tunnel_info when loaded directly on PC
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.startsWith('192.168.')) {
+        try {
+          const res = await fetch('/api/tunnel_info');
+          const data = await res.json();
+          if (data && data.tunnel_url) {
+            if (!backendUrl || backendUrl.includes('trycloudflare')) {
+              backendUrl = data.tunnel_url;
+              localStorage.setItem('ghost_backend_url', backendUrl);
+              const input = document.getElementById('backend-url-input');
+              if (input) input.value = backendUrl;
+            }
           }
-        }
-      } catch (_) {}
+        } catch (_) {}
+      }
     }
 
     // Initialize application
-    window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('DOMContentLoaded', async () => {
+      await checkUrlPairing();
       checkAutoTunnelGateway();
       renderDeviceKeys();
-      checkUrlPairing();
       fetchTelemetry();
       setInterval(fetchTelemetry, 6000);
       pingDevicePresence();

@@ -93,14 +93,43 @@ class DevicePingRequest(BaseModel):
     device_id: str
     device_name: Optional[str] = "Mobile Device"
     user_agent: Optional[str] = ""
+    token: Optional[str] = None
 
 class DeviceActionRequest(BaseModel):
     device_id: str
+
+class VerifyTokenRequest(BaseModel):
+    token: str
+    device_id: str
+    device_name: Optional[str] = "Mobile Device"
+    user_agent: Optional[str] = ""
 
 # ==========================================
 # CONNECTED DEVICES & ACCESS CONTROL SYSTEM
 # ==========================================
 DEVICES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "devices.json")
+AUTH_TOKEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "pairing_token.txt")
+
+def get_or_create_pairing_token() -> str:
+    if os.path.exists(AUTH_TOKEN_FILE):
+        try:
+            with open(AUTH_TOKEN_FILE, "r", encoding="utf-8") as f:
+                t = f.read().strip()
+                if t:
+                    return t
+        except Exception:
+            pass
+    import random
+    new_t = f"{random.randint(100000, 999999)}"
+    try:
+        os.makedirs(os.path.dirname(AUTH_TOKEN_FILE), exist_ok=True)
+        with open(AUTH_TOKEN_FILE, "w", encoding="utf-8") as f:
+            f.write(new_t)
+    except Exception:
+        pass
+    return new_t
+
+PAIRING_TOKEN = get_or_create_pairing_token()
 
 def load_devices() -> dict:
     if os.path.exists(DEVICES_FILE):
@@ -130,6 +159,24 @@ def get_client_ip(request: Request) -> str:
         return request.client.host
     return "Unknown"
 
+def is_device_authorized(device_id: Optional[str] = None, token: Optional[str] = None, client_ip: Optional[str] = None) -> bool:
+    # 1. Local requests directly from the PC are always authorized
+    if client_ip in ("127.0.0.1", "::1", "localhost", "Unknown"):
+        return True
+    
+    # 2. Token match
+    if token and token.strip() == PAIRING_TOKEN:
+        return True
+        
+    # 3. Known and authenticated device in devices.json
+    if device_id:
+        devices = load_devices()
+        dev = devices.get(device_id)
+        if dev and not dev.get("is_blocked", False) and dev.get("is_authenticated", False):
+            return True
+
+    return False
+
 def check_device_allowed(device_id: Optional[str] = None) -> bool:
     if not device_id:
         return True
@@ -139,16 +186,58 @@ def check_device_allowed(device_id: Optional[str] = None) -> bool:
         return False
     return True
 
+@app.get("/api/auth/info")
+async def get_auth_info(request: Request):
+    """Returns pairing token for the host PC display."""
+    return {
+        "pairing_token": PAIRING_TOKEN,
+        "gateway_url": "https://backpack-vanity-poser.ngrok-free.dev"
+    }
+
+@app.post("/api/auth/verify")
+async def verify_pairing(req: VerifyTokenRequest, request: Request):
+    """Verifies a pairing PIN/token entered by a new phone or client."""
+    if req.token.strip() == PAIRING_TOKEN:
+        devices = load_devices()
+        dev_id = req.device_id.strip()
+        client_ip = get_client_ip(request)
+        ua = req.user_agent or request.headers.get("user-agent", "")
+        now_ts = time.time()
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        devices[dev_id] = {
+            "device_id": dev_id,
+            "device_name": req.device_name or "Paired Device",
+            "ip": client_ip,
+            "user_agent": ua,
+            "first_seen": now_str,
+            "last_seen": now_ts,
+            "is_blocked": False,
+            "is_authenticated": True
+        }
+        save_devices(devices)
+        logger.info(f"New client authenticated successfully: {dev_id} ({req.device_name})")
+        return {"success": True, "message": "Paired successfully."}
+    return {"success": False, "message": "Invalid pairing PIN or token."}
+
 @app.post("/api/devices/ping")
 async def ping_device(req: DevicePingRequest, request: Request):
     dev_id = req.device_id.strip()
+    client_ip = get_client_ip(request)
+
+    if not is_device_authorized(dev_id, req.token, client_ip):
+        return {
+            "allowed": False,
+            "status": "unauthorized",
+            "message": "Device not paired. Pairing token required."
+        }
+    
     if not dev_id:
         return {"allowed": True, "status": "ok"}
     
     devices = load_devices()
     now_ts = time.time()
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    client_ip = get_client_ip(request)
     ua = req.user_agent or request.headers.get("user-agent", "")
 
     if dev_id in devices and devices[dev_id].get("is_blocked"):
@@ -166,11 +255,13 @@ async def ping_device(req: DevicePingRequest, request: Request):
             "user_agent": ua,
             "first_seen": now_str,
             "last_seen": now_ts,
-            "is_blocked": False
+            "is_blocked": False,
+            "is_authenticated": True
         }
     else:
         devices[dev_id]["last_seen"] = now_ts
         devices[dev_id]["ip"] = client_ip
+        devices[dev_id]["is_authenticated"] = True
         if req.device_name:
             devices[dev_id]["device_name"] = req.device_name
         if ua:
@@ -180,7 +271,12 @@ async def ping_device(req: DevicePingRequest, request: Request):
     return {"allowed": True, "status": "online", "device_id": dev_id}
 
 @app.get("/api/devices")
-async def get_devices():
+async def get_devices(request: Request, device_id: Optional[str] = None, token: Optional[str] = None):
+    client_ip = get_client_ip(request)
+    req_token = token or request.headers.get("x-pairing-token")
+    if not is_device_authorized(device_id, req_token, client_ip):
+        raise HTTPException(status_code=401, detail="Unauthorized. Pairing token required.")
+
     devices = load_devices()
     now_ts = time.time()
     device_list = []
@@ -190,7 +286,6 @@ async def get_devices():
     for dev_id, info in devices.items():
         last_seen = info.get("last_seen", 0)
         is_blocked = info.get("is_blocked", False)
-        # Device is considered currently online if pinged within last 35 seconds
         is_online = (now_ts - last_seen < 35) and not is_blocked
         if is_online:
             online_count += 1
@@ -208,7 +303,6 @@ async def get_devices():
             "is_blocked": is_blocked
         })
 
-    # Sort: online first, then by last seen
     device_list.sort(key=lambda x: (x["is_blocked"], not x["is_online"], x["last_seen_seconds_ago"]))
 
     return {
@@ -281,9 +375,13 @@ async def serve_home():
 COMMAND_TIMEOUT_SECONDS = 30
 
 @app.post("/api/command")
-async def execute_command(req: CommandRequest):
+async def execute_command(req: CommandRequest, request: Request):
     """Runs the (blocking) command pipeline in a worker thread so a slow or hung
     PC action can never freeze the server's event loop."""
+    client_ip = get_client_ip(request)
+    req_token = request.headers.get("x-pairing-token")
+    if not is_device_authorized(req.device_id, req_token, client_ip):
+        raise HTTPException(status_code=401, detail="Unauthorized. Device pairing required.")
     if req.device_id and not check_device_allowed(req.device_id):
         raise HTTPException(status_code=403, detail="Device access has been revoked.")
     text = req.text.strip()
@@ -364,7 +462,11 @@ def update_settings(req: SettingsRequest):
     return {"success": True, "message": "Settings updated successfully."}
 
 @app.get("/api/status")
-async def get_status():
+async def get_status(request: Request, device_id: Optional[str] = None, token: Optional[str] = None):
+    client_ip = get_client_ip(request)
+    req_token = token or request.headers.get("x-pairing-token")
+    if not is_device_authorized(device_id, req_token, client_ip):
+        return {"status": "unpaired", "cpu": 0, "ram": 0, "battery": None}
     try:
         cpu = psutil.cpu_percent(interval=None)
         ram = psutil.virtual_memory().percent
@@ -468,12 +570,32 @@ def generate_screen_mjpeg_stream():
         bmi.biBitCount = 24
         bmi.biCompression = 0
 
+        class CURSORINFO(ctypes.Structure):
+            _fields_ = [
+                ("cbSize", ctypes.c_uint32),
+                ("flags", ctypes.c_uint32),
+                ("hCursor", ctypes.c_void_p),
+                ("ptScreenPos", POINT)
+            ]
+
+        ci = CURSORINFO()
+        ci.cbSize = ctypes.sizeof(CURSORINFO)
         raw_buf = (ctypes.c_char * (target_w * target_h * 3))()
         pt = POINT()
 
         while True:
             # Hardware StretchBlt scale directly in GDI driver
             gdi32.StretchBlt(mem_dc, 0, 0, target_w, target_h, src_dc, 0, 0, sw, sh, 0x00CC0020)
+
+            # Render real Windows hardware mouse cursor directly onto frame
+            try:
+                if user32.GetCursorInfo(ctypes.byref(ci)) and (ci.flags & 1) and ci.hCursor:
+                    cur_x = int(ci.ptScreenPos.x * target_w / sw)
+                    cur_y = int(ci.ptScreenPos.y * target_h / sh)
+                    user32.DrawIconEx(mem_dc, cur_x, cur_y, ci.hCursor, 0, 0, 0, None, 3)
+            except Exception:
+                pass
+
             gdi32.GetDIBits(mem_dc, bmp, 0, target_h, ctypes.byref(raw_buf), ctypes.byref(bmi), 0)
 
             frame = np.frombuffer(raw_buf, dtype=np.uint8).reshape((target_h, target_w, 3)).copy()
@@ -609,9 +731,10 @@ async def websocket_mouse_endpoint(websocket: WebSocket):
     await websocket.accept()
     agent = get_computer_agent()
 
-    # Instantly align pulse cursor upon connection
+    # Instantly align pulse cursor upon connection & send exact screen resolution
     try:
         _, _, init_x, init_y = agent.get_cursor_pos()
+        await websocket.send_text(f"res:{agent.screen_width},{agent.screen_height}")
         await websocket.send_text(f"p:{init_x},{init_y}")
     except Exception:
         pass
@@ -633,6 +756,19 @@ async def websocket_mouse_endpoint(websocket: WebSocket):
                         coords = agent.move_rel(int(parts[0]), int(parts[1]))
                         if coords:
                             await websocket.send_text(f"p:{coords[0]},{coords[1]}")
+                    except ValueError:
+                        pass
+            elif msg.startswith("a:"):
+                # "a:pctX,pctY" format for direct screen touch / absolute position
+                parts = msg[2:].split(",")
+                if len(parts) == 2:
+                    try:
+                        px = float(parts[0])
+                        py = float(parts[1])
+                        abs_x = int((px / 100.0) * agent.screen_width)
+                        abs_y = int((py / 100.0) * agent.screen_height)
+                        agent.move_to(abs_x, abs_y)
+                        await websocket.send_text(f"p:{px:.2f},{py:.2f}")
                     except ValueError:
                         pass
             elif msg.startswith("c:"):
