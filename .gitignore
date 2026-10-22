@@ -37,3 +37,6 @@ cert.pem
 cloudflared.exe
 *.log
 cf.log
+
+scratch/
+

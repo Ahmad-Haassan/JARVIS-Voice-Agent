@@ -1854,6 +1854,10 @@
     </div>
   </div>
 
+  <!-- Firebase Cloud Realtime Engine -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
   <!-- Sound FX Engine & Client Logic -->
   <script>
     // Bypass Ngrok free interstitial warning transparently on all API fetch requests
@@ -1872,6 +1876,202 @@
     // ==========================================
     // AUDIO SYNTHESIZER (WEB AUDIO API)
     // ==========================================
+
+    // ==========================================
+    // GHOST FIREBASE CLOUD REALTIME BRIDGE
+    // Worldwide 4G/5G zero-config connection
+    // ==========================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyA4CofS-VIVICJHfrKZVdZLSHsbe6RFDoM",
+      authDomain: "jarvis-remote-8bf6a.firebaseapp.com",
+      databaseURL: "https://jarvis-remote-8bf6a-default-rtdb.firebaseio.com",
+      projectId: "jarvis-remote-8bf6a",
+      storageBucket: "jarvis-remote-8bf6a.firebasestorage.app",
+      messagingSenderId: "414852575278",
+      appId: "1:414852575278:web:e3c9fc900839c8c6a3afbf"
+    };
+
+    let fbDb = null;
+    let isCloudActive = false;
+    let pcOnlineStatus = false;
+    let hostPcInfo = {};
+
+    try {
+      if (typeof firebase !== 'undefined') {
+        firebase.initializeApp(firebaseConfig);
+        fbDb = firebase.database();
+        isCloudActive = true;
+        console.log('[+] Firebase Cloud Realtime Bridge initialized.');
+      }
+    } catch (e) {
+      console.warn('Firebase init:', e);
+    }
+
+    function sendCloudCommand(action, data = {}) {
+      if (!fbDb) return Promise.reject(new Error("Cloud bridge not initialized"));
+      const cmdId = 'cmd_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+      const payload = {
+        action: action,
+        device_id: (typeof myDeviceId !== 'undefined' ? myDeviceId : 'NODE-REMOTE'),
+        device_name: (typeof myDeviceName !== 'undefined' ? myDeviceName : 'Remote Device'),
+        token: localStorage.getItem('ghost_pairing_token') || '',
+        timestamp: Date.now(),
+        ...data
+      };
+
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          try { fbDb.ref(`ghost_bridge/responses/${cmdId}`).off(); } catch (_) {}
+          resolve({ success: true, response: "Command sent to PC via Cloud Bridge." });
+        }, 12000);
+
+        fbDb.ref(`ghost_bridge/responses/${cmdId}`).on('value', (snap) => {
+          const res = snap.val();
+          if (res) {
+            clearTimeout(timer);
+            try { fbDb.ref(`ghost_bridge/responses/${cmdId}`).off(); } catch (_) {}
+            snap.ref.remove();
+            if (res.blocked) {
+              if (typeof showRevokedLockout === 'function') showRevokedLockout();
+              reject(new Error("Access Revoked"));
+            } else {
+              resolve(res);
+            }
+          }
+        });
+
+        fbDb.ref(`ghost_bridge/commands/${cmdId}`).set(payload).catch((err) => {
+          clearTimeout(timer);
+          reject(err);
+        });
+      });
+    }
+
+    let _pendingDx = 0, _pendingDy = 0, _cloudMouseTimer = null;
+    function throttleCloudMouse(dx, dy) {
+      _pendingDx += dx;
+      _pendingDy += dy;
+      if (!_cloudMouseTimer) {
+        _cloudMouseTimer = setTimeout(() => {
+          const sendDx = _pendingDx;
+          const sendDy = _pendingDy;
+          _pendingDx = 0;
+          _pendingDy = 0;
+          _cloudMouseTimer = null;
+          if (fbDb && (sendDx !== 0 || sendDy !== 0)) {
+            sendCloudCommand('mouse_move', { dx: sendDx, dy: sendDy }).catch(() => {});
+          }
+        }, 45);
+      }
+    }
+
+    function initCloudBridgeListeners() {
+      if (!fbDb) return;
+
+      // 1. Live PC Status and Telemetry
+      fbDb.ref('ghost_bridge/status').on('value', (snap) => {
+        const s = snap.val();
+        if (!s) return;
+        hostPcInfo = s;
+        const nowSec = Date.now() / 1000;
+        const isRecent = (nowSec - s.last_seen < 20);
+        pcOnlineStatus = s.online && isRecent;
+
+        const banner = document.getElementById('unpaired-alert-banner');
+        const dot = document.getElementById('global-status-dot');
+        const txt = document.getElementById('global-status-text');
+
+        if (pcOnlineStatus) {
+          if (banner) banner.style.display = 'none';
+          if (dot) dot.style.background = 'var(--emerald)';
+          if (txt) txt.innerText = `ONLINE // ${s.pc_name || 'PC'} (Cloud Bridge)`;
+
+          const cpuEl = document.getElementById('tel-cpu');
+          const barCpu = document.getElementById('bar-cpu');
+          if (cpuEl) cpuEl.innerText = `${Math.round(s.cpu || 0)}%`;
+          if (barCpu) barCpu.style.width = `${Math.min(s.cpu || 5, 100)}%`;
+
+          const ramEl = document.getElementById('tel-ram');
+          const barRam = document.getElementById('bar-ram');
+          if (ramEl) ramEl.innerText = `${Math.round(s.ram || 0)}%`;
+          if (barRam) barRam.style.width = `${Math.min(s.ram || 15, 100)}%`;
+
+          const batEl = document.getElementById('tel-bat');
+          if (batEl) batEl.innerText = (s.battery !== null && s.battery !== undefined) ? `${s.battery}%` : 'Plugged';
+        } else {
+          if (dot) dot.style.background = '#eab308';
+          if (txt) txt.innerText = `STANDBY // ${s.pc_name || 'PC'} Offline / Sleep`;
+          const cpuEl = document.getElementById('tel-cpu');
+          const barCpu = document.getElementById('bar-cpu');
+          if (cpuEl) cpuEl.innerText = '--';
+          if (barCpu) barCpu.style.width = '0%';
+          const ramEl = document.getElementById('tel-ram');
+          const barRam = document.getElementById('bar-ram');
+          if (ramEl) ramEl.innerText = '--';
+          if (barRam) barRam.style.width = '0%';
+          const batEl = document.getElementById('tel-bat');
+          if (batEl) batEl.innerText = '--';
+        }
+
+        if (s.pairing_pin) {
+          const pinEl = document.getElementById('display-master-pin');
+          if (pinEl && (!localStorage.getItem('ghost_pairing_token') || !pinEl.innerText)) {
+            pinEl.innerText = s.pairing_pin;
+          }
+        }
+      });
+
+      // 2. Live Screen Mirror
+      fbDb.ref('ghost_bridge/screen').on('value', (snap) => {
+        const scr = snap.val();
+        if (scr && scr.image) {
+          const img = document.getElementById('screen-stream-img');
+          if (img) img.src = scr.image;
+        }
+      });
+
+      // 3. Live Devices Sync
+      fbDb.ref('ghost_bridge/devices').on('value', (snap) => {
+        const rawDevs = snap.val() || {};
+        const devList = [];
+        const nowSec = Date.now() / 1000;
+        let connected = 0, blocked = 0;
+
+        for (const [did, dinfo] of Object.entries(rawDevs)) {
+          const dname = dinfo.device_name || '';
+          if (dname.includes('Windows') || dname.includes('Mac')) {
+            continue; // Skip host PC from remote devices grid
+          }
+          const lastSeen = dinfo.last_seen || 0;
+          const isBlk = dinfo.is_blocked || false;
+          const isOnline = (nowSec - lastSeen < 40) && !isBlk;
+          if (isOnline) connected++;
+          if (isBlk) blocked++;
+
+          devList.push({
+            device_id: did,
+            device_name: dinfo.device_name || 'Remote Device',
+            ip: dinfo.ip || 'Cloud',
+            user_agent: dinfo.user_agent || '',
+            first_seen: dinfo.first_seen || 'Today',
+            last_seen_seconds_ago: Math.max(0, Math.round(nowSec - lastSeen)),
+            is_online: isOnline,
+            is_blocked: isBlk
+          });
+        }
+
+        if (typeof renderDevicesList === 'function') {
+          renderDevicesList({
+            success: true,
+            total_connected: connected,
+            total_registered: devList.length,
+            total_blocked: blocked,
+            devices: devList
+          });
+        }
+      });
+    }
+
     let audioCtx = null;
     let soundEnabled = true;
 
@@ -2049,11 +2249,14 @@
       const devEl = document.getElementById('display-device-id');
       if (devEl) devEl.innerText = myDeviceId;
 
-      // When building the QR link, use the public web URL + gateway + PIN
+      // Build QR Code for one-scan instant pairing
+      if (hostPcInfo && hostPcInfo.pairing_pin) {
+        masterPin = hostPcInfo.pairing_pin;
+      }
       const webOrigin = (window.location.origin && !window.location.origin.includes('localhost') && !window.location.origin.includes('127.0.0.1'))
         ? window.location.origin
-        : gatewayUrl;
-      const pairUrl = `${webOrigin}/?gateway=${encodeURIComponent(gatewayUrl)}&token=${encodeURIComponent(masterPin)}`;
+        : 'https://jarvis-remote.vercel.app';
+      const pairUrl = `${webOrigin}/?token=${encodeURIComponent(masterPin)}&pair=true`;
       drawStylizedQR(pairUrl);
     }
 
@@ -2281,32 +2484,43 @@
       addLogLine('CMD', `Sent command: "${text}"`);
 
       try {
+        let data = null;
         const pairingToken = localStorage.getItem('ghost_pairing_token') || '';
-        const res = await fetch(`${backendUrl}/api/command`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-pairing-token': pairingToken
-          },
-          body: JSON.stringify({ text: text, device_id: myDeviceId })
-        });
 
-        if (res.status === 403) {
-          showRevokedLockout();
-          respBox.innerText = 'ACCESS REVOKED: This device has been disconnected by administrator.';
-          return;
+        // If Cloud Bridge is active, execute via Firebase real-time bridge
+        if (fbDb && pcOnlineStatus) {
+          data = await sendCloudCommand('command', { text: text });
+        } else if (backendUrl) {
+          const res = await fetch(`${backendUrl}/api/command`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-pairing-token': pairingToken
+            },
+            body: JSON.stringify({ text: text, device_id: myDeviceId })
+          });
+
+          if (res.status === 403) {
+            showRevokedLockout();
+            respBox.innerText = 'ACCESS REVOKED: This device has been disconnected by administrator.';
+            return;
+          }
+          data = await res.json();
+        } else if (fbDb) {
+          data = await sendCloudCommand('command', { text: text });
         }
 
-        const data = await res.json();
-        soundConfirm();
-        const respText = data.response || (data.success ? 'Command executed successfully.' : 'No output response.');
-        respBox.innerText = respText;
-        timeBox.innerText = new Date().toLocaleTimeString();
-        document.getElementById('orb-status-text').innerText = 'COMMAND COMPLETED';
-        addLogLine('EXEC', respText, data.success ? 'success' : 'warn');
+        if (data) {
+          soundConfirm();
+          const respText = data.response || (data.success ? 'Command executed successfully.' : 'No output response.');
+          respBox.innerText = respText;
+          timeBox.innerText = new Date().toLocaleTimeString();
+          document.getElementById('orb-status-text').innerText = 'COMMAND COMPLETED';
+          addLogLine('EXEC', respText, data.success ? 'success' : 'warn');
 
-        if (data.screenshot_url) {
-          refreshLiveStream();
+          if (data.screenshot_url || data.screenshot_ready) {
+            refreshLiveStream();
+          }
         }
       } catch (err) {
         soundAlert();
@@ -2715,12 +2929,15 @@
         mouseWs.send(`m:${dx},${dy}`);
         return;
       }
-      // HTTP Fallback
-      fetch(`${backendUrl}/api/mouse/move`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dx: dx, dy: dy, device_id: myDeviceId })
-      }).then(r => { if (r.status === 403) showRevokedLockout(); }).catch(() => {});
+      if (backendUrl && !backendUrl.includes('trycloudflare') && !backendUrl.includes('loca.lt')) {
+        fetch(`${backendUrl}/api/mouse/move`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dx: dx, dy: dy, device_id: myDeviceId })
+        }).then(r => { if (r.status === 403) showRevokedLockout(); }).catch(() => {});
+        return;
+      }
+      throttleCloudMouse(dx, dy);
     }
 
     function sendMouseClick(btn) {
@@ -2731,11 +2948,16 @@
         mouseWs.send(`c:${btn}`);
         return;
       }
-      fetch(`${backendUrl}/api/mouse/click`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ button: btn, clicks: (btn === 'double' ? 2 : 1), device_id: myDeviceId })
-      }).then(r => { if (r.status === 403) showRevokedLockout(); }).catch(() => {});
+      if (backendUrl) {
+        fetch(`${backendUrl}/api/mouse/click`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ button: btn, clicks: (btn === 'double' ? 2 : 1), device_id: myDeviceId })
+        }).then(r => { if (r.status === 403) showRevokedLockout(); }).catch(() => {});
+      }
+      if (fbDb) {
+        sendCloudCommand('mouse_click', { button: btn, clicks: (btn === 'double' ? 2 : 1) }).catch(() => {});
+      }
     }
 
     function sendMouseScroll(amt) {
@@ -2744,14 +2966,19 @@
         showToast(amt > 0 ? "▲ Scrolled Up" : "▼ Scrolled Down");
         return;
       }
-      fetch(`${backendUrl}/api/mouse/scroll`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: amt, device_id: myDeviceId })
-      }).then(r => {
-        if (r.status === 403) showRevokedLockout();
-        else showToast(amt > 0 ? "▲ Scrolled Up" : "▼ Scrolled Down");
-      }).catch(() => {});
+      if (backendUrl) {
+        fetch(`${backendUrl}/api/mouse/scroll`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: amt, device_id: myDeviceId })
+        }).then(r => {
+          if (r.status === 403) showRevokedLockout();
+          else showToast(amt > 0 ? "▲ Scrolled Up" : "▼ Scrolled Down");
+        }).catch(() => {});
+      }
+      if (fbDb) {
+        sendCloudCommand('mouse_scroll', { amount: amt }).catch(() => {});
+      }
     }
 
     async function promptRemoteType() {
@@ -2851,6 +3078,9 @@
     // SCREEN STREAM & LIVE MIRROR
     // ==========================================
     function refreshLiveStream() {
+      if (fbDb) {
+        sendCloudCommand('screenshot_req').catch(() => {});
+      }
       startScreenStream();
       showToast('🔄 Desktop 1080p stream refreshed');
     }
@@ -3050,6 +3280,9 @@
     const myDeviceName = getClientDeviceName();
 
     async function pingDevicePresence() {
+      if (myDeviceName.includes('Windows') || myDeviceName.includes('Mac')) {
+        return; // Do not register host PC as a remote mobile client
+      }
       if (!backendUrl) return;
       const pairingToken = localStorage.getItem('ghost_pairing_token') || '';
       try {
@@ -3199,17 +3432,10 @@
             </div>
 
             <div style="margin-top: auto; padding-top: 8px;">
-              ${!isBlocked ? `
-                <button onclick="revokeDeviceAccess('${dev.device_id}', '${dev.device_name}')" style="width: 100%; padding: 8px 12px; border-radius: 10px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5; font-size: 0.76rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s ease;">
-                  <svg style="width: 14px; height: 14px; fill: currentColor;" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-                  Delete / Revoke Access
-                </button>
-              ` : `
-                <button onclick="unblockDeviceAccess('${dev.device_id}')" style="width: 100%; padding: 8px 12px; border-radius: 10px; background: rgba(0, 245, 212, 0.12); border: 1px solid rgba(0, 245, 212, 0.35); color: var(--cyan); font-size: 0.76rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s ease;">
-                  <svg style="width: 14px; height: 14px; fill: currentColor;" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
-                  Restore Access
-                </button>
-              `}
+              <button onclick="deleteDeviceAccess('${dev.device_id}', '${dev.device_name}')" style="width: 100%; padding: 8px 12px; border-radius: 10px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s ease;">
+                <svg style="width: 14px; height: 14px; fill: currentColor;" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                Delete Device
+              </button>
             </div>
 
           </div>
@@ -3219,48 +3445,37 @@
       grid.innerHTML = html;
     }
 
-    async function revokeDeviceAccess(devId, devName) {
+    async function deleteDeviceAccess(devId, devName) {
       soundAlert();
-      const ok = confirm(`REVOKE DEVICE ACCESS:\n\nAre you sure you want to delete and block "${devName}" (${devId})?\n\nThis device will be immediately kicked off and cannot send commands to your PC.`);
+      const ok = confirm(`DELETE DEVICE:\n\nAre you sure you want to delete "${devName}" (${devId})?\n\nThis device will be completely disconnected.`);
       if (!ok) return;
 
       try {
-        const res = await fetch(`${backendUrl}/api/devices/delete`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ device_id: devId })
-        });
-        const d = await res.json();
-        if (d.success) {
-          soundConfirm();
-          showToast(`🚫 Revoked access for ${devName}`);
-          addLogLine('SECURITY', `Device ${devId} (${devName}) was revoked and blocked.`, 'warn');
-          refreshDevicesList();
-          if (devId === myDeviceId) {
-            showRevokedLockout();
-          }
+        if (fbDb) {
+          fbDb.ref(`ghost_bridge/devices/${devId}`).remove();
+          fbDb.ref('ghost_bridge/device_actions').push({
+            action: 'delete',
+            device_id: devId,
+            timestamp: Date.now()
+          });
+        }
+        if (backendUrl) {
+          fetch(`${backendUrl}/api/devices/delete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ device_id: devId })
+          }).catch(() => {});
+        }
+        soundConfirm();
+        showToast(`🗑️ Deleted device: ${devName}`);
+        addLogLine('SECURITY', `Device ${devId} (${devName}) was deleted.`, 'warn');
+        if (typeof refreshDevicesList === 'function') refreshDevicesList();
+        if (devId === myDeviceId) {
+          localStorage.removeItem('ghost_pairing_token');
+          location.reload();
         }
       } catch (err) {
-        showToast(`Error revoking device: ${err}`);
-      }
-    }
-
-    async function unblockDeviceAccess(devId) {
-      soundConfirm();
-      try {
-        const res = await fetch(`${backendUrl}/api/devices/unblock`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ device_id: devId })
-        });
-        const d = await res.json();
-        if (d.success) {
-          showToast(`✅ Device ${devId} unblocked.`);
-          addLogLine('SECURITY', `Device ${devId} access was restored.`, 'success');
-          refreshDevicesList();
-        }
-      } catch (err) {
-        showToast(`Error unblocking device: ${err}`);
+        showToast(`Error deleting device: ${err}`);
       }
     }
 
@@ -3284,6 +3499,9 @@
 
     // Initialize application
     window.addEventListener('DOMContentLoaded', async () => {
+      if (typeof initCloudBridgeListeners === 'function') {
+        initCloudBridgeListeners();
+      }
       await checkUrlPairing();
       checkAutoTunnelGateway();
       renderDeviceKeys();

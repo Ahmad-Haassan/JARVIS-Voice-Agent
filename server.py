@@ -62,6 +62,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+def startup_event():
+    try:
+        from core.bridge.firebase_bridge import get_firebase_bridge
+        get_firebase_bridge().start()
+        logger.info("[*] GHOST Firebase Cloud Bridge initiated on server startup.")
+    except Exception as e:
+        logger.warning(f"Failed to start Firebase Cloud Bridge: {e}")
+
+@app.on_event("shutdown")
+def shutdown_event():
+    try:
+        from core.bridge.firebase_bridge import get_firebase_bridge
+        get_firebase_bridge().stop()
+    except Exception:
+        pass
+
 class CommandRequest(BaseModel):
     text: str
     device_id: Optional[str] = None
@@ -318,11 +335,10 @@ async def delete_device(req: DeviceActionRequest):
     dev_id = req.device_id.strip()
     devices = load_devices()
     if dev_id in devices:
-        devices[dev_id]["is_blocked"] = True
-        devices[dev_id]["blocked_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        del devices[dev_id]
         save_devices(devices)
-        logger.warning(f"Device revoked & blocked: {dev_id} ({devices[dev_id].get('device_name')})")
-        return {"success": True, "message": f"Device access revoked and disconnected."}
+        logger.info(f"Device completely deleted: {dev_id}")
+        return {"success": True, "message": f"Device deleted."}
     return {"success": False, "message": "Device not found."}
 
 @app.post("/api/devices/unblock")
