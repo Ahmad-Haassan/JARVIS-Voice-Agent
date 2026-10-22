@@ -1778,6 +1778,11 @@
       <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--danger); padding: 8px 16px; border-radius: 8px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3);" id="revoked-dev-id-tag">
         NODE ID: GHOST-REVOKED
       </div>
+      <div style="margin-top: 20px; display: flex; gap: 12px;">
+        <button onclick="document.getElementById('revoked-lockout-shield').style.display='none'; localStorage.clear(); location.reload();" class="primary-btn" style="padding: 10px 22px; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+          🔄 Reset Credentials & Re-pair
+        </button>
+      </div>
     </div>
 
     <!-- Footer -->
@@ -2148,10 +2153,13 @@
           });
           const d = await res.json();
           if (d && d.success) {
+            const shield = document.getElementById('revoked-lockout-shield');
+            if (shield) shield.style.display = 'none';
             showToast('✅ Device paired & verified with PC!');
             addLogLine('AUTH', `Device ${myDeviceId} verified and granted access.`, 'success');
             fetchTelemetry();
             refreshDevicesList();
+            connectMouseWs();
           } else {
             showToast('❌ Invalid pairing PIN.');
           }
@@ -2973,14 +2981,20 @@
 
     function saveGatewaySettings() {
       const val = document.getElementById('backend-url-input').value.trim();
+      const pinInput = document.getElementById('device-pin-input');
+      const pin = pinInput ? pinInput.value.trim() : '';
       if (val) {
         backendUrl = val.replace(/\/$/, '');
         localStorage.setItem('ghost_backend_url', backendUrl);
-        renderDeviceKeys();
-        soundConfirm();
-        showToast('✅ Gateway URL Updated');
-        fetchTelemetry();
       }
+      if (pin) {
+        localStorage.setItem('ghost_pairing_token', pin);
+      }
+      renderDeviceKeys();
+      soundConfirm();
+      showToast('✅ Gateway & Credentials Updated');
+      fetchTelemetry();
+      pingDevicePresence();
       closeGatewayModal();
     }
 
